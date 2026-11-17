@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
 import { dashboard } from './test/fixtures'
@@ -109,5 +109,15 @@ describe('escolha entre interface gráfica e CLI', () => {
     expect(await screen.findByLabelText(/Senha do administrador/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Interface gráfica' }))
     expect(await screen.findByLabelText('Senha')).toBeInTheDocument()
+  })
+})
+
+describe('celular', () => {
+  it('avisa que celulares não são suportados', () => {
+    const ua = vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile')
+    mockFetch({ 'GET /api/session': { status: 401, json: { code: 'unauthorized', message: 'x' } } })
+    renderWithProviders(<App />)
+    expect(screen.getByRole('heading', { name: 'Celular não suportado' })).toBeInTheDocument()
+    ua.mockRestore()
   })
 })

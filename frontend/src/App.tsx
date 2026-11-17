@@ -11,6 +11,7 @@ import { History } from './pages/History'
 import { Layout } from './pages/Layout'
 import { Login } from './pages/Login'
 import { ModeChooser } from './pages/ModeChooser'
+import { MobileNotice, isMobileDevice } from './pages/MobileNotice'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { Projects } from './pages/Projects'
 import { Schedules } from './pages/Schedules'
@@ -45,6 +46,7 @@ export function App() {
     queryClient.setQueryData(['session'], null)
   }
 
+  if (isMobileDevice()) return <MobileNotice />
   if (session.isPending) return null
   const authenticated = Boolean(session.data)
   // A escolha vem antes do login; com sessão e sem escolha, vale a interface gráfica.
