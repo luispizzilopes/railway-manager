@@ -1,1 +1,18 @@
 .env
+.env.*
+!.env.example
+
+# Rust
+target/
+
+# Frontend
+node_modules/
+dist/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Logs locais
+*.log

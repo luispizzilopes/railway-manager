@@ -1,0 +1,12 @@
+query Deployment($id: String!) {
+  deployment(id: $id) {
+    ...DeploymentFields
+  }
+}
+
+fragment DeploymentFields on Deployment {
+  id
+  status
+  canRedeploy
+  deploymentStopped
+}

@@ -1,4 +1,15 @@
 .git
 .gitignore
 README.md
-Dockerfile
+.env
+.env.*
+!.env.example
+**/target/
+**/node_modules/
+**/dist/
+*.db
+*.db-shm
+*.db-wal
+openspec
+docs
+.claude

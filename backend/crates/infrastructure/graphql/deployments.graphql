@@ -1,0 +1,18 @@
+query Deployments($input: DeploymentListInput!, $first: Int!) {
+  deployments(input: $input, first: $first) {
+    edges {
+      node {
+        ...DeploymentFields
+        createdAt
+        meta
+      }
+    }
+  }
+}
+
+fragment DeploymentFields on Deployment {
+  id
+  status
+  canRedeploy
+  deploymentStopped
+}

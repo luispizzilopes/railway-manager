@@ -1,0 +1,18 @@
+query ProjectEnvironments($id: String!, $first: Int!, $after: String) {
+  project(id: $id) {
+    environments(first: $first, after: $after) {
+      edges {
+        node {
+          id
+          name
+          isEphemeral
+          deletedAt
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}

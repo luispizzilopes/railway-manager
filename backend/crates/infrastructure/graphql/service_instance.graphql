@@ -1,0 +1,25 @@
+query ServiceInstance($environmentId: String!, $serviceId: String!) {
+  serviceInstance(environmentId: $environmentId, serviceId: $serviceId) {
+    ...InstanceFields
+  }
+}
+
+fragment InstanceFields on ServiceInstance {
+  serviceId
+  serviceName
+  environmentId
+  deletedAt
+  latestDeployment {
+    ...DeploymentFields
+  }
+  activeDeployments {
+    ...DeploymentFields
+  }
+}
+
+fragment DeploymentFields on Deployment {
+  id
+  status
+  canRedeploy
+  deploymentStopped
+}

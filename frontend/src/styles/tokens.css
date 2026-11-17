@@ -1,0 +1,90 @@
+/* Tokens de design: painel escuro, superfícies grafite, bordas sutis e destaque verde. */
+
+:root {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: 'Source Code Pro', 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Superfícies */
+  --bg: #121212;
+  --bg-alt: #171717;
+  --surface: #1c1c1c;
+  --surface-2: #232323;
+  --surface-hover: #262626;
+  --overlay: #1f1f1f;
+  --control: #1f1f1f;
+
+  --border: #2e2e2e;
+  --border-muted: #262626;
+  --border-strong: #3e3e3e;
+  --border-control: #363636;
+
+  --text: #ededed;
+  --text-2: #a1a1a1;
+  --text-3: #707070;
+
+  /* Destaque (roxo) */
+  --brand: hsl(270 70% 65%);
+  --brand-strong: hsl(270 75% 72%);
+  --brand-fill: hsl(270 48% 32%);
+  --brand-fill-hover: hsl(270 52% 38%);
+  --brand-border: hsl(270 70% 65% / 0.45);
+  --brand-soft: hsl(270 70% 65% / 0.12);
+
+  /* Sucesso (verde) */
+  --success: #3ecf8e;
+  --success-border: rgb(62 207 142 / 0.35);
+  --success-soft: rgb(62 207 142 / 0.1);
+
+  --danger: #f56565;
+  --danger-fill: #541c15;
+  --danger-fill-hover: #6e2219;
+  --danger-border: rgb(245 101 101 / 0.4);
+  --danger-soft: rgb(245 101 101 / 0.08);
+
+  --warn: #f5a524;
+  --warn-border: rgb(245 165 36 / 0.4);
+  --warn-soft: rgb(245 165 36 / 0.08);
+
+  --info: #60a5fa;
+  --info-border: rgb(96 165 250 / 0.35);
+  --info-soft: rgb(96 165 250 / 0.08);
+
+  --pink: hsl(330 70% 68%);
+
+  /* Status */
+  --state-running: var(--success);
+  --state-stopped: #8f8f8f;
+  --state-sleeping: var(--info);
+  --state-transitioning: var(--warn);
+  --state-failed: var(--danger);
+  --state-approval: var(--pink);
+  --state-unknown: #707070;
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-2: 0 24px 48px -12px rgb(0 0 0 / 0.6);
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px hsl(270 70% 65% / 0.6);
+
+  color-scheme: dark;
+}

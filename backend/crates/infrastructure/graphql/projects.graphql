@@ -1,0 +1,17 @@
+query Projects($workspaceId: String, $first: Int!, $after: String) {
+  projects(workspaceId: $workspaceId, first: $first, after: $after, includeDeleted: false) {
+    edges {
+      node {
+        id
+        name
+        description
+        workspaceId
+        deletedAt
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

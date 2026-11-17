@@ -1,0 +1,12 @@
+mutation DeploymentRedeploy($id: String!) {
+  deploymentRedeploy(id: $id, usePreviousImageTag: true) {
+    ...DeploymentFields
+  }
+}
+
+fragment DeploymentFields on Deployment {
+  id
+  status
+  canRedeploy
+  deploymentStopped
+}

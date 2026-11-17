@@ -1,0 +1,43 @@
+[package]
+name = "railway-manager"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "railway_manager"
+path = "src/lib.rs"
+
+[[bin]]
+name = "railway-manager"
+path = "src/main.rs"
+
+[dependencies]
+api = { version = "0.1.0", path = "../api" }
+application = { version = "0.1.0", path = "../application" }
+argon2 = "0.6.0"
+axum = "0.8.9"
+base64 = "0.23.1"
+chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
+domain = { version = "0.1.0", path = "../domain" }
+infrastructure = { version = "0.1.0", path = "../infrastructure" }
+secrecy = "0.10.3"
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+application = { path = "../application", features = ["testkit"] }
+axum = "0.8.9"
+chrono = "0.4.45"
+serde_json = "1.0.154"
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio"] }
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["full", "test-util"] }
+tower = { version = "0.5.3", features = ["util"] }
+wiremock = "0.6.5"

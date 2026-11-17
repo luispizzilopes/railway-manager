@@ -1,0 +1,23 @@
+[package]
+name = "application"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+# Gateway falso do Railway para testes de outras crates.
+testkit = []
+
+[dependencies]
+async-trait = "0.1.92"
+chrono = { version = "0.4.45", default-features = false, features = ["std", "clock", "serde"] }
+domain = { version = "0.1.0", path = "../domain" }
+secrecy = "0.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["sync", "time", "rt", "macros"] }
+tracing = "0.1.44"
+uuid = { version = "1.29.2", features = ["v4"] }
+
+[lints]
+workspace = true
