@@ -221,6 +221,13 @@ export type AlertCode =
   | 'rate_limited'
   | 'project_not_found'
 
+export interface NextAction {
+  action: PowerKind
+  at: Iso
+  schedule_id: Uuid
+  schedule_name: string
+}
+
 export interface Dashboard {
   generated_at: Iso
   integration_ready: boolean
@@ -237,6 +244,7 @@ export interface Dashboard {
   projects: {
     project: Project
     environments: { environment: Environment; instances: InstanceCard[] }[]
+    next_action: NextAction | null
   }[]
   recent_operations: OperationSummary[]
   alerts: { code: AlertCode; message: string }[]
@@ -278,11 +286,15 @@ export interface OperationDetail {
   done: boolean
 }
 
+export type OperationTrigger = 'manual' | 'schedule'
+
 export interface HistoryEntry {
   item: OperationItem
   kind: PowerKind
   scope: OperationScope
   requested_by: string
+  trigger: OperationTrigger
+  schedule_name: string | null
   operation_status: OperationStatus
   created_at: Iso
 }
@@ -300,7 +312,67 @@ export interface HistoryFilters {
   environment?: string
   kind?: string
   result?: string
+  trigger?: string
   from?: string
   to?: string
   page?: number
+}
+
+export interface ScheduleWindow {
+  start: string
+  end: string
+}
+
+export type ScheduleTarget =
+  | { type: 'project'; environment_id: Uuid | null }
+  | { type: 'instances'; instance_ids: Uuid[] }
+
+export interface Schedule {
+  id: Uuid
+  project_id: Uuid
+  name: string
+  enabled: boolean
+  timezone: string
+  /** 0 = segunda … 6 = domingo */
+  days: number[]
+  windows: ScheduleWindow[]
+  target: ScheduleTarget
+  paused_reason: string | null
+  created_at: Iso
+  updated_at: Iso
+}
+
+export interface Occurrence {
+  at: Iso
+  action: PowerKind
+  window: number
+}
+
+export interface ScheduleView {
+  schedule: Schedule
+  next_runs: Occurrence[]
+  warnings: string[]
+}
+
+export type RunStatus = 'pending' | 'executed' | 'late' | 'skipped' | 'missed' | 'failed'
+
+export interface ScheduleRun {
+  id: Uuid
+  schedule_id: Uuid
+  schedule_name: string
+  action: PowerKind
+  scheduled_for: Iso
+  processed_at: Iso
+  status: RunStatus
+  operation_id: Uuid | null
+  message: string | null
+}
+
+export interface ScheduleInput {
+  project_id?: Uuid
+  name: string
+  timezone: string
+  days: number[]
+  windows: ScheduleWindow[]
+  target: ScheduleTarget
 }

@@ -16,3 +16,4 @@ dist/
 
 # Logs locais
 *.log
+*.bak

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::{
     OperationId, OperationItemId, PlanId, ProjectId, RailwayDeploymentId, RailwayEnvironmentId,
-    RailwayProjectId, RailwayServiceId, ServiceInstanceId,
+    RailwayProjectId, RailwayServiceId, ScheduleId, ServiceInstanceId,
 };
 use crate::power::{Decision, PowerKind};
 use crate::state::ObservedState;
@@ -163,14 +163,15 @@ pub enum OperationScope {
 
 str_enum!(OperationScope { Instance => "instance", Project => "project", Batch => "batch" });
 
-/// Origem da operação; o agendador futuro usará `schedule`.
+/// Origem da operação: clique do administrador ou evento de agenda.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OperationTrigger {
     Manual,
+    Schedule,
 }
 
-str_enum!(OperationTrigger { Manual => "manual" });
+str_enum!(OperationTrigger { Manual => "manual", Schedule => "schedule" });
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Operation {
@@ -178,6 +179,9 @@ pub struct Operation {
     pub kind: PowerKind,
     pub scope: OperationScope,
     pub trigger: OperationTrigger,
+    /// Agenda que disparou a operação (nome copiado: sobrevive à exclusão da agenda).
+    pub schedule_id: Option<ScheduleId>,
+    pub schedule_name: Option<String>,
     pub requested_by: String,
     pub plan_id: PlanId,
     pub status: OperationStatus,
@@ -452,5 +456,9 @@ mod tests {
         for &s in OperationStatus::ALL {
             assert_eq!(s.as_str().parse::<OperationStatus>(), Ok(s));
         }
+        for &t in OperationTrigger::ALL {
+            assert_eq!(t.as_str().parse::<OperationTrigger>(), Ok(t));
+        }
+        assert_eq!(OperationTrigger::Schedule.as_str(), "schedule");
     }
 }

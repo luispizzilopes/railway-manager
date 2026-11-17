@@ -9,5 +9,6 @@ pub mod ports;
 pub mod power;
 pub mod projects;
 pub mod railway;
+pub mod schedules;
 #[cfg(any(test, feature = "testkit"))]
 pub mod testkit;

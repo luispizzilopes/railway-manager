@@ -50,6 +50,7 @@ impl From<AppError> for ApiError {
         let message = err.to_string();
         let (status, code) = match &err {
             AppError::Validation(_) => (S::BAD_REQUEST, "validation"),
+            AppError::InvalidSchedule(_) => (S::BAD_REQUEST, "invalid_schedule"),
             AppError::Unprocessable(_) => (S::UNPROCESSABLE_ENTITY, "unprocessable"),
             AppError::NotFound(_) => (S::NOT_FOUND, "not_found"),
             AppError::Conflict(_) => (S::CONFLICT, "conflict"),
@@ -66,6 +67,9 @@ impl From<AppError> for ApiError {
         let details = match &err {
             AppError::PlanAlreadyUsed(Some(id)) => Some(json!({ "operation_id": id })),
             AppError::RateLimited(secs) => Some(json!({ "retry_after_secs": secs })),
+            AppError::InvalidSchedule(domain::schedule::InvalidSchedule::Overlap(a, b)) => {
+                Some(json!({ "conflicts": [a, b] }))
+            }
             _ => None,
         };
         if status.is_server_error() {

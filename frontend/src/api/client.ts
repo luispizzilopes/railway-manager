@@ -21,6 +21,9 @@ import type {
   Project,
   ProjectImportReport,
   RefreshReport,
+  ScheduleInput,
+  ScheduleRun,
+  ScheduleView,
   Uuid,
 } from './types'
 
@@ -111,6 +114,18 @@ export const api = {
   operation: (id: Uuid) => get<OperationDetail>(`/api/operations/${id}`),
 
   history: (filters: HistoryFilters) => get<Page<HistoryEntry>>(`/api/history${historyQuery(filters)}`),
+
+  schedules: (projectId?: Uuid) =>
+    get<{ schedules: ScheduleView[]; default_timezone: string }>(
+      `/api/schedules${projectId ? `?project_id=${projectId}` : ''}`,
+    ),
+  schedule: (id: Uuid) => get<ScheduleView>(`/api/schedules/${id}`),
+  createSchedule: (input: ScheduleInput) => post<ScheduleView>('/api/schedules', input),
+  updateSchedule: (id: Uuid, input: ScheduleInput) => request<ScheduleView>('PUT', `/api/schedules/${id}`, input),
+  deleteSchedule: (id: Uuid) => request<void>('DELETE', `/api/schedules/${id}`),
+  pauseSchedule: (id: Uuid) => post<ScheduleView>(`/api/schedules/${id}/pause`),
+  resumeSchedule: (id: Uuid) => post<ScheduleView>(`/api/schedules/${id}/resume`),
+  scheduleRuns: (id: Uuid, page = 1) => get<Page<ScheduleRun>>(`/api/schedules/${id}/runs?page=${page}&per_page=20`),
 }
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

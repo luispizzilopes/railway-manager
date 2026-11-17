@@ -148,6 +148,8 @@ fn operation_for(plan: &Plan) -> (Operation, Vec<OperationItem>) {
         kind: plan.kind,
         scope: plan.scope,
         trigger: OperationTrigger::Manual,
+        schedule_id: None,
+        schedule_name: None,
         requested_by: "admin".into(),
         plan_id: plan.id,
         status: OperationStatus::Pending,

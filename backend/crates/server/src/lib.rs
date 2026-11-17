@@ -13,11 +13,13 @@ use application::ports::{Clock, OperationRepository, SystemClock};
 use application::power::{PowerConfig, PowerService};
 use application::projects::ProjectService;
 use application::railway::RailwayGateway;
+use application::schedules::{ScheduleService, SchedulerConfig, SchedulerService};
 use infrastructure::crypto::XChaChaCipher;
 use infrastructure::railway::{RailwayClient, Transport, TransportConfig};
 use infrastructure::sqlite::*;
 use secrecy::ExposeSecret;
 use sqlx::SqlitePool;
+use tokio::task::JoinHandle;
 
 use config::Config;
 
@@ -86,6 +88,30 @@ pub fn build_state(
             stop_mechanism: config.railway.stop_mechanism,
         },
     ));
+    let schedule_repo = Arc::new(SqliteSchedules::new(pool.clone()));
+    let schedule_runs = Arc::new(SqliteScheduleRuns::new(pool.clone()));
+    let schedules = Arc::new(ScheduleService::new(
+        schedule_repo.clone(),
+        schedule_runs.clone(),
+        projects_repo.clone(),
+        inventory_repo.clone(),
+        clock.clone(),
+        config.scheduler.timezone,
+        o.start_timeout,
+    ));
+    let scheduler = Arc::new(SchedulerService::new(
+        schedules.clone(),
+        schedule_repo,
+        schedule_runs,
+        inventory_repo.clone(),
+        credentials.clone(),
+        power.clone(),
+        clock.clone(),
+        SchedulerConfig {
+            tick: config.scheduler.tick,
+            catchup: config.scheduler.catchup,
+        },
+    ));
     let history = Arc::new(HistoryService::new(operations_repo.clone()));
     let dashboard = Arc::new(DashboardService::new(
         projects_repo,
@@ -93,6 +119,7 @@ pub fn build_state(
         operations_repo,
         credentials.clone(),
         railway,
+        schedules.clone(),
         clock.clone(),
         config.stale_after,
     ));
@@ -109,6 +136,8 @@ pub fn build_state(
         power,
         history,
         dashboard,
+        schedules,
+        scheduler,
         sessions: Arc::new(SqliteSessions::new(pool)),
         clock,
         auth: Arc::new(AuthConfig {
@@ -126,4 +155,27 @@ pub async fn recover(pool: &SqlitePool) -> Result<u64, String> {
         .interrupt_unfinished(chrono::Utc::now())
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Agendador em segundo plano: marca eventos órfãos ao subir e avalia as agendas a
+/// cada `RM_SCHEDULER_TICK_SECS`. Erros de um ciclo são registrados e o próximo segue.
+pub fn spawn_scheduler(scheduler: Arc<SchedulerService>, clock: Arc<dyn Clock>) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        match scheduler.startup().await {
+            Ok(0) => {}
+            Ok(n) => tracing::warn!(
+                n,
+                "eventos de agenda interrompidos por reinício marcados como falhos"
+            ),
+            Err(err) => tracing::error!(%err, "falha ao preparar o agendador"),
+        }
+        let mut interval = tokio::time::interval(scheduler.config().tick);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            if let Err(err) = scheduler.tick(clock.now()).await {
+                tracing::error!(%err, "falha no ciclo do agendador");
+            }
+        }
+    })
 }

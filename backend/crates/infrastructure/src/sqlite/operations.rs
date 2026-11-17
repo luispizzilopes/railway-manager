@@ -29,6 +29,8 @@ fn operation_from_row(row: &SqliteRow, prefix: &str) -> RepoResult<Operation> {
         kind: row.parse(&col("kind"))?,
         scope: row.parse(&col("scope"))?,
         trigger: row.parse(&col("trigger"))?,
+        schedule_id: row.opt_parse(&col("schedule_id"))?,
+        schedule_name: row.opt_text(&col("schedule_name"))?,
         requested_by: row.text(&col("requested_by"))?,
         plan_id: row.parse(&col("plan_id"))?,
         status: row.parse(&col("status"))?,
@@ -104,6 +106,9 @@ fn push_filters(query: &mut QueryBuilder<Sqlite>, f: &HistoryFilter) {
     }
     if let Some(v) = f.result {
         query.push(" AND oi.result = ").push_bind(v.as_str());
+    }
+    if let Some(v) = f.trigger {
+        query.push(" AND o.trigger = ").push_bind(v.as_str());
     }
     if let Some(v) = f.from {
         query.push(" AND o.created_at >= ").push_bind(ts(v));
@@ -254,8 +259,8 @@ impl OperationRepository for SqliteOperations {
             .map_err(db_err)?;
 
         let mut query = QueryBuilder::<Sqlite>::new(
-            "SELECT oi.*, o.kind AS o_kind, o.scope AS o_scope, o.requested_by AS o_requested_by,
-                    o.status AS o_status, o.created_at AS o_created_at
+            "SELECT oi.*, o.kind AS o_kind, o.scope AS o_scope, o.requested_by AS o_requested_by, o.trigger AS o_trigger,
+                    o.schedule_name AS o_schedule_name, o.status AS o_status, o.created_at AS o_created_at
                FROM operation_items oi JOIN operations o ON o.id = oi.operation_id",
         );
         push_filters(&mut query, filter);
@@ -277,6 +282,8 @@ impl OperationRepository for SqliteOperations {
                     kind: row.parse("o_kind")?,
                     scope: row.parse("o_scope")?,
                     requested_by: row.text("o_requested_by")?,
+                    trigger: row.parse("o_trigger")?,
+                    schedule_name: row.opt_text("o_schedule_name")?,
                     operation_status: row.parse("o_status")?,
                     created_at: row.time("o_created_at")?,
                 })

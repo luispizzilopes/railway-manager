@@ -80,7 +80,7 @@ function PlanView({ plan }: { plan: Plan }) {
   )
 }
 
-function Progress({ items }: { items: OperationItem[] }) {
+export function Progress({ items }: { items: OperationItem[] }) {
   return (
     <>
       {groupBy(items, (i) => i.label.project_name).map(([project, rows]) => (
@@ -226,6 +226,30 @@ export function OperationFlow({
           {progress.data && <Progress items={progress.data.items} />}
         </>
       )}
+    </Modal>
+  )
+}
+
+/** Resultado de uma operação já criada (ex.: disparada por uma agenda). */
+export function OperationResult({ operationId, onClose }: { operationId: string; onClose: () => void }) {
+  const detail = useQuery({
+    queryKey: ['operation', operationId],
+    queryFn: () => api.operation(operationId),
+    refetchInterval: (q) => (q.state.data?.done ? false : 2500),
+  })
+  const op = detail.data?.operation
+  return (
+    <Modal
+      title={op ? `${KIND_LABEL[op.kind]} — ${STATUS_LABEL[op.status]}` : 'Operação'}
+      onClose={onClose}
+      footer={
+        <button type="button" className="btn" onClick={onClose}>
+          Fechar
+        </button>
+      }
+    >
+      <ErrorAlert error={detail.error} />
+      {detail.data && <Progress items={detail.data.items} />}
     </Modal>
   )
 }

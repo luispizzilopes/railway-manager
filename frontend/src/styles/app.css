@@ -815,6 +815,24 @@ dl.form-grid dd {
   color: var(--text-2);
 }
 
+.result-run-executed {
+  color: var(--success);
+}
+
+.result-run-late {
+  color: var(--warn);
+}
+
+.result-run-skipped,
+.result-run-pending {
+  color: var(--text-2);
+}
+
+.result-run-missed,
+.result-run-failed {
+  color: var(--danger);
+}
+
 .result-pending,
 .result-running,
 .result-verifying {
@@ -1128,4 +1146,23 @@ dl.form-grid dd {
 details > summary {
   cursor: pointer;
   color: var(--text-2);
+}
+
+.next-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--brand-border);
+  background: var(--brand-soft);
+  color: var(--text);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.next-action a {
+  color: var(--brand);
+  text-decoration: none;
 }

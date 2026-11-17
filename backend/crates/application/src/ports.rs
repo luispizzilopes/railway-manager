@@ -7,12 +7,14 @@ use domain::credential::{CredentialMetadata, CredentialStatus};
 use domain::deployment::DeploymentStatus;
 use domain::ids::{
     CredentialId, EnvironmentId, OperationId, PlanId, ProjectId, RailwayDeploymentId,
-    RailwayEnvironmentId, RailwayProjectId, RailwayServiceId, ServiceId, ServiceInstanceId,
+    RailwayEnvironmentId, RailwayProjectId, RailwayServiceId, ScheduleId, ServiceId,
+    ServiceInstanceId,
 };
 use domain::operation::{
-    ItemResult, Operation, OperationItem, OperationScope, OperationStatus, Plan,
+    ItemResult, Operation, OperationItem, OperationScope, OperationStatus, OperationTrigger, Plan,
 };
 use domain::power::PowerKind;
+use domain::schedule::{Schedule, ScheduleRun};
 use domain::state::ObservedState;
 use serde::Serialize;
 
@@ -205,6 +207,7 @@ pub struct HistoryFilter {
     pub environment_name: Option<String>,
     pub kind: Option<PowerKind>,
     pub result: Option<ItemResult>,
+    pub trigger: Option<OperationTrigger>,
     pub from: Option<DateTime<Utc>>,
     pub to: Option<DateTime<Utc>>,
 }
@@ -224,6 +227,8 @@ pub struct HistoryEntry {
     pub kind: PowerKind,
     pub scope: OperationScope,
     pub requested_by: String,
+    pub trigger: OperationTrigger,
+    pub schedule_name: Option<String>,
     pub operation_status: OperationStatus,
     pub created_at: DateTime<Utc>,
 }
@@ -263,4 +268,39 @@ pub trait SessionRepository: Send + Sync {
     async fn is_valid(&self, id_hash: &str, now: DateTime<Utc>) -> RepoResult<bool>;
     async fn delete(&self, id_hash: &str) -> RepoResult<()>;
     async fn purge_expired(&self, now: DateTime<Utc>) -> RepoResult<u64>;
+}
+
+#[async_trait]
+pub trait ScheduleRepository: Send + Sync {
+    async fn insert(&self, schedule: &Schedule) -> RepoResult<()>;
+    /// Atualiza dados, janelas e instâncias selecionadas.
+    async fn update(&self, schedule: &Schedule) -> RepoResult<()>;
+    async fn get(&self, id: ScheduleId) -> RepoResult<Option<Schedule>>;
+    /// Todas as agendas (ou só as de um projeto), por nome.
+    async fn list(&self, project: Option<ProjectId>) -> RepoResult<Vec<Schedule>>;
+    async fn delete(&self, id: ScheduleId) -> RepoResult<()>;
+    /// Pausa agendas de instâncias selecionadas que ficaram sem nenhuma instância.
+    async fn pause_without_targets(&self, reason: &str, now: DateTime<Utc>) -> RepoResult<u64>;
+}
+
+#[async_trait]
+pub trait ScheduleRunRepository: Send + Sync {
+    async fn last_evaluated(&self) -> RepoResult<Option<DateTime<Utc>>>;
+    /// Numa transação: insere os registros (ignorando eventos já processados) e
+    /// avança `last_evaluated_at`. Retorna só os registros inseridos agora.
+    async fn record_tick(
+        &self,
+        runs: &[ScheduleRun],
+        evaluated_at: DateTime<Utc>,
+    ) -> RepoResult<Vec<ScheduleRun>>;
+    async fn update(&self, run: &ScheduleRun) -> RepoResult<()>;
+    /// Mais recentes primeiro.
+    async fn list(
+        &self,
+        schedule: ScheduleId,
+        page: u32,
+        per_page: u32,
+    ) -> RepoResult<Page<ScheduleRun>>;
+    /// Registros `pending` (processo caiu antes de criar a operação) viram `failed`.
+    async fn fail_pending(&self, message: &str, now: DateTime<Utc>) -> RepoResult<u64>;
 }

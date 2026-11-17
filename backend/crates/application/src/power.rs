@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use domain::deployment::DeploymentStatus;
 use domain::ids::{
     EnvironmentId, OperationId, OperationItemId, PlanId, ProjectId, RailwayDeploymentId,
-    RailwayEnvironmentId, ServiceInstanceId,
+    RailwayEnvironmentId, ScheduleId, ServiceInstanceId,
 };
 use domain::operation::{
     InstanceLabel, ItemResult, Operation, OperationItem, OperationScope, OperationStatus,
@@ -28,6 +28,9 @@ use crate::ports::{
     Clock, ConsumeOutcome, InstanceView, InventoryRepository, OperationRepository, PlanRepository,
 };
 use crate::railway::{RailwayError, RailwayGateway, RailwayServiceInstance};
+
+/// `requested_by` das operações disparadas por agendas.
+pub const SCHEDULER_USER: &str = "agendador";
 
 #[derive(Debug, Clone)]
 pub struct PowerConfig {
@@ -326,6 +329,29 @@ impl PowerService {
         plan_id: PlanId,
         requested_by: &str,
     ) -> AppResult<OperationId> {
+        self.execute_as(plan_id, requested_by, OperationTrigger::Manual, None)
+            .await
+    }
+
+    /// Execução disparada por uma agenda: mesmo fluxo, registrando a origem.
+    pub async fn execute_scheduled(
+        self: &Arc<Self>,
+        plan_id: PlanId,
+        schedule_id: ScheduleId,
+        schedule_name: &str,
+    ) -> AppResult<OperationId> {
+        let origin = Some((schedule_id, schedule_name.to_owned()));
+        self.execute_as(plan_id, SCHEDULER_USER, OperationTrigger::Schedule, origin)
+            .await
+    }
+
+    async fn execute_as(
+        self: &Arc<Self>,
+        plan_id: PlanId,
+        requested_by: &str,
+        trigger: OperationTrigger,
+        schedule: Option<(ScheduleId, String)>,
+    ) -> AppResult<OperationId> {
         let plan = self.plans.get(plan_id).await?.ok_or_else(|| {
             AppError::Validation("plano inexistente: gere e confirme um plano".into())
         })?;
@@ -334,7 +360,9 @@ impl PowerService {
             id: OperationId::new(),
             kind: plan.kind,
             scope: plan.scope,
-            trigger: OperationTrigger::Manual,
+            trigger,
+            schedule_id: schedule.as_ref().map(|(id, _)| *id),
+            schedule_name: schedule.map(|(_, name)| name),
             requested_by: requested_by.to_owned(),
             plan_id,
             status: OperationStatus::Pending,

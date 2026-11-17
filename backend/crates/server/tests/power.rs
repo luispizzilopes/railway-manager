@@ -782,3 +782,46 @@ async fn iniciar_em_transicao_nao_consulta_historico_nem_age() {
             .any(|c| c.starts_with("restart_source"))
     );
 }
+
+#[tokio::test]
+async fn execucao_de_agenda_registra_origem_e_conflito_vira_skipped() {
+    use domain::ids::ScheduleId;
+    use domain::operation::OperationTrigger;
+    let h = harness().await;
+    let p = loja(&h).await;
+    let api = instance(&h, p, "production", "api").await;
+
+    // Uma operação manual ocupa a instância.
+    h.railway.mutation_delay(Duration::from_millis(300));
+    let manual = h
+        .power
+        .plan(PowerKind::Stop, &PowerTarget::Instance(api))
+        .await
+        .unwrap();
+    h.power.execute(manual.plan.id, "admin").await.unwrap();
+
+    let schedule = ScheduleId::new();
+    let target = PowerTarget::Project {
+        project: p,
+        environment: None,
+        instances: Some(vec![api]),
+    };
+    let planned = h.power.plan(PowerKind::Stop, &target).await.unwrap();
+    let id = h
+        .power
+        .execute_scheduled(planned.plan.id, schedule, "comercial")
+        .await
+        .unwrap();
+    h.power.wait_idle().await;
+
+    let (op, items) = h.power.get(id).await.unwrap();
+    assert_eq!(op.trigger, OperationTrigger::Schedule);
+    assert_eq!(op.schedule_id, Some(schedule));
+    assert_eq!(op.schedule_name.as_deref(), Some("comercial"));
+    assert_eq!(op.requested_by, "agendador");
+    assert_eq!(items[0].result, ItemResult::Skipped);
+    assert_eq!(
+        items[0].error_message.as_deref(),
+        Some("operação em andamento")
+    );
+}

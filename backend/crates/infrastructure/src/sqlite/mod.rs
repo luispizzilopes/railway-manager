@@ -5,6 +5,7 @@ mod inventory;
 mod operations;
 mod plans;
 mod projects;
+mod schedules;
 mod sessions;
 
 use std::str::FromStr;
@@ -21,6 +22,7 @@ pub use inventory::SqliteInventory;
 pub use operations::SqliteOperations;
 pub use plans::SqlitePlans;
 pub use projects::SqliteProjects;
+pub use schedules::{SqliteScheduleRuns, SqliteSchedules};
 pub use sessions::SqliteSessions;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations");

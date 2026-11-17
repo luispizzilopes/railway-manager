@@ -60,6 +60,7 @@ async fn run(config: Config) -> Result<(), String> {
         tracing::warn!(dir = %config.frontend_dir.display(), "frontend não encontrado; servindo só a API");
     }
     let power = state.power.clone();
+    let scheduler = railway_manager::spawn_scheduler(state.scheduler.clone(), state.clock.clone());
     let app = api::router(state, frontend);
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr)
@@ -70,6 +71,7 @@ async fn run(config: Config) -> Result<(), String> {
         .with_graceful_shutdown(shutdown())
         .await
         .map_err(|e| e.to_string())?;
+    scheduler.abort();
     // Operações em andamento que não terminarem viram `interrupted` no próximo início.
     let _ = tokio::time::timeout(std::time::Duration::from_secs(10), power.wait_idle()).await;
     Ok(())

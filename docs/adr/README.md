@@ -10,3 +10,4 @@ Decisões de arquitetura do Railway Manager. Para criar um novo ADR, copie
 | [003](003-mecanismo-de-desligamento.md) | Mecanismo de desligamento (`deploymentRemove` × `deploymentStop`) | proposto |
 | [004](004-plano-execucao-verificacao.md) | Fluxo plano → execução → verificação | aceito |
 | [005](005-credenciais.md) | Armazenamento e uso da credencial Railway | aceito |
+| [006](006-agendador.md) | Agendador por varredura com exatamente-uma-vez no banco | aceito |

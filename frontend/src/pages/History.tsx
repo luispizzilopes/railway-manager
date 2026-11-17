@@ -8,7 +8,7 @@ import { ErrorAlert } from '../components/Modal'
 import { StateChip } from '../components/StateChip'
 import { KIND_LABEL, RESULT_LABEL, formatDateTime, formatDuration } from '../format'
 
-const FILTER_KEYS = ['project', 'service', 'environment', 'kind', 'result', 'from', 'to'] as const
+const FILTER_KEYS = ['project', 'service', 'environment', 'kind', 'result', 'trigger', 'from', 'to'] as const
 const PER_PAGE = 50
 
 export function filtersFrom(params: URLSearchParams): HistoryFilters {
@@ -111,6 +111,14 @@ export function History() {
             </select>
           </div>
           <div className="field">
+            <label htmlFor="f-trigger">Origem</label>
+            <select id="f-trigger" className="select" value={draft.trigger ?? ''} onChange={set('trigger')}>
+              <option value="">Todas</option>
+              <option value="manual">Manual</option>
+              <option value="schedule">Agenda</option>
+            </select>
+          </div>
+          <div className="field">
             <label htmlFor="f-from">De</label>
             <input id="f-from" className="input" type="date" value={draft.from ?? ''} onChange={set('from')} />
           </div>
@@ -154,10 +162,13 @@ export function History() {
                 </tr>
               </thead>
               <tbody>
-                {history.data?.items.map(({ item, kind, created_at }) => (
+                {history.data?.items.map(({ item, kind, created_at, trigger, schedule_name }) => (
                   <tr key={item.id} data-testid="history-row">
                     <td>{formatDateTime(created_at)}</td>
-                    <td>{KIND_LABEL[kind]}</td>
+                    <td>
+                      {KIND_LABEL[kind]}
+                      <div className="subtle">{trigger === 'schedule' ? `agenda: ${schedule_name}` : 'manual'}</div>
+                    </td>
                     <td>
                       {item.label.project_name} · {item.label.service_name} · {item.label.environment_name}
                     </td>

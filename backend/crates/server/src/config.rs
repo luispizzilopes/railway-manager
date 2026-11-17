@@ -76,6 +76,16 @@ pub struct Config {
     pub railway: RailwayConfig,
     pub operations: OperationsConfig,
     pub stale_after: Duration,
+    pub scheduler: SchedulerConfig,
+}
+
+#[derive(Debug)]
+pub struct SchedulerConfig {
+    /// Fuso usado quando a agenda não informa outro.
+    pub timezone: chrono_tz::Tz,
+    /// Evento perdido mais antigo que isto não é recuperado (0 = nunca recupera).
+    pub catchup: Duration,
+    pub tick: Duration,
 }
 
 impl Config {
@@ -151,6 +161,12 @@ impl Config {
             },
             operations,
             stale_after: env.secs("RM_STALE_AFTER_SECS", 300)?,
+            scheduler: SchedulerConfig {
+                timezone: env
+                    .parsed::<chrono_tz::Tz>("RM_SCHEDULE_TIMEZONE", "America/Sao_Paulo")?,
+                catchup: Duration::from_secs(env.parsed("RM_SCHEDULE_CATCHUP_SECS", "1800")?),
+                tick: env.secs("RM_SCHEDULER_TICK_SECS", 30)?,
+            },
         })
     }
 }
@@ -298,6 +314,9 @@ mod tests {
         assert_eq!(cfg.railway.rps, 5);
         assert_eq!(cfg.railway.stop_mechanism, StopMechanism::Remove);
         assert_eq!(cfg.stale_after, Duration::from_secs(300));
+        assert_eq!(cfg.scheduler.timezone, chrono_tz::America::Sao_Paulo);
+        assert_eq!(cfg.scheduler.catchup, Duration::from_secs(1800));
+        assert_eq!(cfg.scheduler.tick, Duration::from_secs(30));
         assert_eq!(cfg.bind_addr.port(), 8080);
     }
 
@@ -309,6 +328,9 @@ mod tests {
             ("RM_STALE_AFTER_SECS", "-1"),
             ("RM_STOP_MECHANISM", "pause"),
             ("RM_COOKIE_SECURE", "talvez"),
+            ("RM_SCHEDULE_TIMEZONE", "Lua/Base"),
+            ("RM_SCHEDULE_CATCHUP_SECS", "-5"),
+            ("RM_SCHEDULER_TICK_SECS", "0"),
         ] {
             let err = load(&[("RM_ADMIN_PASSWORD", "x"), (var, value)]).unwrap_err();
             assert!(

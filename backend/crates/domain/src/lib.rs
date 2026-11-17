@@ -6,4 +6,5 @@ pub mod deployment;
 pub mod ids;
 pub mod operation;
 pub mod power;
+pub mod schedule;
 pub mod state;

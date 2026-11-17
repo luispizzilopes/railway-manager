@@ -136,14 +136,17 @@ impl PlanRepository for SqlitePlans {
             .map_err(db_err)?;
 
         sqlx::query(
-            "INSERT INTO operations (id, kind, scope, trigger, requested_by, plan_id, status,
-                                     created_at, started_at, finished_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO operations (id, kind, scope, trigger, schedule_id, schedule_name,
+                                     requested_by, plan_id, status, created_at, started_at,
+                                     finished_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(operation.id.to_string())
         .bind(operation.kind.as_str())
         .bind(operation.scope.as_str())
         .bind(operation.trigger.as_str())
+        .bind(operation.schedule_id.map(|id| id.to_string()))
+        .bind(&operation.schedule_name)
         .bind(&operation.requested_by)
         .bind(plan_id.to_string())
         .bind(operation.status.as_str())

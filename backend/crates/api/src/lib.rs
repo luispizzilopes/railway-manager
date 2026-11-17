@@ -14,6 +14,7 @@ use application::inventory::InventoryService;
 use application::ports::{Clock, SessionRepository};
 use application::power::PowerService;
 use application::projects::ProjectService;
+use application::schedules::{ScheduleService, SchedulerService};
 use axum::Router;
 use axum::middleware::from_fn;
 use axum::middleware::from_fn_with_state;
@@ -31,6 +32,8 @@ pub struct AppState {
     pub power: Arc<PowerService>,
     pub history: Arc<HistoryService>,
     pub dashboard: Arc<DashboardService>,
+    pub schedules: Arc<ScheduleService>,
+    pub scheduler: Arc<SchedulerService>,
     pub sessions: Arc<dyn SessionRepository>,
     pub clock: Arc<dyn Clock>,
     pub auth: Arc<AuthConfig>,
@@ -68,6 +71,16 @@ fn api(state: AppState) -> Router<AppState> {
         .route("/operations", post(execute_operation))
         .route("/operations/{id}", get(get_operation))
         .route("/history", get(history))
+        .route("/schedules", get(list_schedules).post(create_schedule))
+        .route(
+            "/schedules/{id}",
+            get(get_schedule)
+                .put(update_schedule)
+                .delete(delete_schedule),
+        )
+        .route("/schedules/{id}/pause", post(pause_schedule))
+        .route("/schedules/{id}/resume", post(resume_schedule))
+        .route("/schedules/{id}/runs", get(schedule_runs))
         .route("/dashboard", get(dashboard))
         .route("/dashboard/refresh", post(refresh))
         .fallback(api_not_found)

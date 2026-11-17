@@ -15,6 +15,9 @@ pub enum AppError {
     NotFound(String),
     #[error("{0}")]
     Conflict(String),
+    /// Agenda inválida (400); sobreposição traz as janelas em conflito.
+    #[error("{0}")]
+    InvalidSchedule(domain::schedule::InvalidSchedule),
     /// Plano já executado (409), com a operação criada por ele.
     #[error("este plano já foi executado")]
     PlanAlreadyUsed(Option<domain::ids::OperationId>),
@@ -73,5 +76,11 @@ impl From<CipherError> for AppError {
             CipherError::MissingKey | CipherError::Undecipherable => Self::CredentialUndecipherable,
             CipherError::Encrypt => Self::Internal(err.to_string()),
         }
+    }
+}
+
+impl From<domain::schedule::InvalidSchedule> for AppError {
+    fn from(err: domain::schedule::InvalidSchedule) -> Self {
+        Self::InvalidSchedule(err)
     }
 }

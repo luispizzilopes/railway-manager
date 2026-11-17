@@ -36,7 +36,12 @@ arquivo SQLite; o token do Railway é guardado cifrado.
   **desatualizado** ou **indisponível**, últimas operações e alertas (sem token, token
   recusado, rate limit).
 
-Fora do escopo desta versão: agendamento, criar/excluir projetos ou serviços,
+- **Agendas**: liga e desliga automaticamente um projeto inteiro (ou só um ambiente) ou
+  serviços selecionados, em uma ou mais janelas por dia, nos dias da semana escolhidos e no
+  fuso da agenda — ex.: seg–sex, ligado das 07:00 às 12:00 e das 13:00 às 18:00. Detalhes em
+  [Agendas](#agendas).
+
+Fora do escopo desta versão: expressões cron livres, feriados, criar/excluir projetos ou serviços,
 notificações, múltiplas contas, custos.
 
 ## Requisitos
@@ -72,6 +77,9 @@ Toda a configuração vem de variáveis de ambiente; a lista completa e comentad
 | `RM_POLL_INTERVAL_SECS` / `RM_POLL_MAX_INTERVAL_SECS` | Polling de verificação (com backoff). | `5` / `15` |
 | `RM_STALE_AFTER_SECS` | Idade a partir da qual um estado é "desatualizado". | `300` |
 | `RM_LOG` | Filtro de log (`tracing`). | `info` |
+| `RM_SCHEDULE_TIMEZONE` | Fuso padrão das agendas (nome IANA). | `America/Sao_Paulo` |
+| `RM_SCHEDULE_CATCHUP_SECS` | Até quanto tempo depois um evento perdido ainda é executado (0 = nunca). | `1800` |
+| `RM_SCHEDULER_TICK_SECS` | Intervalo em que o agendador avalia as agendas. | `30` |
 
 O processo **não inicia** sem senha de administrador e recusa valores inválidos
 (chave mestra malformada, números fora de faixa) com uma mensagem indicando a variável.
@@ -146,6 +154,40 @@ fixos. Só existe um processo por banco; não escale para mais de uma réplica.
 - Se o Railway recusar o token mais tarde (revogado), ele é marcado como inválido e a
   visão geral avisa.
 
+## Agendas
+
+Em **Agendas**, crie uma agenda escolhendo o projeto, o alvo (projeto inteiro, opcionalmente
+um ambiente, ou serviços selecionados), os dias, o fuso e as janelas. Cada janela liga no
+início e desliga no fim; uma janela com fim antes do início termina no dia seguinte
+(22:00–02:00). Janelas da mesma agenda não podem se sobrepor.
+
+- **Mesmo fluxo das operações manuais**: no horário, o agendador lê o estado no Railway e
+  cria a operação com as mesmas regras (ignora quem já está no estado desejado, sobe o
+  último commit que subiu, verifica o resultado). Cada evento aparece no histórico com a
+  origem "agenda" e o nome dela; cada agenda mostra as próximas e as últimas execuções.
+- **Age só nos horários**: entre um evento e outro nada é desfeito. Se você ligar um
+  serviço manualmente às 15:00, ele fica ligado até o próximo desligamento da agenda.
+- **Servidor fora do ar no horário**: ao voltar, executa só o evento perdido mais recente
+  de cada agenda, se tiver sido há até `RM_SCHEDULE_CATCHUP_SECS` (padrão 30 min); os
+  outros ficam como "perdido". Nenhum evento é executado duas vezes, mesmo com reinícios.
+- **Pausar e editar** valem dali em diante: eventos durante a pausa não são recuperados.
+- **Conflitos**: se no mesmo minuto uma agenda desliga e outra liga o mesmo serviço, ligar
+  prevalece. O editor avisa (sem impedir) sobre sobreposição com outras agendas e sobre
+  janelas menores que o prazo de confirmação ao iniciar.
+- Agendas de serviços selecionados que ficam sem nenhum serviço são pausadas; remover o
+  projeto do gerenciamento exclui suas agendas (o histórico permanece).
+
+### Atualizando de uma versão sem agendas
+
+A primeira inicialização desta versão reconstrói a tabela de operações no SQLite para
+registrar a origem. Os dados são preservados, mas **faça um backup antes**:
+
+```bash
+cp backend/railway-manager.db backend/railway-manager.db.bak
+```
+
+Voltar para a versão anterior depois da atualização exige restaurar esse backup.
+
 ## Limitações conhecidas
 
 - **Rate limit do Railway** (por plano: Free 100 req/hora; Hobby 1000/hora e 10/s;
@@ -161,7 +203,10 @@ fixos. Só existe um processo por banco; não escale para mais de uma réplica.
   como religar depois; por isso o padrão é `deploymentRemove` (ADR-003).
 - **Reinício no meio de uma operação**: itens em andamento viram `interrupted` e não são
   reexecutados automaticamente; a próxima sincronização mostra o estado real.
-- Um administrador, um token, um processo (SQLite).
+- Um administrador, um token, um processo (SQLite). Com mais de um processo no mesmo banco
+  os eventos de agenda não se repetem, mas a configuração não é suportada.
+- Agendas com muitos serviços no mesmo minuto concentram chamadas ao Railway nesse
+  horário (o rate limit enfileira as chamadas).
 
 ## Desenvolvimento
 

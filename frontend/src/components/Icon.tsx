@@ -16,6 +16,13 @@ const PATHS = {
       <path d="m3 16.5 9 4.5 9-4.5" />
     </>
   ),
+  schedules: (
+    <>
+      <rect x="3" y="4.5" width="18" height="16.5" rx="2" />
+      <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+      <path d="M12 13v3l2 1.5" />
+    </>
+  ),
   history: (
     <>
       <path d="M3 12a9 9 0 1 0 2.6-6.4L3 8" />

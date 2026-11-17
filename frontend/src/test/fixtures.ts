@@ -48,6 +48,7 @@ export function dashboard(cards: InstanceCard[], overrides: Partial<Dashboard> =
             instances: cards,
           },
         ],
+        next_action: null,
       },
     ],
     recent_operations: [],

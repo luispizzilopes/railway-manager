@@ -16,6 +16,7 @@ use crate::credentials::CredentialService;
 use crate::error::AppResult;
 use crate::ports::{Clock, InventoryRepository, OperationRepository, ProjectRepository};
 use crate::railway::{RailwayGateway, RateLimitStatus};
+use crate::schedules::{NextAction, ScheduleService};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Indicators {
@@ -52,6 +53,8 @@ pub struct EnvironmentGroup {
 pub struct ProjectCard {
     pub project: Project,
     pub environments: Vec<EnvironmentGroup>,
+    /// Próxima ação de agenda ativa do projeto.
+    pub next_action: Option<NextAction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -99,6 +102,7 @@ pub struct DashboardService {
     operations: Arc<dyn OperationRepository>,
     credentials: Arc<CredentialService>,
     railway: Arc<dyn RailwayGateway>,
+    schedules: Arc<ScheduleService>,
     clock: Arc<dyn Clock>,
     stale_after: chrono::Duration,
 }
@@ -120,12 +124,14 @@ fn summarize(operation: Operation, items: &[OperationItem]) -> OperationSummary 
 }
 
 impl DashboardService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         projects: Arc<dyn ProjectRepository>,
         inventory: Arc<dyn InventoryRepository>,
         operations: Arc<dyn OperationRepository>,
         credentials: Arc<CredentialService>,
         railway: Arc<dyn RailwayGateway>,
+        schedules: Arc<ScheduleService>,
         clock: Arc<dyn Clock>,
         stale_after: std::time::Duration,
     ) -> Self {
@@ -135,6 +141,7 @@ impl DashboardService {
             operations,
             credentials,
             railway,
+            schedules,
             clock,
             stale_after: chrono::Duration::from_std(stale_after)
                 .unwrap_or(chrono::Duration::minutes(5)),
@@ -159,11 +166,13 @@ impl DashboardService {
             instances: views.len(),
             ..Default::default()
         };
+        let mut next_actions = self.schedules.next_actions().await?;
         let mut cards: Vec<ProjectCard> = projects
             .iter()
             .map(|p| ProjectCard {
                 project: p.clone(),
                 environments: vec![],
+                next_action: next_actions.remove(&p.id),
             })
             .collect();
 

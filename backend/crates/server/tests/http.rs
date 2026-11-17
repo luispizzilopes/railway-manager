@@ -767,3 +767,197 @@ async fn frontend_com_fallback_spa_e_api_fora_dele() {
     assert_eq!(api.json["code"], "not_found");
     assert!(!api.text.contains("<title>"));
 }
+
+// ---------- agendas (power-schedules 4.3 e 4.4) ----------
+
+fn schedule_body(project: &str, windows: Value) -> Value {
+    json!({
+        "project_id": project,
+        "name": "comercial",
+        "timezone": "UTC",
+        "days": [0, 1, 2, 3, 4, 5, 6],
+        "windows": windows,
+        "target": { "type": "project" }
+    })
+}
+
+#[tokio::test]
+async fn agendas_via_http() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+
+    let created = app
+        .post(
+            "/api/schedules",
+            schedule_body(
+                &project,
+                json!([{ "start": "07:00", "end": "12:00" }, { "start": "13:00", "end": "18:00" }]),
+            ),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.text);
+    assert_eq!(created.json["next_runs"].as_array().unwrap().len(), 5);
+    assert_eq!(created.json["warnings"], json!([]));
+    assert_eq!(
+        created.json["schedule"]["windows"][1],
+        json!({ "start": "13:00", "end": "18:00" })
+    );
+    let id = created.json["schedule"]["id"].as_str().unwrap().to_owned();
+
+    let list = app
+        .get(&format!("/api/schedules?project_id={project}"))
+        .await;
+    assert_eq!(list.json["default_timezone"], "America/Sao_Paulo");
+    assert_eq!(list.json["schedules"].as_array().unwrap().len(), 1);
+
+    let mut edited = schedule_body(&project, json!([{ "start": "08:00", "end": "09:00" }]));
+    edited["name"] = json!("só manhã");
+    edited["days"] = json!([0, 4]);
+    let updated = app
+        .call("PUT", &format!("/api/schedules/{id}"), Some(edited))
+        .await;
+    assert_eq!(updated.status, StatusCode::OK, "{}", updated.text);
+    assert_eq!(updated.json["schedule"]["name"], "só manhã");
+    assert_eq!(updated.json["schedule"]["days"], json!([0, 4]));
+
+    let paused = app
+        .post(&format!("/api/schedules/{id}/pause"), json!({}))
+        .await;
+    assert_eq!(paused.json["schedule"]["enabled"], false);
+    assert_eq!(paused.json["next_runs"], json!([]));
+    let resumed = app
+        .post(&format!("/api/schedules/{id}/resume"), json!({}))
+        .await;
+    assert_eq!(resumed.json["schedule"]["enabled"], true);
+
+    let runs = app.get(&format!("/api/schedules/{id}/runs")).await;
+    assert_eq!(runs.json["total"], 0);
+
+    assert_eq!(
+        app.call("DELETE", &format!("/api/schedules/{id}"), None)
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        app.get(&format!("/api/schedules/{id}")).await.status,
+        StatusCode::NOT_FOUND
+    );
+    app.assert_token_never_leaked();
+}
+
+#[tokio::test]
+async fn agenda_invalida_responde_400() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+
+    let overlap = app
+        .post(
+            "/api/schedules",
+            schedule_body(
+                &project,
+                json!([{ "start": "07:00", "end": "12:00" }, { "start": "11:00", "end": "15:00" }]),
+            ),
+        )
+        .await;
+    assert_eq!(overlap.status, StatusCode::BAD_REQUEST);
+    assert_eq!(overlap.json["code"], "invalid_schedule");
+    assert_eq!(overlap.json["details"]["conflicts"], json!([1, 2]));
+
+    let bad_time = app
+        .post(
+            "/api/schedules",
+            schedule_body(&project, json!([{ "start": "7:00", "end": "12:00" }])),
+        )
+        .await;
+    assert_eq!(
+        (bad_time.status, bad_time.json["code"].clone()),
+        (StatusCode::BAD_REQUEST, json!("invalid_schedule"))
+    );
+
+    let mut bad_day = schedule_body(&project, json!([{ "start": "07:00", "end": "12:00" }]));
+    bad_day["days"] = json!([9]);
+    assert_eq!(
+        app.post("/api/schedules", bad_day).await.status,
+        StatusCode::BAD_REQUEST
+    );
+
+    let mut bad_tz = schedule_body(&project, json!([{ "start": "07:00", "end": "12:00" }]));
+    bad_tz["timezone"] = json!("Lua/Base");
+    assert_eq!(
+        app.post("/api/schedules", bad_tz).await.status,
+        StatusCode::BAD_REQUEST
+    );
+
+    let mut no_project = schedule_body(&project, json!([{ "start": "07:00", "end": "12:00" }]));
+    no_project.as_object_mut().unwrap().remove("project_id");
+    assert_eq!(
+        app.post("/api/schedules", no_project).await.status,
+        StatusCode::BAD_REQUEST
+    );
+
+    assert_eq!(app.get("/api/schedules").await.json["schedules"], json!([]));
+}
+
+#[tokio::test]
+async fn historico_filtra_por_origem_via_http() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    let plan = app
+        .post(
+            "/api/operations/plan",
+            json!({ "kind": "stop", "target": { "type": "project", "project_id": project } }),
+        )
+        .await;
+    let op = app
+        .post(
+            "/api/operations",
+            json!({ "plan_id": plan.json["plan_id"] }),
+        )
+        .await;
+    app.wait_operation(op.json["operation_id"].as_str().unwrap())
+        .await;
+
+    let manual = app.get("/api/history?trigger=manual").await;
+    assert_eq!(manual.json["total"], 2);
+    assert_eq!(manual.json["items"][0]["trigger"], "manual");
+    assert_eq!(manual.json["items"][0]["schedule_name"], Value::Null);
+    assert_eq!(
+        app.get("/api/history?trigger=schedule").await.json["total"],
+        0
+    );
+    assert_eq!(
+        app.get("/api/history?trigger=cron").await.status,
+        StatusCode::BAD_REQUEST
+    );
+}
+
+#[tokio::test]
+async fn dashboard_mostra_proxima_acao_agendada() {
+    use chrono::{Timelike, Utc};
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    // Janela aberta agora: a próxima ação é desligar no fim dela.
+    let now = Utc::now();
+    let minute = |offset: i64| {
+        let t = now + chrono::Duration::minutes(offset);
+        format!("{:02}:{:02}", t.hour(), t.minute())
+    };
+    let (start, end) = (minute(-60), minute(120));
+    app.post(
+        "/api/schedules",
+        schedule_body(&project, json!([{ "start": start, "end": end }])),
+    )
+    .await;
+
+    let dash = app.get("/api/dashboard").await;
+    let next = &dash.json["projects"][0]["next_action"];
+    assert_eq!(next["action"], "stop", "{}", dash.text);
+    assert_eq!(next["schedule_name"], "comercial");
+    let at = chrono::DateTime::parse_from_rfc3339(next["at"].as_str().unwrap()).unwrap();
+    assert_eq!(format!("{:02}:{:02}", at.hour(), at.minute()), end);
+}

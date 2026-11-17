@@ -7,7 +7,7 @@ import type { Dashboard as DashboardData, InstanceCard, PowerKind, PowerTarget }
 import { ErrorAlert } from '../components/Modal'
 import { OperationFlow } from '../components/OperationFlow'
 import { FreshnessNote, StateChip } from '../components/StateChip'
-import { KIND_LABEL, STATUS_LABEL, relativeTime } from '../format'
+import { KIND_LABEL, STATUS_LABEL, formatTime, relativeTime } from '../format'
 
 /** Intervalo da atualização automática enquanto a tela está aberta. */
 export const AUTO_REFRESH_MS = 60_000
@@ -181,7 +181,7 @@ export function Dashboard() {
         </div>
       )}
 
-      {data?.projects.map(({ project, environments }) => (
+      {data?.projects.map(({ project, environments, next_action }) => (
         <section key={project.id} className="card project-card" aria-label={project.display_name ?? project.name}>
           <div className="card-head">
             <input
@@ -194,6 +194,12 @@ export function Dashboard() {
               <Link to={`/projects/${project.id}`}>{project.display_name ?? project.name}</Link>
             </h3>
             {project.sync_status === 'not_found' && <span className="result result-failed">não encontrado no Railway</span>}
+            {next_action && (
+              <span className="next-action" data-testid="next-action">
+                Próxima: {KIND_LABEL[next_action.action]} às {formatTime(next_action.at)} ·{' '}
+                <Link to="/schedules">{next_action.schedule_name}</Link>
+              </span>
+            )}
             <span className="spacer" />
             {(['start', 'stop'] as const).map((kind) => (
               <button

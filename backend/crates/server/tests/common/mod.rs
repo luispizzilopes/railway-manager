@@ -5,11 +5,13 @@ use std::sync::Arc;
 
 use application::credentials::{CredentialService, RegisterCredential};
 use application::inventory::InventoryService;
-use application::ports::SystemClock;
+use application::ports::{Clock, SystemClock};
 use application::power::{PowerConfig, PowerService};
 use application::projects::ProjectService;
 use application::railway::RailwayToken;
+use application::schedules::{ScheduleService, SchedulerConfig, SchedulerService};
 use application::testkit::FakeRailway;
+use application::testkit::ManualClock;
 use domain::credential::CredentialKind;
 use infrastructure::crypto::XChaChaCipher;
 use infrastructure::sqlite::*;
@@ -26,6 +28,10 @@ pub struct Harness {
     pub inventory: Arc<InventoryService>,
     pub projects: Arc<ProjectService>,
     pub power: Arc<PowerService>,
+    pub schedules: Arc<ScheduleService>,
+    pub scheduler: Arc<SchedulerService>,
+    /// Presente quando o harness usa relógio manual.
+    pub clock: Option<Arc<ManualClock>>,
 }
 
 pub async fn harness() -> Harness {
@@ -64,10 +70,27 @@ pub async fn harness_with_power(config: PowerConfig) -> Harness {
     .await
 }
 
+/// Harness com relógio manual (agendas e agendador).
+pub async fn scheduling_harness(now: chrono::DateTime<chrono::Utc>) -> Harness {
+    let manual = Arc::new(ManualClock::at(now));
+    let pool = connect("sqlite::memory:").await.unwrap();
+    let mut h = harness_with_clock(pool, Some([9; 32]), fast_power(), manual.clone()).await;
+    h.clock = Some(manual);
+    h
+}
+
 pub async fn harness_full(pool: SqlitePool, key: Option<[u8; 32]>, power: PowerConfig) -> Harness {
+    harness_with_clock(pool, key, power, Arc::new(SystemClock)).await
+}
+
+pub async fn harness_with_clock(
+    pool: SqlitePool,
+    key: Option<[u8; 32]>,
+    power: PowerConfig,
+    clock: Arc<dyn Clock>,
+) -> Harness {
     let railway = Arc::new(FakeRailway::new());
     railway.accept_token(TOKEN);
-    let clock = Arc::new(SystemClock);
     let credentials = Arc::new(CredentialService::new(
         Arc::new(SqliteCredentials::new(pool.clone())),
         Arc::new(XChaChaCipher::new(key.as_ref())),
@@ -92,13 +115,37 @@ pub async fn harness_full(pool: SqlitePool, key: Option<[u8; 32]>, power: PowerC
         clock.clone(),
     ));
     let power = Arc::new(PowerService::new(
-        inventory_repo,
+        inventory_repo.clone(),
         Arc::new(SqlitePlans::new(pool.clone())),
         Arc::new(SqliteOperations::new(pool.clone())),
         credentials.clone(),
         railway.clone(),
-        clock,
+        clock.clone(),
         power,
+    ));
+    let schedule_repo = Arc::new(SqliteSchedules::new(pool.clone()));
+    let runs = Arc::new(SqliteScheduleRuns::new(pool.clone()));
+    let schedules = Arc::new(ScheduleService::new(
+        schedule_repo.clone(),
+        runs.clone(),
+        Arc::new(SqliteProjects::new(pool.clone())),
+        inventory_repo.clone(),
+        clock.clone(),
+        chrono_tz::UTC,
+        std::time::Duration::from_secs(600),
+    ));
+    let scheduler = Arc::new(SchedulerService::new(
+        schedules.clone(),
+        schedule_repo,
+        runs,
+        inventory_repo,
+        credentials.clone(),
+        power.clone(),
+        clock,
+        SchedulerConfig {
+            tick: std::time::Duration::from_secs(30),
+            catchup: std::time::Duration::from_secs(1800),
+        },
     ));
     Harness {
         pool,
@@ -107,6 +154,9 @@ pub async fn harness_full(pool: SqlitePool, key: Option<[u8; 32]>, power: PowerC
         inventory,
         projects,
         power,
+        schedules,
+        scheduler,
+        clock: None,
     }
 }
 

@@ -11,6 +11,7 @@ testkit = []
 [dependencies]
 async-trait = "0.1.92"
 chrono = { version = "0.4.45", default-features = false, features = ["std", "clock", "serde"] }
+chrono-tz = "0.10.4"
 domain = { version = "0.1.0", path = "../domain" }
 secrecy = "0.10.3"
 serde = { version = "1.0.229", features = ["derive"] }

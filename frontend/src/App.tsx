@@ -9,6 +9,7 @@ import { Layout } from './pages/Layout'
 import { Login } from './pages/Login'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { Projects } from './pages/Projects'
+import { Schedules } from './pages/Schedules'
 import { Settings } from './pages/Settings'
 
 export function App() {
@@ -47,6 +48,7 @@ export function App() {
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
+        <Route path="schedules" element={<Schedules />} />
         <Route path="history" element={<History />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<p className="muted">Página não encontrada.</p>} />

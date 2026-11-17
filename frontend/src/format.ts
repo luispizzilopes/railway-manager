@@ -1,6 +1,6 @@
 // Rótulos e formatação para a interface (pt-BR).
 
-import type { ItemResult, ObservedState, OperationStatus, PowerKind, SyncStatus } from './api/types'
+import type { ItemResult, ObservedState, OperationStatus, PowerKind, RunStatus, SyncStatus } from './api/types'
 
 export const STATE_LABEL: Record<ObservedState, string> = {
   running: 'Ativo',
@@ -67,4 +67,40 @@ export function formatDuration(ms: number | null | undefined): string {
 
 export function shortId(id: string): string {
   return id.slice(0, 8)
+}
+
+export const DAY_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+
+/** "Seg–Sex", "Todos os dias", "Seg, Qua, Sex". */
+export function formatDays(days: number[]): string {
+  const sorted = [...days].sort((a, b) => a - b)
+  if (sorted.length === 7) return 'Todos os dias'
+  const contiguous = sorted.every((d, i) => i === 0 || d === sorted[i - 1] + 1)
+  if (contiguous && sorted.length > 2) return `${DAY_LABEL[sorted[0]]}–${DAY_LABEL[sorted[sorted.length - 1]]}`
+  return sorted.map((d) => DAY_LABEL[d]).join(', ')
+}
+
+export const RUN_LABEL: Record<RunStatus, string> = {
+  pending: 'Em execução',
+  executed: 'Executado',
+  late: 'Executado com atraso',
+  skipped: 'Nada a fazer',
+  missed: 'Perdido',
+  failed: 'Falhou',
+}
+
+/** Data e hora no fuso informado (ex.: "seg., 17/11 07:00"). */
+export function formatInZone(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone,
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso))
+}
+
+export function formatTime(iso: string): string {
+  return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 }

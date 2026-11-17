@@ -5,6 +5,7 @@ import { Icon, type IconName } from '../components/Icon'
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: 'Visão geral', icon: 'overview', end: true },
   { to: '/projects', label: 'Projetos', icon: 'projects' },
+  { to: '/schedules', label: 'Agendas', icon: 'schedules' },
   { to: '/history', label: 'Histórico', icon: 'history' },
   { to: '/settings', label: 'Configurações', icon: 'settings' },
 ]
