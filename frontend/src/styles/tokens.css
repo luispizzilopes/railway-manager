@@ -1,9 +1,8 @@
-/* Tokens de design: painel escuro, superfícies grafite, bordas sutis e destaque verde. */
+/* Tokens de design no estilo do Railway: tema escuro, superfícies cinza-arroxeadas e destaque roxo. */
 
 :root {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
-  --font-mono: 'Source Code Pro', 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Inter', BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, ui-monospace, monospace;
 
   --text-xs: 11px;
   --text-sm: 12px;
@@ -26,65 +25,92 @@
   --radius-lg: 8px;
   --radius-xl: 12px;
 
+  /* Paleta oficial do Railway (docs.railway.com, tema escuro; escalas Radix 1-12) */
+  --gray-1: #131415;
+  --gray-2: #1a191c;
+  --gray-3: #232226;
+  --gray-4: #2a292f;
+  --gray-5: #313037;
+  --gray-6: #3b3941;
+  --gray-7: #484750;
+  --gray-8: #615f6c;
+  --gray-9: #6f6d7a;
+  --gray-10: #7c7a88;
+  --gray-11: #b4b2bf;
+  --gray-12: #eeeef0;
+
+  --purple-1: #120f1b;
+  --purple-2: #191525;
+  --purple-3: #2a1e42;
+  --purple-4: #362459;
+  --purple-5: #402c66;
+  --purple-6: #4b3774;
+  --purple-7: #5a4589;
+  --purple-8: #7156aa;
+  --purple-9: #553f83;
+  --purple-10: #45326c;
+  --purple-11: #bfa5ff;
+  --purple-12: #e4dcfd;
+
   /* Superfícies */
-  --bg: #121212;
-  --bg-alt: #171717;
-  --surface: #1c1c1c;
-  --surface-2: #232323;
-  --surface-hover: #262626;
-  --overlay: #1f1f1f;
-  --control: #1f1f1f;
+  --bg: var(--gray-1);
+  --bg-alt: var(--purple-1);
+  --surface: var(--gray-2);
+  --surface-2: var(--gray-3);
+  --surface-hover: var(--gray-4);
+  --overlay: var(--gray-2);
+  --control: var(--gray-1);
 
-  --border: #2e2e2e;
-  --border-muted: #262626;
-  --border-strong: #3e3e3e;
-  --border-control: #363636;
+  --border: var(--gray-5);
+  --border-muted: var(--gray-4);
+  --border-strong: var(--gray-7);
+  --border-control: var(--gray-6);
 
-  --text: #ededed;
-  --text-2: #a1a1a1;
-  --text-3: #707070;
+  --text: var(--gray-12);
+  --text-2: var(--gray-11);
+  --text-3: var(--gray-10);
 
-  /* Destaque (roxo) */
-  --brand: hsl(270 70% 65%);
-  --brand-strong: hsl(270 75% 72%);
-  --brand-fill: hsl(270 48% 32%);
-  --brand-fill-hover: hsl(270 52% 38%);
-  --brand-border: hsl(270 70% 65% / 0.45);
-  --brand-soft: hsl(270 70% 65% / 0.12);
+  /* Destaque (roxo Railway) */
+  --brand: var(--purple-11);
+  --brand-strong: var(--purple-12);
+  --brand-fill: var(--purple-9);
+  --brand-fill-hover: var(--purple-8);
+  --brand-border: var(--purple-7);
+  --brand-soft: rgb(191 165 255 / 0.14);
 
-  /* Sucesso (verde) */
-  --success: #3ecf8e;
-  --success-border: rgb(62 207 142 / 0.35);
-  --success-soft: rgb(62 207 142 / 0.1);
+  /* Sucesso (grass) */
+  --success: #71d083;
+  --success-border: #366740;
+  --success-soft: rgb(70 167 88 / 0.14);
 
-  --danger: #f56565;
-  --danger-fill: #541c15;
-  --danger-fill-hover: #6e2219;
-  --danger-border: rgb(245 101 101 / 0.4);
-  --danger-soft: rgb(245 101 101 / 0.08);
+  --danger: #ff9592;
+  --danger-fill: #e5484d;
+  --danger-fill-hover: #ec5d5e;
+  --danger-border: #8c333a;
+  --danger-soft: rgb(229 72 77 / 0.14);
 
-  --warn: #f5a524;
-  --warn-border: rgb(245 165 36 / 0.4);
-  --warn-soft: rgb(245 165 36 / 0.08);
+  --warn: #ffca16;
+  --warn-border: #714f19;
+  --warn-soft: rgb(255 197 61 / 0.12);
 
-  --info: #60a5fa;
-  --info-border: rgb(96 165 250 / 0.35);
-  --info-soft: rgb(96 165 250 / 0.08);
+  --info: #acb5d5;
+  --info-border: #474e69;
+  --info-soft: rgb(133 141 172 / 0.14);
 
-  --pink: hsl(330 70% 68%);
+  --pink: #e93d82;
 
   /* Status */
   --state-running: var(--success);
-  --state-stopped: #8f8f8f;
+  --state-stopped: var(--gray-10);
   --state-sleeping: var(--info);
   --state-transitioning: var(--warn);
   --state-failed: var(--danger);
-  --state-approval: var(--pink);
-  --state-unknown: #707070;
+  --state-approval: #f58bb5;
+  --state-unknown: var(--gray-9);
 
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-2: 0 24px 48px -12px rgb(0 0 0 / 0.6);
-  --focus: 0 0 0 2px var(--bg), 0 0 0 4px hsl(270 70% 65% / 0.6);
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--purple-8);
 
   color-scheme: dark;
 }

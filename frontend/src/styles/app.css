@@ -27,7 +27,7 @@ h3 {
 
 h1 {
   font-size: var(--text-2xl);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -79,7 +79,7 @@ code,
 }
 
 ::selection {
-  background: hsl(270 70% 65% / 0.3);
+  background: rgb(191 165 255 / 0.3);
 }
 
 .icon {
@@ -203,7 +203,7 @@ code,
   align-items: center;
   gap: var(--space-3);
   padding: 0 var(--space-6);
-  background: rgb(18 18 18 / 0.85);
+  background: rgb(19 20 21 / 0.85);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
   font-size: var(--text-md);
@@ -454,7 +454,7 @@ code,
   color: var(--text);
   font: inherit;
   font-size: var(--text-md);
-  font-weight: 400;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -473,7 +473,7 @@ code,
 .btn-primary {
   background: var(--brand-fill);
   border-color: var(--brand-border);
-  color: #fafafa;
+  color: #fff;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -484,7 +484,7 @@ code,
 .btn-danger {
   background: var(--danger-fill);
   border-color: var(--danger-border);
-  color: #fafafa;
+  color: #fff;
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -1064,7 +1064,7 @@ dl.form-grid dd {
   place-items: center;
   padding: var(--space-4);
   background:
-    radial-gradient(600px circle at 50% 35%, hsl(270 70% 65% / 0.1), transparent 70%),
+    radial-gradient(600px circle at 50% 35%, rgb(191 165 255 / 0.1), transparent 70%),
     var(--bg);
 }
 
