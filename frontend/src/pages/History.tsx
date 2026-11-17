@@ -116,6 +116,7 @@ export function History() {
               <option value="">Todas</option>
               <option value="manual">Manual</option>
               <option value="schedule">Agenda</option>
+              <option value="scheduled_action">Ação agendada</option>
             </select>
           </div>
           <div className="field">
@@ -162,12 +163,18 @@ export function History() {
                 </tr>
               </thead>
               <tbody>
-                {history.data?.items.map(({ item, kind, created_at, trigger, schedule_name }) => (
+                {history.data?.items.map(({ item, kind, created_at, trigger, schedule_name, scheduled_action_label }) => (
                   <tr key={item.id} data-testid="history-row">
                     <td>{formatDateTime(created_at)}</td>
                     <td>
                       {KIND_LABEL[kind]}
-                      <div className="subtle">{trigger === 'schedule' ? `agenda: ${schedule_name}` : 'manual'}</div>
+                      <div className="subtle">
+                        {trigger === 'schedule'
+                          ? `agenda: ${schedule_name}`
+                          : trigger === 'scheduled_action'
+                            ? `ação agendada: ${scheduled_action_label ?? ''}`
+                            : 'manual'}
+                      </div>
                     </td>
                     <td>
                       {item.label.project_name} · {item.label.service_name} · {item.label.environment_name}

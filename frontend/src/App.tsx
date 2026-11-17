@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Route, Routes } from 'react-router'
 
 import { UNAUTHORIZED_EVENT, api } from './api/client'
+import { ConsolePage } from './pages/ConsolePage'
 import { Dashboard } from './pages/Dashboard'
 import { History } from './pages/History'
 import { Layout } from './pages/Layout'
@@ -50,6 +51,7 @@ export function App() {
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="schedules" element={<Schedules />} />
         <Route path="history" element={<History />} />
+        <Route path="console" element={<ConsolePage />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<p className="muted">Página não encontrada.</p>} />
       </Route>

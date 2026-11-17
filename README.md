@@ -40,6 +40,11 @@ arquivo SQLite; o token do Railway é guardado cifrado.
   serviços selecionados, em uma ou mais janelas por dia, nos dias da semana escolhidos e no
   fuso da agenda — ex.: seg–sex, ligado das 07:00 às 12:00 e das 13:00 às 18:00. Detalhes em
   [Agendas](#agendas).
+- **Console de comandos**: tudo o que a interface faz, em uma linha, na página **Console** ou
+  num painel aberto com ``Ctrl+` `` / `Ctrl+K` em qualquer tela — `stop all`, `start all --env
+  production`, `restart */api@production`, `stop all --at 18:00`, seletores com curinga,
+  simulação (`--dry-run`), apelidos e `--json`. Detalhes em [Console](#console) e a referência
+  completa em [`docs/console.md`](docs/console.md).
 
 Fora do escopo desta versão: expressões cron livres, feriados, criar/excluir projetos ou serviços,
 notificações, múltiplas contas, custos.
@@ -188,6 +193,38 @@ cp backend/railway-manager.db backend/railway-manager.db.bak
 
 Voltar para a versão anterior depois da atualização exige restaurar esse backup.
 
+## Console
+
+O console (menu **Console**, ou ``Ctrl+` `` / `Ctrl+K` em qualquer tela) executa comandos
+sobre a mesma API e com as mesmas regras da interface. `help` lista os comandos e
+`help <comando>` mostra opções e exemplos; a referência completa, com seletores, atalhos e
+receitas, está em [`docs/console.md`](docs/console.md).
+
+```
+stop all --dry-run                      # o que seria desligado
+stop all --except infra                 # desliga tudo, menos infra (confirmação: digite "tudo")
+start all --env production -y           # liga produção, sem perguntar
+restart loja/api@production             # desliga e liga de novo
+stop all --at 19:00; start all --env production --at "amanhã 07:00"
+at list                                 # ações agendadas pendentes (também na tela Agendas)
+```
+
+- **Ações agendadas pontuais** (`--at`/`--in`) são executadas pelo agendador uma única vez,
+  com as mesmas regras, catch-up (`RM_SCHEDULE_CATCHUP_SECS`) e auditoria das agendas; no
+  histórico a origem é "ação agendada". Até 30 dias à frente; canceláveis até o horário.
+- **Reiniciar** são duas operações (desligar, depois ligar as que desligaram). Se a página
+  for fechada entre as duas, as instâncias ficam desligadas e o console, ao reabrir, mostra o
+  comando para ligá-las.
+- O token só é digitado num campo mascarado (`credential set account`) e nunca vai para o
+  histórico de comandos, que fica guardado apenas neste navegador.
+
+### Atualizando para a versão com o console
+
+A primeira inicialização reconstrói de novo a tabela de operações no SQLite (para a origem
+"ação agendada"). Os dados são preservados, mas **faça um backup antes**, como na
+[atualização das agendas](#atualizando-de-uma-versão-sem-agendas); voltar para a versão
+anterior depois de alguma ação agendada ter sido executada exige restaurar o backup.
+
 ## Limitações conhecidas
 
 - **Rate limit do Railway** (por plano: Free 100 req/hora; Hobby 1000/hora e 10/s;
@@ -207,6 +244,9 @@ Voltar para a versão anterior depois da atualização exige restaurar esse back
   os eventos de agenda não se repetem, mas a configuração não é suportada.
 - Agendas com muitos serviços no mesmo minuto concentram chamadas ao Railway nesse
   horário (o rate limit enfileira as chamadas).
+- O `restart` do console é orquestrado pelo navegador: fechar a aba entre as etapas deixa
+  as instâncias desligadas (o console avisa ao reabrir). Histórico de comandos e apelidos
+  do console ficam só no navegador em que foram criados.
 
 ## Desenvolvimento
 

@@ -31,6 +31,8 @@ fn operation_from_row(row: &SqliteRow, prefix: &str) -> RepoResult<Operation> {
         trigger: row.parse(&col("trigger"))?,
         schedule_id: row.opt_parse(&col("schedule_id"))?,
         schedule_name: row.opt_text(&col("schedule_name"))?,
+        scheduled_action_id: row.opt_parse(&col("scheduled_action_id"))?,
+        scheduled_action_label: row.opt_text(&col("scheduled_action_label"))?,
         requested_by: row.text(&col("requested_by"))?,
         plan_id: row.parse(&col("plan_id"))?,
         status: row.parse(&col("status"))?,
@@ -260,7 +262,8 @@ impl OperationRepository for SqliteOperations {
 
         let mut query = QueryBuilder::<Sqlite>::new(
             "SELECT oi.*, o.kind AS o_kind, o.scope AS o_scope, o.requested_by AS o_requested_by, o.trigger AS o_trigger,
-                    o.schedule_name AS o_schedule_name, o.status AS o_status, o.created_at AS o_created_at
+                    o.schedule_name AS o_schedule_name,
+                    o.scheduled_action_label AS o_scheduled_action_label, o.status AS o_status, o.created_at AS o_created_at
                FROM operation_items oi JOIN operations o ON o.id = oi.operation_id",
         );
         push_filters(&mut query, filter);
@@ -284,6 +287,7 @@ impl OperationRepository for SqliteOperations {
                     requested_by: row.text("o_requested_by")?,
                     trigger: row.parse("o_trigger")?,
                     schedule_name: row.opt_text("o_schedule_name")?,
+                    scheduled_action_label: row.opt_text("o_scheduled_action_label")?,
                     operation_status: row.parse("o_status")?,
                     created_at: row.time("o_created_at")?,
                 })

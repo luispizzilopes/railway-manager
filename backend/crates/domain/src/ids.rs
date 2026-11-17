@@ -60,6 +60,7 @@ internal_id!(OperationItemId);
 internal_id!(PlanId);
 internal_id!(ScheduleId);
 internal_id!(ScheduleRunId);
+internal_id!(ScheduledActionId);
 
 macro_rules! railway_id {
     ($(#[$doc:meta])* $name:ident, $label:literal) => {

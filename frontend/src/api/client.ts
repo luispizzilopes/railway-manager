@@ -24,6 +24,9 @@ import type {
   ScheduleInput,
   ScheduleRun,
   ScheduleView,
+  ScheduledAction,
+  ScheduledActionInput,
+  ScheduledActionStatus,
   Uuid,
 } from './types'
 
@@ -65,7 +68,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 const get = <T>(path: string) => request<T>('GET', path)
 const post = <T>(path: string, body: unknown = {}) => request<T>('POST', path, body)
 
-export function historyQuery(filters: HistoryFilters): string {
+export function historyQuery(filters: HistoryFilters | Record<string, string | number | undefined>): string {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== '' && value !== null) params.set(key, String(value))
@@ -108,6 +111,7 @@ export const api = {
   associateInstance: (project: Uuid, input: { environment_id: string; service_id: string }) =>
     post<{ instance: InstanceView }>(`/api/projects/${project}/instances`, input),
   removeInstance: (id: Uuid) => request<void>('DELETE', `/api/instances/${id}`),
+  removeService: (id: Uuid) => request<void>('DELETE', `/api/services/${id}`),
 
   plan: (kind: PowerKind, target: PowerTarget) => post<Plan>('/api/operations/plan', { kind, target }),
   execute: (plan_id: Uuid) => post<{ operation_id: Uuid }>('/api/operations', { plan_id }),
@@ -126,6 +130,14 @@ export const api = {
   pauseSchedule: (id: Uuid) => post<ScheduleView>(`/api/schedules/${id}/pause`),
   resumeSchedule: (id: Uuid) => post<ScheduleView>(`/api/schedules/${id}/resume`),
   scheduleRuns: (id: Uuid, page = 1) => get<Page<ScheduleRun>>(`/api/schedules/${id}/runs?page=${page}&per_page=20`),
+
+  scheduledActions: (status?: ScheduledActionStatus, page = 1, perPage = 50) =>
+    get<Page<ScheduledAction> & { default_timezone: string }>(
+      `/api/scheduled-actions${historyQuery({ status, page, per_page: perPage })}`,
+    ),
+  scheduledAction: (id: Uuid) => get<ScheduledAction>(`/api/scheduled-actions/${id}`),
+  createScheduledAction: (input: ScheduledActionInput) => post<ScheduledAction>('/api/scheduled-actions', input),
+  cancelScheduledAction: (id: Uuid) => post<ScheduledAction>(`/api/scheduled-actions/${id}/cancel`),
 }
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

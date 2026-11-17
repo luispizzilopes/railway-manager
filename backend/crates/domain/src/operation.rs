@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ids::{
     OperationId, OperationItemId, PlanId, ProjectId, RailwayDeploymentId, RailwayEnvironmentId,
-    RailwayProjectId, RailwayServiceId, ScheduleId, ServiceInstanceId,
+    RailwayProjectId, RailwayServiceId, ScheduleId, ScheduledActionId, ServiceInstanceId,
 };
 use crate::power::{Decision, PowerKind};
 use crate::state::ObservedState;
@@ -163,15 +163,20 @@ pub enum OperationScope {
 
 str_enum!(OperationScope { Instance => "instance", Project => "project", Batch => "batch" });
 
-/// Origem da operação: clique do administrador ou evento de agenda.
+/// Origem da operação: clique do administrador, evento de agenda ou ação agendada pontual.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OperationTrigger {
     Manual,
     Schedule,
+    ScheduledAction,
 }
 
-str_enum!(OperationTrigger { Manual => "manual", Schedule => "schedule" });
+str_enum!(OperationTrigger {
+    Manual => "manual",
+    Schedule => "schedule",
+    ScheduledAction => "scheduled_action",
+});
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Operation {
@@ -182,6 +187,9 @@ pub struct Operation {
     /// Agenda que disparou a operação (nome copiado: sobrevive à exclusão da agenda).
     pub schedule_id: Option<ScheduleId>,
     pub schedule_name: Option<String>,
+    /// Ação agendada que disparou a operação (rótulo copiado).
+    pub scheduled_action_id: Option<ScheduledActionId>,
+    pub scheduled_action_label: Option<String>,
     pub requested_by: String,
     pub plan_id: PlanId,
     pub status: OperationStatus,

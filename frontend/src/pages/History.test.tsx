@@ -34,6 +34,50 @@ describe('histórico', () => {
     )
   })
 
+  it('origem "ação agendada" no filtro e na linha', async () => {
+    const entry = {
+      item: {
+        id: 'it-1',
+        operation_id: 'op-1',
+        service_instance_id: 'i-1',
+        label: {
+          project_id: 'p-1',
+          project_name: 'loja',
+          railway_project_id: 'rp',
+          service_name: 'api',
+          railway_service_id: 'rs',
+          environment_name: 'production',
+          railway_environment_id: 're',
+        },
+        previous_state: 'running',
+        desired_state: 'stopped',
+        final_state: 'stopped',
+        deployment_id: null,
+        result: 'succeeded',
+        error_message: null,
+        started_at: null,
+        finished_at: null,
+        duration_ms: 1000,
+      },
+      kind: 'stop',
+      scope: 'batch',
+      requested_by: 'agendador',
+      trigger: 'scheduled_action',
+      schedule_name: null,
+      scheduled_action_label: 'todos os projetos',
+      operation_status: 'succeeded',
+      created_at: '2026-11-17T21:00:05Z',
+    }
+    const calls = mockFetch({
+      'GET /api/history': { items: [entry], total: 1, page: 1, per_page: 50 },
+      'GET /api/projects': { projects: [PROJECT] },
+    })
+    renderWithProviders(<History />, { route: '/history?trigger=scheduled_action' })
+    expect(await screen.findByTestId('history-row')).toHaveTextContent('ação agendada: todos os projetos')
+    expect(screen.getByLabelText('Origem')).toHaveValue('scheduled_action')
+    expect(calls.find((c) => c.url.startsWith('/api/history'))!.url).toContain('trigger=scheduled_action')
+  })
+
   it('filtersFrom ignora vazios e página 1', () => {
     expect(filtersFrom(new URLSearchParams('kind=&page=1&environment=prod'))).toEqual({ environment: 'prod' })
   })

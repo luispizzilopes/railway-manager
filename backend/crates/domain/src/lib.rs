@@ -7,4 +7,5 @@ pub mod ids;
 pub mod operation;
 pub mod power;
 pub mod schedule;
+pub mod scheduled_action;
 pub mod state;

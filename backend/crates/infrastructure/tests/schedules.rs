@@ -341,6 +341,10 @@ async fn operation(
         trigger,
         schedule_id: schedule.map(|s| s.id),
         schedule_name: schedule.map(|s| s.name.clone()),
+        scheduled_action_id: (trigger == OperationTrigger::ScheduledAction)
+            .then(domain::ids::ScheduledActionId::new),
+        scheduled_action_label: (trigger == OperationTrigger::ScheduledAction)
+            .then(|| "todos os projetos".to_owned()),
         requested_by: "agendador".into(),
         plan_id: plan.id,
         status: OperationStatus::Succeeded,
@@ -407,4 +411,31 @@ async fn historico_filtra_por_origem_e_preserva_nome_da_agenda() {
         .unwrap()
         .unwrap();
     assert_eq!(op.schedule_id, Some(s.id));
+}
+
+#[tokio::test]
+async fn historico_filtra_por_acao_agendada_com_rotulo() {
+    use domain::operation::OperationTrigger;
+    let fx = fixture().await;
+    operation(&fx, OperationTrigger::Manual, None).await;
+    operation(&fx, OperationTrigger::ScheduledAction, None).await;
+
+    let ops = SqliteOperations::new(fx.pool.clone());
+    let filter = HistoryFilter {
+        trigger: Some(OperationTrigger::ScheduledAction),
+        ..Default::default()
+    };
+    let page = ops.history(&filter, 1, 50).await.unwrap();
+    assert_eq!(page.total, 1);
+    assert_eq!(
+        page.items[0].scheduled_action_label.as_deref(),
+        Some("todos os projetos")
+    );
+    assert_eq!(page.items[0].schedule_name, None);
+    let (op, _) = ops
+        .get(page.items[0].item.operation_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(op.scheduled_action_id.is_some());
 }

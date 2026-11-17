@@ -1166,3 +1166,209 @@ details > summary {
   color: var(--brand);
   text-decoration: none;
 }
+
+/* ---------- console ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.console {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+}
+
+.console-page {
+  height: calc(100vh - 220px);
+  min-height: 360px;
+}
+
+.console-panel {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+}
+
+.console-log {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.console-options {
+  padding: var(--space-1) var(--space-4);
+  color: var(--text-2);
+  border-top: 1px solid var(--border-muted);
+  white-space: pre-wrap;
+}
+
+.console-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.console-line-prompt {
+  background: var(--warn-soft);
+}
+
+.con-prompt-label {
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+.console-line-prompt .con-prompt-label {
+  color: var(--warn);
+}
+
+.console-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+}
+
+.con-input-echo {
+  color: var(--text-2);
+}
+
+.con-prompt-sign {
+  color: var(--brand);
+}
+
+.con-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.con-tone-muted {
+  color: var(--text-3);
+}
+
+.con-tone-error {
+  color: var(--danger);
+}
+
+.con-tone-success {
+  color: var(--success);
+}
+
+.con-tone-warn {
+  color: var(--warn);
+}
+
+.con-tone-info {
+  color: var(--info);
+}
+
+.con-muted {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+
+.con-title {
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.con-table-wrap {
+  overflow-x: auto;
+}
+
+.con-table {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.con-table th,
+.con-table td {
+  text-align: left;
+  padding: 2px var(--space-3) 2px 0;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.con-table th {
+  color: var(--text-3);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.con-json {
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: var(--text-sm);
+}
+
+.con-id {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--brand);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.console-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  height: 45vh;
+  min-height: 220px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-alt);
+  border-top: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-2);
+  resize: vertical;
+  overflow: hidden;
+}
+
+.console-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.console-drawer-head .btn {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .console-drawer {
+    height: 70vh;
+  }
+
+  .console-page {
+    height: calc(100vh - 180px);
+  }
+}

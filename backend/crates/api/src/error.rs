@@ -51,6 +51,7 @@ impl From<AppError> for ApiError {
         let (status, code) = match &err {
             AppError::Validation(_) => (S::BAD_REQUEST, "validation"),
             AppError::InvalidSchedule(_) => (S::BAD_REQUEST, "invalid_schedule"),
+            AppError::UnknownInstances(_) => (S::BAD_REQUEST, "unknown_instances"),
             AppError::Unprocessable(_) => (S::UNPROCESSABLE_ENTITY, "unprocessable"),
             AppError::NotFound(_) => (S::NOT_FOUND, "not_found"),
             AppError::Conflict(_) => (S::CONFLICT, "conflict"),
@@ -66,6 +67,7 @@ impl From<AppError> for ApiError {
         };
         let details = match &err {
             AppError::PlanAlreadyUsed(Some(id)) => Some(json!({ "operation_id": id })),
+            AppError::UnknownInstances(ids) => Some(json!({ "unknown": ids })),
             AppError::RateLimited(secs) => Some(json!({ "retry_after_secs": secs })),
             AppError::InvalidSchedule(domain::schedule::InvalidSchedule::Overlap(a, b)) => {
                 Some(json!({ "conflicts": [a, b] }))

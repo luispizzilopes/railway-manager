@@ -169,7 +169,9 @@ export interface Operation {
   id: Uuid
   kind: PowerKind
   scope: OperationScope
-  trigger: 'manual'
+  trigger: OperationTrigger
+  schedule_name?: string | null
+  scheduled_action_label?: string | null
   requested_by: string
   plan_id: Uuid
   status: OperationStatus
@@ -255,6 +257,7 @@ export type PowerTarget =
   | { type: 'instance'; instance_id: Uuid }
   | { type: 'project'; project_id: Uuid; environment_id?: Uuid | null; instance_ids?: Uuid[] | null }
   | { type: 'batch'; project_ids: Uuid[]; environment_name?: string | null }
+  | { type: 'instances'; instance_ids: Uuid[] }
 
 export interface PlanEntry {
   instance_id: Uuid
@@ -286,7 +289,7 @@ export interface OperationDetail {
   done: boolean
 }
 
-export type OperationTrigger = 'manual' | 'schedule'
+export type OperationTrigger = 'manual' | 'schedule' | 'scheduled_action'
 
 export interface HistoryEntry {
   item: OperationItem
@@ -295,6 +298,7 @@ export interface HistoryEntry {
   requested_by: string
   trigger: OperationTrigger
   schedule_name: string | null
+  scheduled_action_label: string | null
   operation_status: OperationStatus
   created_at: Iso
 }
@@ -375,4 +379,40 @@ export interface ScheduleInput {
   days: number[]
   windows: ScheduleWindow[]
   target: ScheduleTarget
+}
+
+export type ActionTarget =
+  | { type: 'all'; environment_name?: string | null }
+  | { type: 'projects'; project_ids: Uuid[]; environment_name?: string | null }
+  | { type: 'instances'; instance_ids: Uuid[] }
+
+export type ScheduledActionStatus =
+  | 'pending'
+  | 'processing'
+  | 'executed'
+  | 'late'
+  | 'skipped'
+  | 'missed'
+  | 'failed'
+  | 'cancelled'
+
+export interface ScheduledAction {
+  id: Uuid
+  kind: PowerKind
+  run_at: Iso
+  target: ActionTarget
+  note: string | null
+  label: string
+  status: ScheduledActionStatus
+  message: string | null
+  operation_id: Uuid | null
+  created_at: Iso
+  processed_at: Iso | null
+}
+
+export interface ScheduledActionInput {
+  kind: PowerKind
+  run_at: Iso
+  target: ActionTarget
+  note?: string | null
 }

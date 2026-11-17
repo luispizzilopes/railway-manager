@@ -5,6 +5,7 @@ mod inventory;
 mod operations;
 mod plans;
 mod projects;
+mod scheduled_actions;
 mod schedules;
 mod sessions;
 
@@ -22,6 +23,7 @@ pub use inventory::SqliteInventory;
 pub use operations::SqliteOperations;
 pub use plans::SqlitePlans;
 pub use projects::SqliteProjects;
+pub use scheduled_actions::SqliteScheduledActions;
 pub use schedules::{SqliteScheduleRuns, SqliteSchedules};
 pub use sessions::SqliteSessions;
 

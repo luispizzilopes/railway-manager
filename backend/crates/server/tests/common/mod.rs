@@ -9,6 +9,7 @@ use application::ports::{Clock, SystemClock};
 use application::power::{PowerConfig, PowerService};
 use application::projects::ProjectService;
 use application::railway::RailwayToken;
+use application::scheduled_actions::ScheduledActionService;
 use application::schedules::{ScheduleService, SchedulerConfig, SchedulerService};
 use application::testkit::FakeRailway;
 use application::testkit::ManualClock;
@@ -29,6 +30,7 @@ pub struct Harness {
     pub projects: Arc<ProjectService>,
     pub power: Arc<PowerService>,
     pub schedules: Arc<ScheduleService>,
+    pub actions: Arc<ScheduledActionService>,
     pub scheduler: Arc<SchedulerService>,
     /// Presente quando o harness usa relógio manual.
     pub clock: Option<Arc<ManualClock>>,
@@ -134,8 +136,16 @@ pub async fn harness_with_clock(
         chrono_tz::UTC,
         std::time::Duration::from_secs(600),
     ));
+    let actions = Arc::new(ScheduledActionService::new(
+        Arc::new(SqliteScheduledActions::new(pool.clone())),
+        Arc::new(SqliteProjects::new(pool.clone())),
+        inventory_repo.clone(),
+        clock.clone(),
+        chrono_tz::UTC,
+    ));
     let scheduler = Arc::new(SchedulerService::new(
         schedules.clone(),
+        actions.clone(),
         schedule_repo,
         runs,
         inventory_repo,
@@ -155,6 +165,7 @@ pub async fn harness_with_clock(
         projects,
         power,
         schedules,
+        actions,
         scheduler,
         clock: None,
     }

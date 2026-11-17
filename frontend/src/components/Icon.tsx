@@ -38,6 +38,12 @@ const PATHS = {
       <circle cx="17" cy="18" r="2" />
     </>
   ),
+  console: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 9 3 3-3 3M13 15h4" />
+    </>
+  ),
   logout: (
     <>
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

@@ -22,6 +22,7 @@ use crate::ports::{
     ScheduleRepository, ScheduleRunRepository,
 };
 use crate::power::{PowerService, PowerTarget};
+use crate::scheduled_actions::ScheduledActionService;
 
 /// Motivo da pausa automática quando o alvo fica vazio.
 pub const NO_TARGETS: &str = "sem instâncias no alvo";
@@ -441,6 +442,7 @@ pub struct TickReport {
 
 pub struct SchedulerService {
     schedules: Arc<ScheduleService>,
+    actions: Arc<ScheduledActionService>,
     schedule_repo: Arc<dyn ScheduleRepository>,
     runs: Arc<dyn ScheduleRunRepository>,
     inventory: Arc<dyn InventoryRepository>,
@@ -454,6 +456,7 @@ impl SchedulerService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         schedules: Arc<ScheduleService>,
+        actions: Arc<ScheduledActionService>,
         schedule_repo: Arc<dyn ScheduleRepository>,
         runs: Arc<dyn ScheduleRunRepository>,
         inventory: Arc<dyn InventoryRepository>,
@@ -464,6 +467,7 @@ impl SchedulerService {
     ) -> Self {
         Self {
             schedules,
+            actions,
             schedule_repo,
             runs,
             inventory,
@@ -478,17 +482,37 @@ impl SchedulerService {
         &self.config
     }
 
-    /// Na inicialização: eventos registrados sem operação (processo caiu no meio)
-    /// viram `failed`; nunca são reexecutados.
+    /// Na inicialização: eventos registrados sem operação e ações agendadas
+    /// reivindicadas (processo caiu no meio) viram `failed`; nunca são reexecutados.
     pub async fn startup(&self) -> AppResult<u64> {
-        Ok(self
+        let runs = self
             .runs
             .fail_pending("interrompido por reinício do servidor", self.clock.now())
-            .await?)
+            .await?;
+        Ok(runs + self.actions.startup().await?)
     }
 
-    /// Avalia as agendas até `now` e executa os eventos devidos.
+    /// Avalia as agendas até `now` e executa os eventos devidos; depois, as ações
+    /// agendadas pontuais vencidas (conflitos com eventos do mesmo ciclo viram
+    /// `skipped` pelo bloqueio de itens ativos).
     pub async fn tick(&self, now: DateTime<Utc>) -> AppResult<TickReport> {
+        let mut report = self.tick_schedules(now).await?;
+        let catchup = chrono::Duration::from_std(self.config.catchup)
+            .unwrap_or(chrono::Duration::minutes(30));
+        let late_after = chrono::Duration::from_std(self.config.tick * 2)
+            .unwrap_or(chrono::Duration::minutes(1));
+        let actions = self
+            .actions
+            .process_due(now, catchup, late_after, &self.credentials, &self.power)
+            .await?;
+        report.executed += actions.executed;
+        report.skipped += actions.skipped;
+        report.missed += actions.missed;
+        report.failed += actions.failed;
+        Ok(report)
+    }
+
+    async fn tick_schedules(&self, now: DateTime<Utc>) -> AppResult<TickReport> {
         self.schedules.pause_orphans().await?;
         let mut report = TickReport::default();
         let Some(last) = self.runs.last_evaluated().await? else {

@@ -11,3 +11,4 @@ Decisões de arquitetura do Railway Manager. Para criar um novo ADR, copie
 | [004](004-plano-execucao-verificacao.md) | Fluxo plano → execução → verificação | aceito |
 | [005](005-credenciais.md) | Armazenamento e uso da credencial Railway | aceito |
 | [006](006-agendador.md) | Agendador por varredura com exatamente-uma-vez no banco | aceito |
+| [007](007-console-e-acoes-agendadas.md) | Console de comandos no cliente e ações agendadas pontuais | aceito |

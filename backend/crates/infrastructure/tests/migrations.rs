@@ -162,3 +162,129 @@ async fn tabelas_de_agenda_e_cascatas() {
         assert_eq!(count(&pool, table).await, 0, "{table}");
     }
 }
+
+/// Versão com as agendas, antes das ações agendadas (change command-console).
+const SCHEDULES: i64 = 20261117000002;
+
+#[tokio::test]
+async fn reconstrucao_aceita_origem_scheduled_action_sem_perder_historico() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("agendas.db");
+    let pool = pool_at(&path).await;
+    MIGRATOR.run_to(SCHEDULES, &pool).await.unwrap();
+
+    sqlx::raw_sql(
+        "INSERT INTO projects (id, railway_project_id, name, created_at, sync_status)
+             VALUES ('p1', 'rp1', 'loja', '2026-11-16T10:00:00.000Z', 'ok');
+         INSERT INTO operation_plans (id, payload_json, created_at, expires_at)
+             VALUES ('plan1', '{}', '2026-11-16T10:00:00.000Z', '2026-11-16T10:05:00.000Z'),
+                    ('plan2', '{}', '2026-11-17T10:00:00.000Z', '2026-11-17T10:05:00.000Z');
+         INSERT INTO operations (id, kind, scope, trigger, requested_by, plan_id, status, created_at)
+             VALUES ('op1', 'stop', 'project', 'manual', 'admin', 'plan1', 'succeeded', '2026-11-16T10:01:00.000Z');
+         INSERT INTO operations (id, kind, scope, trigger, schedule_id, schedule_name, requested_by,
+                                 plan_id, status, created_at)
+             VALUES ('op2', 'start', 'project', 'schedule', 'sch1', 'comercial', 'agendador',
+                     'plan2', 'succeeded', '2026-11-17T10:00:00.000Z');
+         INSERT INTO operation_items (id, operation_id, project_id, project_name,
+             railway_project_id, service_name, railway_service_id, environment_name, railway_environment_id,
+             previous_state, desired_state, result)
+             VALUES ('it1', 'op1', 'p1', 'loja', 'rp1', 'api', 'rs1', 'production', 're1',
+                     'running', 'stopped', 'succeeded'),
+                    ('it2', 'op2', 'p1', 'loja', 'rp1', 'api', 'rs1', 'production', 're1',
+                     'stopped', 'running', 'succeeded');",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    MIGRATOR.run(&pool).await.unwrap();
+
+    assert_eq!(count(&pool, "operations").await, 2);
+    assert_eq!(count(&pool, "operation_items").await, 2);
+    let name: String = sqlx::query_scalar("SELECT schedule_name FROM operations WHERE id = 'op2'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(name, "comercial");
+    let violations: Vec<(String,)> = sqlx::query_as("PRAGMA foreign_key_check")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert!(violations.is_empty(), "{violations:?}");
+
+    sqlx::raw_sql(
+        "INSERT INTO operation_plans (id, payload_json, created_at, expires_at)
+             VALUES ('plan3', '{}', '2026-11-17T18:00:00.000Z', '2026-11-17T18:05:00.000Z');
+         INSERT INTO operations (id, kind, scope, trigger, scheduled_action_id, scheduled_action_label,
+                                 requested_by, plan_id, status, created_at)
+             VALUES ('op3', 'stop', 'batch', 'scheduled_action', 'a1', 'todos os projetos',
+                     'agendador', 'plan3', 'pending', '2026-11-17T18:00:00.000Z');",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let missing_label = sqlx::raw_sql(
+        "INSERT INTO operation_plans (id, payload_json, created_at, expires_at)
+             VALUES ('plan4', '{}', '2026-11-17T18:00:00.000Z', '2026-11-17T18:05:00.000Z');
+         INSERT INTO operations (id, kind, scope, trigger, requested_by, plan_id, status, created_at)
+             VALUES ('op4', 'stop', 'batch', 'scheduled_action', 'agendador', 'plan4', 'pending',
+                     '2026-11-17T18:00:00.000Z');",
+    )
+    .execute(&pool)
+    .await;
+    assert!(missing_label.is_err());
+
+    sqlx::query("DELETE FROM operations WHERE id = 'op1'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count(&pool, "operation_items").await, 1, "cascata mantida");
+}
+
+#[tokio::test]
+async fn tabelas_de_acoes_agendadas_e_cascatas() {
+    let pool = connect("sqlite::memory:").await.unwrap();
+    sqlx::raw_sql(
+        "INSERT INTO projects (id, railway_project_id, name, created_at, sync_status)
+             VALUES ('p1', 'rp1', 'loja', '2026-11-16T10:00:00.000Z', 'ok');
+         INSERT INTO environments (id, project_id, railway_environment_id, name, is_ephemeral)
+             VALUES ('e1', 'p1', 're1', 'production', 0);
+         INSERT INTO services (id, project_id, railway_service_id, name) VALUES ('s1', 'p1', 'rs1', 'api');
+         INSERT INTO service_instances (id, project_id, service_id, environment_id) VALUES ('i1', 'p1', 's1', 'e1');
+         INSERT INTO scheduled_actions (id, kind, run_at, target_kind, label, status, created_at)
+             VALUES ('a1', 'stop', '2026-11-17T21:00:00.000Z', 'projects', 'loja', 'pending',
+                     '2026-11-17T14:00:00.000Z'),
+                    ('a2', 'start', '2026-11-18T10:00:00.000Z', 'instances', 'loja/api@production',
+                     'pending', '2026-11-17T14:00:00.000Z');
+         INSERT INTO scheduled_action_projects (action_id, project_id) VALUES ('a1', 'p1');
+         INSERT INTO scheduled_action_instances (action_id, service_instance_id) VALUES ('a2', 'i1');",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let env_on_instances = sqlx::query(
+        "INSERT INTO scheduled_actions (id, kind, run_at, target_kind, environment_name, label, status, created_at)
+             VALUES ('a3', 'stop', '2026-11-17T21:00:00.000Z', 'instances', 'production', 'x', 'pending',
+                     '2026-11-17T14:00:00.000Z')",
+    )
+    .execute(&pool)
+    .await;
+    assert!(env_on_instances.is_err());
+
+    sqlx::query("DELETE FROM service_instances WHERE id = 'i1'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count(&pool, "scheduled_action_instances").await, 0);
+    sqlx::query("DELETE FROM projects WHERE id = 'p1'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count(&pool, "scheduled_action_projects").await, 0);
+    assert_eq!(
+        count(&pool, "scheduled_actions").await,
+        2,
+        "as ações ficam (o alvo vazio vira `skipped` na execução)"
+    );
+}

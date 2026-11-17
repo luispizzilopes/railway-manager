@@ -18,6 +18,9 @@ pub enum AppError {
     /// Agenda inválida (400); sobreposição traz as janelas em conflito.
     #[error("{0}")]
     InvalidSchedule(domain::schedule::InvalidSchedule),
+    /// Instâncias inexistentes ou não gerenciadas num alvo de instâncias (400).
+    #[error("instâncias desconhecidas ou não gerenciadas: {}", ids(.0))]
+    UnknownInstances(Vec<domain::ids::ServiceInstanceId>),
     /// Plano já executado (409), com a operação criada por ele.
     #[error("este plano já foi executado")]
     PlanAlreadyUsed(Option<domain::ids::OperationId>),
@@ -41,6 +44,13 @@ pub enum AppError {
     Railway(String),
     #[error("erro interno: {0}")]
     Internal(String),
+}
+
+fn ids(list: &[domain::ids::ServiceInstanceId]) -> String {
+    list.iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 pub type AppResult<T> = Result<T, AppError>;

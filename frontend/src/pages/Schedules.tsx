@@ -448,6 +448,73 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
   )
 }
 
+// ---------- ações agendadas pontuais ----------
+
+/** Ações pendentes criadas pelo console (`stop all --at 18:00`), com cancelamento. */
+export function PendingActions() {
+  const queryClient = useQueryClient()
+  const actions = useQuery({
+    queryKey: ['scheduled-actions', 'pending'],
+    queryFn: () => api.scheduledActions('pending'),
+    refetchInterval: 60_000,
+  })
+  const cancel = useMutation({
+    mutationFn: (id: string) => api.cancelScheduledAction(id),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['scheduled-actions'] }),
+  })
+  const items = actions.data?.items ?? []
+  if (!actions.data && !actions.error) return null
+  return (
+    <section aria-labelledby="pending-actions" className="stack">
+      <div>
+        <h2 id="pending-actions">Ações agendadas</h2>
+        <p className="subtle">
+          Ações únicas criadas pelo console, por exemplo <code>stop all --at 18:00</code>. Veja{' '}
+          <code>help stop</code> no console.
+        </p>
+      </div>
+      <ErrorAlert error={actions.error ?? cancel.error} />
+      {items.length === 0 ? (
+        <div className="card empty">Nenhuma ação pendente.</div>
+      ) : (
+        <div className="card table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Ação</th>
+                <th>Alvo</th>
+                <th>Quando</th>
+                <th>Observação</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((a) => (
+                <tr key={a.id} data-testid="pending-action">
+                  <td>{KIND_LABEL[a.kind]}</td>
+                  <td>{a.label}</td>
+                  <td className="mono">{formatInZone(a.run_at, actions.data!.default_timezone)}</td>
+                  <td>{a.note ?? ''}</td>
+                  <td className="num">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      disabled={cancel.isPending}
+                      onClick={() => cancel.mutate(a.id)}
+                    >
+                      Cancelar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ---------- lista ----------
 
 export function Schedules() {
@@ -581,6 +648,7 @@ export function Schedules() {
             O agendador age só nos horários: ligar ou desligar manualmente vale até o próximo evento.
           </p>
         )}
+        <PendingActions />
       </div>
 
       {editing && (

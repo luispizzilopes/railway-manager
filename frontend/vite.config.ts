@@ -7,6 +7,8 @@ const backend = process.env.RM_BACKEND_URL ?? 'http://localhost:8080'
 export default defineConfig({
   plugins: [react()],
   server: {
+    // O teste de consistência do console lê ../docs/console.md.
+    fs: { allow: ['.', '../docs'] },
     proxy: {
       '/api': backend,
       '/healthz': backend,

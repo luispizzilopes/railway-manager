@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use domain::deployment::DeploymentStatus;
 use domain::ids::{
     EnvironmentId, OperationId, OperationItemId, PlanId, ProjectId, RailwayDeploymentId,
-    RailwayEnvironmentId, ScheduleId, ServiceInstanceId,
+    RailwayEnvironmentId, ScheduleId, ScheduledActionId, ServiceInstanceId,
 };
 use domain::operation::{
     InstanceLabel, ItemResult, Operation, OperationItem, OperationScope, OperationStatus,
@@ -57,6 +57,23 @@ impl Default for PowerConfig {
     }
 }
 
+/// Quem disparou a execução.
+enum Origin {
+    Manual,
+    Schedule(ScheduleId, String),
+    ScheduledAction(ScheduledActionId, String),
+}
+
+impl Origin {
+    fn trigger(&self) -> OperationTrigger {
+        match self {
+            Self::Manual => OperationTrigger::Manual,
+            Self::Schedule(..) => OperationTrigger::Schedule,
+            Self::ScheduledAction(..) => OperationTrigger::ScheduledAction,
+        }
+    }
+}
+
 /// Alvo de uma operação.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PowerTarget {
@@ -72,6 +89,8 @@ pub enum PowerTarget {
         projects: Vec<ProjectId>,
         environment_name: Option<String>,
     },
+    /// Conjunto arbitrário de instâncias gerenciadas, de um ou mais projetos.
+    Instances(Vec<ServiceInstanceId>),
 }
 
 /// Custo estimado em requisições ao Railway (mínimo, sem contar novas tentativas).
@@ -243,6 +262,32 @@ impl PowerService {
                     .collect();
                 (OperationScope::Batch, views)
             }
+            PowerTarget::Instances(ids) => {
+                if ids.is_empty() {
+                    return Err(AppError::Validation(
+                        "selecione ao menos uma instância".into(),
+                    ));
+                }
+                let mut seen = HashSet::new();
+                let wanted: Vec<_> = ids.iter().copied().filter(|i| seen.insert(*i)).collect();
+                let mut by_id: HashMap<_, _> = self
+                    .inventory
+                    .list_instances(None)
+                    .await?
+                    .into_iter()
+                    .map(|v| (v.instance.id, v))
+                    .collect();
+                let unknown: Vec<_> = wanted
+                    .iter()
+                    .copied()
+                    .filter(|i| !by_id.contains_key(i))
+                    .collect();
+                if !unknown.is_empty() {
+                    return Err(AppError::UnknownInstances(unknown));
+                }
+                let views = wanted.iter().filter_map(|i| by_id.remove(i)).collect();
+                (OperationScope::Batch, views)
+            }
         };
         if views.is_empty() {
             return Err(AppError::Validation(
@@ -329,8 +374,7 @@ impl PowerService {
         plan_id: PlanId,
         requested_by: &str,
     ) -> AppResult<OperationId> {
-        self.execute_as(plan_id, requested_by, OperationTrigger::Manual, None)
-            .await
+        self.execute_as(plan_id, requested_by, Origin::Manual).await
     }
 
     /// Execução disparada por uma agenda: mesmo fluxo, registrando a origem.
@@ -340,29 +384,40 @@ impl PowerService {
         schedule_id: ScheduleId,
         schedule_name: &str,
     ) -> AppResult<OperationId> {
-        let origin = Some((schedule_id, schedule_name.to_owned()));
-        self.execute_as(plan_id, SCHEDULER_USER, OperationTrigger::Schedule, origin)
-            .await
+        let origin = Origin::Schedule(schedule_id, schedule_name.to_owned());
+        self.execute_as(plan_id, SCHEDULER_USER, origin).await
+    }
+
+    /// Execução disparada por uma ação agendada pontual.
+    pub async fn execute_scheduled_action(
+        self: &Arc<Self>,
+        plan_id: PlanId,
+        action_id: ScheduledActionId,
+        label: &str,
+    ) -> AppResult<OperationId> {
+        let origin = Origin::ScheduledAction(action_id, label.to_owned());
+        self.execute_as(plan_id, SCHEDULER_USER, origin).await
     }
 
     async fn execute_as(
         self: &Arc<Self>,
         plan_id: PlanId,
         requested_by: &str,
-        trigger: OperationTrigger,
-        schedule: Option<(ScheduleId, String)>,
+        origin: Origin,
     ) -> AppResult<OperationId> {
         let plan = self.plans.get(plan_id).await?.ok_or_else(|| {
             AppError::Validation("plano inexistente: gere e confirme um plano".into())
         })?;
         let now = self.clock.now();
-        let operation = Operation {
+        let mut operation = Operation {
             id: OperationId::new(),
             kind: plan.kind,
             scope: plan.scope,
-            trigger,
-            schedule_id: schedule.as_ref().map(|(id, _)| *id),
-            schedule_name: schedule.map(|(_, name)| name),
+            trigger: origin.trigger(),
+            schedule_id: None,
+            schedule_name: None,
+            scheduled_action_id: None,
+            scheduled_action_label: None,
             requested_by: requested_by.to_owned(),
             plan_id,
             status: OperationStatus::Pending,
@@ -370,6 +425,17 @@ impl PowerService {
             started_at: None,
             finished_at: None,
         };
+        match origin {
+            Origin::Manual => {}
+            Origin::Schedule(id, name) => {
+                operation.schedule_id = Some(id);
+                operation.schedule_name = Some(name);
+            }
+            Origin::ScheduledAction(id, label) => {
+                operation.scheduled_action_id = Some(id);
+                operation.scheduled_action_label = Some(label);
+            }
+        }
         let items: Vec<_> = plan
             .entries
             .iter()

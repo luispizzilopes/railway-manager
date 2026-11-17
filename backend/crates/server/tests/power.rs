@@ -220,6 +220,76 @@ async fn alvo_vazio_e_invalido() {
     ));
 }
 
+// ---------- alvo `instances` (console) ----------
+
+async fn with_blog(h: &Harness) -> ProjectId {
+    h.railway
+        .add_project(2, "blog", Some(900))
+        .add_environment(2, 30, "production", false)
+        .add_service(2, 40, "web")
+        .add_running(2, 30, 40, 200);
+    let blog = h
+        .projects
+        .register(&rid::<String>(2), None)
+        .await
+        .unwrap()
+        .id;
+    h.inventory.import(blog, &[pair(30, 40)]).await.unwrap();
+    blog
+}
+
+#[tokio::test]
+async fn instancias_de_projetos_diferentes_num_plano_so() {
+    let h = harness().await;
+    let p = loja(&h).await;
+    let blog = with_blog(&h).await;
+    let api = instance(&h, p, "production", "api").await;
+    let web = instance(&h, blog, "production", "web").await;
+
+    let target = PowerTarget::Instances(vec![api, web, api]);
+    let (status, mut items) = run(&h, PowerKind::Stop, target).await;
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_eq!(status, OperationStatus::Succeeded);
+    assert_eq!(
+        items,
+        [
+            ("api@production".into(), ItemResult::Succeeded),
+            ("web@production".into(), ItemResult::Succeeded),
+        ],
+        "uma operação, duplicata considerada uma vez"
+    );
+}
+
+#[tokio::test]
+async fn instancias_com_escopo_batch_e_desconhecida_recusada() {
+    let h = harness().await;
+    let p = loja(&h).await;
+    let api = instance(&h, p, "production", "api").await;
+    let plan = h
+        .power
+        .plan(PowerKind::Stop, &PowerTarget::Instances(vec![api]))
+        .await
+        .unwrap()
+        .plan;
+    assert_eq!(plan.scope, domain::operation::OperationScope::Batch);
+
+    let ghost = ServiceInstanceId::new();
+    match h
+        .power
+        .plan(PowerKind::Stop, &PowerTarget::Instances(vec![api, ghost]))
+        .await
+    {
+        Err(AppError::UnknownInstances(ids)) => assert_eq!(ids, [ghost]),
+        other => panic!("esperava UnknownInstances, veio {other:?}"),
+    }
+    assert!(matches!(
+        h.power
+            .plan(PowerKind::Stop, &PowerTarget::Instances(vec![]))
+            .await,
+        Err(AppError::Validation(_))
+    ));
+}
+
 // ---------- 7.2 execução ----------
 
 #[tokio::test]

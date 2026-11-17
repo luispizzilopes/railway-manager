@@ -191,3 +191,34 @@ describe('integração com dashboard e histórico', () => {
     await waitFor(() => expect(calls.some((c) => c.url === '/api/history?trigger=schedule')).toBe(true))
   })
 })
+
+describe('ações agendadas', () => {
+  it('lista pendentes e cancela', async () => {
+    const pending = {
+      id: 'a-1',
+      kind: 'stop',
+      run_at: '2026-11-17T21:00:00Z',
+      target: { type: 'all', environment_name: null },
+      note: 'fim do dia',
+      label: 'todos os projetos',
+      status: 'pending',
+      message: null,
+      operation_id: null,
+      created_at: '2026-11-17T14:00:00Z',
+      processed_at: null,
+    }
+    const calls = mockFetch({
+      ...routes,
+      'GET /api/scheduled-actions': { items: [pending], total: 1, page: 1, per_page: 50, default_timezone: 'America/Sao_Paulo' },
+      'POST /api/scheduled-actions/a-1/cancel': { ...pending, status: 'cancelled' },
+    })
+    renderWithProviders(<Schedules />)
+    const row = await screen.findByTestId('pending-action')
+    expect(row).toHaveTextContent('Desligar')
+    expect(row).toHaveTextContent('todos os projetos')
+    expect(row).toHaveTextContent('18:00')
+    expect(row).toHaveTextContent('fim do dia')
+    await userEvent.click(within(row).getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => expect(calls.some((c) => c.url === '/api/scheduled-actions/a-1/cancel')).toBe(true))
+  })
+})

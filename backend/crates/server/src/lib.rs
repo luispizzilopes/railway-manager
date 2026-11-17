@@ -13,6 +13,7 @@ use application::ports::{Clock, OperationRepository, SystemClock};
 use application::power::{PowerConfig, PowerService};
 use application::projects::ProjectService;
 use application::railway::RailwayGateway;
+use application::scheduled_actions::ScheduledActionService;
 use application::schedules::{ScheduleService, SchedulerConfig, SchedulerService};
 use infrastructure::crypto::XChaChaCipher;
 use infrastructure::railway::{RailwayClient, Transport, TransportConfig};
@@ -99,8 +100,16 @@ pub fn build_state(
         config.scheduler.timezone,
         o.start_timeout,
     ));
+    let scheduled_actions = Arc::new(ScheduledActionService::new(
+        Arc::new(SqliteScheduledActions::new(pool.clone())),
+        projects_repo.clone(),
+        inventory_repo.clone(),
+        clock.clone(),
+        config.scheduler.timezone,
+    ));
     let scheduler = Arc::new(SchedulerService::new(
         schedules.clone(),
+        scheduled_actions.clone(),
         schedule_repo,
         schedule_runs,
         inventory_repo.clone(),
@@ -137,6 +146,7 @@ pub fn build_state(
         history,
         dashboard,
         schedules,
+        scheduled_actions,
         scheduler,
         sessions: Arc::new(SqliteSessions::new(pool)),
         clock,
@@ -165,7 +175,7 @@ pub fn spawn_scheduler(scheduler: Arc<SchedulerService>, clock: Arc<dyn Clock>) 
             Ok(0) => {}
             Ok(n) => tracing::warn!(
                 n,
-                "eventos de agenda interrompidos por reinício marcados como falhos"
+                "eventos de agenda e ações agendadas interrompidos por reinício marcados como falhos"
             ),
             Err(err) => tracing::error!(%err, "falha ao preparar o agendador"),
         }

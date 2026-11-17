@@ -150,6 +150,8 @@ fn operation_for(plan: &Plan) -> (Operation, Vec<OperationItem>) {
         trigger: OperationTrigger::Manual,
         schedule_id: None,
         schedule_name: None,
+        scheduled_action_id: None,
+        scheduled_action_label: None,
         requested_by: "admin".into(),
         plan_id: plan.id,
         status: OperationStatus::Pending,

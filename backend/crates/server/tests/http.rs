@@ -565,6 +565,86 @@ async fn fluxo_de_plano_e_execucao() {
 }
 
 #[tokio::test]
+async fn plano_com_instancias_de_varios_projetos() {
+    let app = app().await;
+    app.with_credential().await;
+    let loja = app.seed().await;
+    app.railway
+        .add_project(2, "blog", Some(900))
+        .add_environment(2, 30, "production", false)
+        .add_service(2, 40, "web")
+        .add_running(2, 30, 40, 200);
+    let blog = app
+        .post(
+            "/api/projects",
+            json!({ "railway_project_id": rid::<String>(2) }),
+        )
+        .await
+        .json["project"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    app.post(
+        &format!("/api/projects/{blog}/instances/import"),
+        json!({ "instances": [
+            { "environment_id": rid::<String>(30), "service_id": rid::<String>(40) }
+        ]}),
+    )
+    .await;
+    let id_of = |list: &Value, service: &str| {
+        list["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["service"]["name"] == service)
+            .unwrap()["instance"]["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let api = id_of(
+        &app.get(&format!("/api/projects/{loja}/instances"))
+            .await
+            .json,
+        "api",
+    );
+    let web = id_of(
+        &app.get(&format!("/api/projects/{blog}/instances"))
+            .await
+            .json,
+        "web",
+    );
+
+    let plan = app
+        .post(
+            "/api/operations/plan",
+            json!({ "kind": "stop", "target": { "type": "instances", "instance_ids": [api, web] } }),
+        )
+        .await;
+    assert_eq!(plan.status, StatusCode::OK, "{}", plan.text);
+    assert_eq!(plan.json["scope"], "batch");
+    let mut projects: Vec<_> = plan.json["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["project_name"].as_str().unwrap().to_owned())
+        .collect();
+    projects.sort();
+    assert_eq!(projects, ["blog", "loja"]);
+
+    let ghost = "00000000-0000-4000-8000-000000000999";
+    let unknown = app
+        .post(
+            "/api/operations/plan",
+            json!({ "kind": "stop", "target": { "type": "instances", "instance_ids": [api, ghost] } }),
+        )
+        .await;
+    assert_eq!(unknown.status, StatusCode::BAD_REQUEST);
+    assert_eq!(unknown.json["code"], "unknown_instances");
+    assert_eq!(unknown.json["details"]["unknown"], json!([ghost]));
+}
+
+#[tokio::test]
 async fn plano_expirado_responde_410() {
     let app = app_with(&[("RM_PLAN_TTL_SECS", "1")]).await;
     app.with_credential().await;
@@ -960,4 +1040,122 @@ async fn dashboard_mostra_proxima_acao_agendada() {
     assert_eq!(next["schedule_name"], "comercial");
     let at = chrono::DateTime::parse_from_rfc3339(next["at"].as_str().unwrap()).unwrap();
     assert_eq!(format!("{:02}:{:02}", at.hour(), at.minute()), end);
+}
+
+// ---------- ações agendadas (console) ----------
+
+#[tokio::test]
+async fn acoes_agendadas_criar_listar_obter_e_cancelar() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    let soon = (chrono::Utc::now() + chrono::Duration::hours(3)).to_rfc3339();
+    let later = (chrono::Utc::now() + chrono::Duration::hours(5)).to_rfc3339();
+
+    let created = app
+        .post(
+            "/api/scheduled-actions",
+            json!({ "kind": "stop", "run_at": later,
+                    "target": { "type": "all", "environment_name": "production" },
+                    "note": "fim do dia" }),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.text);
+    assert_eq!(created.json["status"], "pending");
+    assert_eq!(created.json["label"], "todos os projetos · production");
+    assert_eq!(created.json["target"]["type"], "all");
+    let id = created.json["id"].as_str().unwrap().to_owned();
+
+    let by_project = app
+        .post(
+            "/api/scheduled-actions",
+            json!({ "kind": "start", "run_at": soon,
+                    "target": { "type": "projects", "project_ids": [project] } }),
+        )
+        .await;
+    assert_eq!(
+        by_project.status,
+        StatusCode::CREATED,
+        "{}",
+        by_project.text
+    );
+    assert_eq!(by_project.json["label"], "loja");
+
+    let list = app.get("/api/scheduled-actions?status=pending").await;
+    assert_eq!(list.status, StatusCode::OK, "{}", list.text);
+    assert_eq!(list.json["total"], 2);
+    assert_eq!(
+        list.json["items"][0]["kind"], "start",
+        "pendentes da mais próxima para a mais distante"
+    );
+    assert!(list.json["default_timezone"].is_string());
+
+    assert_eq!(
+        app.get(&format!("/api/scheduled-actions/{id}")).await.json["note"],
+        "fim do dia"
+    );
+    let cancelled = app
+        .post(&format!("/api/scheduled-actions/{id}/cancel"), json!({}))
+        .await;
+    assert_eq!(cancelled.status, StatusCode::OK);
+    assert_eq!(cancelled.json["status"], "cancelled");
+    let again = app
+        .post(&format!("/api/scheduled-actions/{id}/cancel"), json!({}))
+        .await;
+    assert_eq!(again.status, StatusCode::CONFLICT);
+    assert!(
+        again.json["message"]
+            .as_str()
+            .unwrap()
+            .contains("cancelada")
+    );
+    assert_eq!(
+        app.get("/api/scheduled-actions/00000000-0000-4000-8000-000000000999")
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn acoes_agendadas_validacao() {
+    let app = app().await;
+    app.with_credential().await;
+    app.seed().await;
+    let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+    for body in [
+        json!({ "kind": "stop", "run_at": "2000-01-01T00:00:00Z", "target": { "type": "all" } }),
+        json!({ "kind": "stop", "run_at": "amanhã", "target": { "type": "all" } }),
+        json!({ "kind": "restart", "run_at": future, "target": { "type": "all" } }),
+        json!({ "kind": "stop", "run_at": future, "target": { "type": "projects", "project_ids": [] } }),
+        json!({ "kind": "stop", "run_at": future,
+                "target": { "type": "projects", "project_ids": ["00000000-0000-4000-8000-000000000999"] } }),
+    ] {
+        let reply = app.post("/api/scheduled-actions", body.clone()).await;
+        assert_eq!(
+            reply.status,
+            StatusCode::BAD_REQUEST,
+            "{body} → {}",
+            reply.text
+        );
+    }
+    let unknown = app
+        .post(
+            "/api/scheduled-actions",
+            json!({ "kind": "stop", "run_at": future,
+                    "target": { "type": "instances", "instance_ids": ["00000000-0000-4000-8000-000000000999"] } }),
+        )
+        .await;
+    assert_eq!(unknown.status, StatusCode::BAD_REQUEST);
+    assert_eq!(unknown.json["code"], "unknown_instances");
+    assert_eq!(
+        app.get("/api/scheduled-actions?status=nada").await.status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        app.get("/api/history?trigger=scheduled_action")
+            .await
+            .status,
+        StatusCode::OK
+    );
 }

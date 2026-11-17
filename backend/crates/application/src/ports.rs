@@ -7,14 +7,15 @@ use domain::credential::{CredentialMetadata, CredentialStatus};
 use domain::deployment::DeploymentStatus;
 use domain::ids::{
     CredentialId, EnvironmentId, OperationId, PlanId, ProjectId, RailwayDeploymentId,
-    RailwayEnvironmentId, RailwayProjectId, RailwayServiceId, ScheduleId, ServiceId,
-    ServiceInstanceId,
+    RailwayEnvironmentId, RailwayProjectId, RailwayServiceId, ScheduleId, ScheduledActionId,
+    ServiceId, ServiceInstanceId,
 };
 use domain::operation::{
     ItemResult, Operation, OperationItem, OperationScope, OperationStatus, OperationTrigger, Plan,
 };
 use domain::power::PowerKind;
 use domain::schedule::{Schedule, ScheduleRun};
+use domain::scheduled_action::{ScheduledAction, ScheduledActionStatus};
 use domain::state::ObservedState;
 use serde::Serialize;
 
@@ -229,6 +230,7 @@ pub struct HistoryEntry {
     pub requested_by: String,
     pub trigger: OperationTrigger,
     pub schedule_name: Option<String>,
+    pub scheduled_action_label: Option<String>,
     pub operation_status: OperationStatus,
     pub created_at: DateTime<Utc>,
 }
@@ -303,4 +305,32 @@ pub trait ScheduleRunRepository: Send + Sync {
     ) -> RepoResult<Page<ScheduleRun>>;
     /// Registros `pending` (processo caiu antes de criar a operação) viram `failed`.
     async fn fail_pending(&self, message: &str, now: DateTime<Utc>) -> RepoResult<u64>;
+}
+
+#[async_trait]
+pub trait ScheduledActionRepository: Send + Sync {
+    async fn insert(&self, action: &ScheduledAction) -> RepoResult<()>;
+    async fn get(&self, id: ScheduledActionId) -> RepoResult<Option<ScheduledAction>>;
+    /// Pendentes primeiro (mais próxima antes), depois as demais (mais recente antes).
+    async fn list(
+        &self,
+        status: Option<ScheduledActionStatus>,
+        page: u32,
+        per_page: u32,
+    ) -> RepoResult<Page<ScheduledAction>>;
+    /// Ações `pending` com instante até `now`, da mais antiga para a mais recente.
+    async fn due(&self, now: DateTime<Utc>) -> RepoResult<Vec<ScheduledAction>>;
+    /// `pending → processing` condicional: `true` só para quem a reivindicou.
+    async fn claim(&self, id: ScheduledActionId) -> RepoResult<bool>;
+    /// Grava a situação final de uma ação reivindicada.
+    async fn finish(&self, action: &ScheduledAction) -> RepoResult<()>;
+    /// `pending → cancelled`. `Err(situação atual)` se não estava pendente;
+    /// `RepoError::NotFound` se não existe.
+    async fn cancel(
+        &self,
+        id: ScheduledActionId,
+        now: DateTime<Utc>,
+    ) -> RepoResult<Result<ScheduledAction, ScheduledActionStatus>>;
+    /// Ações `processing` (processo caiu no meio) viram `failed`.
+    async fn fail_processing(&self, message: &str, now: DateTime<Utc>) -> RepoResult<u64>;
 }
