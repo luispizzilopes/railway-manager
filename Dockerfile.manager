@@ -28,7 +28,8 @@ COPY --from=frontend /app/frontend/dist /app/frontend/dist
 ENV RM_DATABASE_URL=sqlite:///data/railway-manager.db \
     RM_FRONTEND_DIR=/app/frontend/dist \
     RM_LOG=info
-VOLUME ["/data"]
+# O banco fica em /data. No Railway, anexe um Volume com mount path /data (a instrução
+# VOLUME não é suportada lá); no Docker local, use -v railway-manager-data:/data.
 USER manager
 EXPOSE 8080
 # Escuta em RM_BIND_ADDR (padrão 0.0.0.0:8080) ou em 0.0.0.0:$PORT quando o Railway define PORT.
