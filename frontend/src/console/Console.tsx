@@ -1,7 +1,7 @@
 // Visão do console: saída (role="log") e linha de comando com histórico, busca e Tab.
 
 import { useQueryClient } from '@tanstack/react-query'
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { api } from '../api/client'
 import type { Dashboard, ScheduleView, ScheduledAction } from '../api/types'
@@ -26,7 +26,19 @@ function useCompletionData() {
   }
 }
 
-export function Console({ variant = 'page', onClose }: { variant?: 'page' | 'panel'; onClose?: () => void }) {
+export function Console({
+  variant = 'page',
+  onClose,
+  prefetch = true,
+  welcome,
+}: {
+  variant?: 'page' | 'panel' | 'cli'
+  onClose?: () => void
+  /** Carrega os dados do autocompletar (só com sessão válida). */
+  prefetch?: boolean
+  /** Texto mostrado enquanto a saída está vazia. */
+  welcome?: ReactNode
+}) {
   const c = useConsole()
   const queryClient = useQueryClient()
   const completionData = useCompletionData()
@@ -39,11 +51,15 @@ export function Console({ variant = 'page', onClose }: { variant?: 'page' | 'pan
 
   useEffect(() => {
     inputRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    if (!prefetch) return
     // Dados para o autocompletar (falhas aqui não importam).
     void queryClient.prefetchQuery({ queryKey: ['dashboard'], queryFn: api.dashboard })
     void queryClient.prefetchQuery({ queryKey: ['schedules'], queryFn: () => api.schedules() })
     void queryClient.prefetchQuery({ queryKey: ['scheduled-actions', 'pending'], queryFn: () => api.scheduledActions('pending') })
-  }, [queryClient])
+  }, [prefetch, queryClient])
 
   useEffect(() => {
     const log = logRef.current
@@ -143,11 +159,21 @@ export function Console({ variant = 'page', onClose }: { variant?: 'page' | 'pan
     }
   }
 
+  /** Clique em qualquer parte do console vai para a linha de comando, exceto em
+   *  controles (ex.: copiar ID) ou quando há texto selecionado para copiar. */
+  function focusInput(e: MouseEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('button, a, input, textarea, select, summary')) return
+    if (window.getSelection()?.toString()) return
+    inputRef.current?.focus()
+  }
+
   const prompt = c.prompt
   return (
-    <div className={`console console-${variant}`}>
+    // oxlint-disable-next-line click-events-have-key-events, no-static-element-interactions -- o teclado já tem a própria linha de comando
+    <div className={`console console-${variant}`} onClick={focusInput}>
       <div className="console-log" ref={logRef} role="log" aria-live="polite" aria-label="Saída do console">
-        {c.blocks.length === 0 && (
+        {c.blocks.length === 0 && welcome}
+        {c.blocks.length === 0 && !welcome && (
           <div className="con-text con-tone-muted">
             Console do Railway Manager. Digite <strong>help</strong> para ver os comandos — por exemplo{' '}
             <code>stop all --dry-run</code> ou <code>start loja@production</code>.

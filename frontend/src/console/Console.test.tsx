@@ -78,6 +78,24 @@ describe('console', () => {
     expect(screen.queryByText(/Comandos do Railway Manager/)).not.toBeInTheDocument()
   })
 
+  it('clicar em qualquer parte do console seleciona a linha de comando', async () => {
+    mockFetch(ROUTES)
+    renderConsole()
+    await userEvent.type(input(), 'status{Enter}')
+    const log = screen.getByRole('log')
+    await within(log).findByText(/3 projeto\(s\)/)
+    input().blur()
+    expect(input()).not.toHaveFocus()
+    await userEvent.click(log)
+    expect(input()).toHaveFocus()
+
+    // Clicar num controle (copiar ID) não rouba o foco dele.
+    input().blur()
+    const id = within(log).getAllByTitle(/clique para copiar/)[0]
+    await userEvent.click(id)
+    expect(id).toHaveFocus()
+  })
+
   it('Ctrl+R busca no histórico', async () => {
     mockFetch(ROUTES)
     const store = memoryStore()
@@ -167,6 +185,7 @@ describe('console', () => {
         return { status: 401, json: { code: 'unauthorized', message: 'autenticação necessária' } }
       },
     })
+    window.localStorage.setItem('rm:mode', 'ui')
     renderWithProviders(<App />, { route: '/console' })
     const field = await screen.findByLabelText(/Comando/)
     await userEvent.type(field, 'project discover{Enter}')

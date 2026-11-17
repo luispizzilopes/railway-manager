@@ -198,6 +198,10 @@ export function consoleHarness(routes: Record<string, unknown>, options: Harness
     setAliases: (next) => void (aliases = next),
     json,
     logout: async () => void (loggedOut = true),
+    authenticated: true,
+    login: async (password) => api.login(password),
+    mode: 'ui',
+    setMode: () => undefined,
     pollMs: 0,
   })
 

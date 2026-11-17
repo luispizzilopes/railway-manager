@@ -6,6 +6,7 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import { useLocation, useNavigate } from 'react-router'
 
 import { api } from '../api/client'
+import type { Mode } from '../mode'
 import { COMMANDS } from './commands'
 import { clearInterruptedRestart, peekInterruptedRestart, restartCommand, restartNotice } from './commands/power'
 import { carriesSecret, runLine } from './engine'
@@ -56,11 +57,21 @@ export function ConsoleProvider({
   onLogout,
   store: givenStore,
   pollMs = 2000,
+  commands = COMMANDS,
+  authenticated = true,
+  onLogin = async () => undefined,
+  mode = 'ui',
+  onMode = () => undefined,
 }: {
   children: ReactNode
   onLogout: () => void | Promise<void>
   store?: Store
   pollMs?: number
+  commands?: CommandDef[]
+  authenticated?: boolean
+  onLogin?: () => void | Promise<void>
+  mode?: Mode
+  onMode?: (mode: Mode) => void
 }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -158,16 +169,23 @@ export function ConsoleProvider({
         dashboard: (fresh) =>
           queryClient.fetchQuery({ queryKey: ['dashboard'], queryFn: api.dashboard, staleTime: fresh ? 0 : 30_000 }),
         store,
-        commands: COMMANDS,
+        commands,
         aliases: aliasesRef.current,
         setAliases,
         json,
         logout: async () => {
           await onLogout()
         },
+        authenticated,
+        login: async (password) => {
+          await api.login(password)
+          await onLogin()
+        },
+        mode,
+        setMode: onMode,
         pollMs,
       }),
-    [ask, clear, navigate, onLogout, pollMs, print, queryClient, setAliases, store, update],
+    [ask, authenticated, clear, commands, mode, navigate, onLogin, onLogout, onMode, pollMs, print, queryClient, setAliases, store, update],
   )
 
   const run = useCallback(
@@ -212,7 +230,7 @@ export function ConsoleProvider({
     function onKey(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key.toLowerCase() === 'k')) {
         e.preventDefault()
-        if (pathname === '/console') {
+        if (pathname === '/console' || mode === 'cli') {
           document.getElementById('console-input')?.focus()
         } else {
           setOpen((o) => !o)
@@ -221,7 +239,7 @@ export function ConsoleProvider({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [pathname])
+  }, [mode, pathname])
 
   const value: ConsoleState = {
     blocks,
@@ -237,7 +255,7 @@ export function ConsoleProvider({
     answer,
     interrupt,
     clear,
-    commands: COMMANDS,
+    commands,
   }
   return <ConsoleContext.Provider value={value}>{children}</ConsoleContext.Provider>
 }

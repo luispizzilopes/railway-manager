@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router'
 import { Icon, type IconName } from '../components/Icon'
 import { Console } from '../console/Console'
 import { ConsoleProvider, useConsole } from '../console/ConsoleProvider'
+import type { Mode } from '../mode'
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: 'Visão geral', icon: 'overview', end: true },
@@ -37,28 +38,10 @@ function ConsolePanel() {
   )
 }
 
-function ConsoleToggle() {
-  const { open, setOpen } = useConsole()
-  const { pathname } = useLocation()
-  if (pathname === '/console') return null
-  return (
-    <button
-      type="button"
-      className="btn btn-ghost btn-sm"
-      aria-pressed={open}
-      title="Abrir o console (Ctrl+` ou Ctrl+K)"
-      onClick={() => setOpen(!open)}
-    >
-      <Icon name="console" />
-      Console
-    </button>
-  )
-}
-
-export function Layout({ onLogout }: { onLogout: () => void }) {
+export function Layout({ onLogout, onMode }: { onLogout: () => void; onMode?: (mode: Mode) => void }) {
   const { pathname } = useLocation()
   return (
-    <ConsoleProvider onLogout={onLogout}>
+    <ConsoleProvider onLogout={onLogout} mode="ui" onMode={onMode}>
       <div className="app">
         <aside className="side">
           <div className="side-brand">
@@ -88,7 +71,17 @@ export function Layout({ onLogout }: { onLogout: () => void }) {
               <strong>{currentSection(pathname)}</strong>
             </div>
             <div className="topnav-right">
-              <ConsoleToggle />
+              {onMode && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  title="Usar só a linha de comando (a sessão continua)"
+                  onClick={() => onMode('cli')}
+                >
+                  <Icon name="console" />
+                  Modo CLI
+                </button>
+              )}
               <span className="env-pill">admin</span>
             </div>
           </header>

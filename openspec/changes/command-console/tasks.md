@@ -51,3 +51,10 @@
 - [x] 7.3 Atualizar README (console, ações agendadas, backup antes de atualizar) e escrever ADR-007 (console no cliente, reinício orquestrado, ações agendadas pontuais); verificar presença e links em `docs/adr/README.md`
 - [x] 7.4 Executar `scripts/check.sh` (backend e frontend); verificar que tudo passa
 - [ ] 7.5 Validação manual com projeto descartável: `stop all --dry-run`, `stop all`, `start all`, `restart` de uma instância, `stop <proj> --in 2m` observando a execução e o histórico com origem `scheduled_action`, e recarregar a página no meio de um `restart` para ver o aviso; registrar o resultado
+
+## 8. Modo somente CLI
+
+- [x] 8.1 Comandos `login`, `ui` e `cli`, contexto com sessão e modo, e bloqueio dos demais comandos antes do login; verificar com testes do fluxo no `App`
+- [x] 8.2 Tela de escolha antes do login (salva no navegador), console em tela cheia no modo CLI com login automático, e botões de troca na interface, no login e na CLI; verificar com testes de componente ("Escolha antes do login", "Login pela linha de comando", "Alternar sem entrar de novo")
+- [x] 8.3 Documentar em `docs/console.md` e no README; verificar com o teste de consistência da documentação
+

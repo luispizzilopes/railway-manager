@@ -1,13 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
 
 import { UNAUTHORIZED_EVENT, api } from './api/client'
+import { type Mode, readMode, writeMode } from './mode'
+import { CliApp } from './pages/CliApp'
 import { ConsolePage } from './pages/ConsolePage'
 import { Dashboard } from './pages/Dashboard'
 import { History } from './pages/History'
 import { Layout } from './pages/Layout'
 import { Login } from './pages/Login'
+import { ModeChooser } from './pages/ModeChooser'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { Projects } from './pages/Projects'
 import { Schedules } from './pages/Schedules'
@@ -16,6 +19,7 @@ import { Settings } from './pages/Settings'
 export function App() {
   const queryClient = useQueryClient()
   const session = useQuery({ queryKey: ['session'], queryFn: api.session, retry: false, staleTime: Infinity })
+  const [mode, setModeState] = useState<Mode | null>(readMode)
 
   useEffect(() => {
     const expired = () => queryClient.setQueryData(['session'], null)
@@ -23,17 +27,15 @@ export function App() {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, expired)
   }, [queryClient])
 
-  if (session.isPending) return null
-  if (!session.data) {
-    return (
-      <Login
-        onLogin={() => {
-          // Descarta dados de outra sessão, mas mantém a consulta de sessão para relê-la.
-          queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'session' })
-          void queryClient.refetchQueries({ queryKey: ['session'] })
-        }}
-      />
-    )
+  function setMode(next: Mode) {
+    writeMode(next)
+    setModeState(next)
+  }
+
+  async function afterLogin() {
+    // Descarta dados de outra sessão, mas mantém a consulta de sessão para relê-la.
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'session' })
+    await queryClient.refetchQueries({ queryKey: ['session'] })
   }
 
   async function logout() {
@@ -43,9 +45,18 @@ export function App() {
     queryClient.setQueryData(['session'], null)
   }
 
+  if (session.isPending) return null
+  const authenticated = Boolean(session.data)
+  // A escolha vem antes do login; com sessão e sem escolha, vale a interface gráfica.
+  if (!authenticated && mode === null) return <ModeChooser onChoose={setMode} />
+  if (mode === 'cli') {
+    return <CliApp authenticated={authenticated} onLogin={afterLogin} onLogout={logout} onMode={setMode} />
+  }
+  if (!authenticated) return <Login onLogin={() => void afterLogin()} onCli={() => setMode('cli')} />
+
   return (
     <Routes>
-      <Route element={<Layout onLogout={logout} />}>
+      <Route element={<Layout onLogout={logout} onMode={setMode} />}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />

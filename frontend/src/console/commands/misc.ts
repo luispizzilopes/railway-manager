@@ -28,13 +28,11 @@ async function help(ctx: Ctx, inv: Invocation) {
 
 async function open(ctx: Ctx, inv: Invocation) {
   const target = inv.args[0]
-  const page = PAGES[target.toLowerCase()]
-  if (page) {
-    ctx.navigate(page)
-    return
-  }
-  const { project } = findProject(await ctx.dashboard(), target)
-  ctx.navigate(`/projects/${project.id}`)
+  let to = PAGES[target.toLowerCase()]
+  if (!to) to = `/projects/${findProject(await ctx.dashboard(), target).project.id}`
+  ctx.navigate(to)
+  // No modo CLI não há telas: abrir uma passa para a interface gráfica.
+  if (ctx.mode === 'cli') ctx.setMode('ui')
 }
 
 const ALIAS_NAME = /^[\p{L}\d_-]+$/u
@@ -94,7 +92,7 @@ export const miscCommands: CommandDef[] = [
     name: 'open',
     aliases: ['abrir'],
     group: 'Console',
-    summary: 'abre uma tela da interface ou a página de um projeto',
+    summary: 'abre uma tela da interface ou a página de um projeto (no modo CLI, passa para a interface gráfica)',
     usage: '<página|projeto>',
     args: [
       {
@@ -132,6 +130,9 @@ export const miscCommands: CommandDef[] = [
     group: 'Console',
     summary: 'encerra a sessão',
     examples: ['logout'],
-    run: async (ctx) => ctx.logout(),
+    run: async (ctx) => {
+      await ctx.logout()
+      note(ctx, 'sessão encerrada', 'success')
+    },
   },
 ]

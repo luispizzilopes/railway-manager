@@ -2,7 +2,7 @@ import { type FormEvent, useState } from 'react'
 
 import { ApiError, api } from '../api/client'
 
-export function Login({ onLogin }: { onLogin: () => void }) {
+export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -54,6 +54,11 @@ export function Login({ onLogin }: { onLogin: () => void }) {
           <button className="btn btn-primary" type="submit" disabled={busy || !password}>
             Entrar
           </button>
+          {onCli && (
+            <button type="button" className="btn btn-ghost" onClick={onCli}>
+              Mudar para linha de comando (CLI)
+            </button>
+          )}
         </div>
       </form>
     </div>

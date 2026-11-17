@@ -5,6 +5,7 @@ O console faz em uma linha tudo o que a interface do Railway Manager faz, além 
 O console usa a mesma API, as mesmas regras e a mesma auditoria da interface. Toda ação de ligar ou desligar passa pelo plano do servidor. Nada é executado sem que o plano seja mostrado antes.
 
 - [Abrir o console](#abrir-o-console)
+- [Modo somente CLI](#modo-somente-cli)
 - [Sintaxe](#sintaxe)
 - [Seletores de alvo](#seletores-de-alvo)
 - [Plano, confirmação e simulação](#plano-confirmação-e-simulação)
@@ -24,9 +25,21 @@ O console usa a mesma API, as mesmas regras e a mesma auditoria da interface. To
 ## Abrir o console
 
 - **Página:** item **Console** no menu lateral (`/console`).
-- **Painel em qualquer tela:** ``Ctrl+` `` (crase) ou `Ctrl+K` abre e fecha um painel na parte de baixo da tela, sem sair da tela atual. No macOS, `Cmd` também funciona. `Esc` fecha o painel. O botão **Console** no topo faz o mesmo.
+- **Painel em qualquer tela:** ``Ctrl+` `` (crase) ou `Ctrl+K` abre e fecha um painel na parte de baixo da tela, sem sair da tela atual. No macOS, `Cmd` também funciona. `Esc` fecha o painel.
 
 A saída e o comando em andamento são os mesmos no painel e na página: dá para começar num e continuar no outro. O console exige sessão válida. Se a sessão expirar, ele mostra o erro e o app volta para o login.
+
+## Modo somente CLI
+
+Antes do login, o app pergunta como você quer usar o Railway Manager: **interface gráfica** ou **somente linha de comando (CLI)**. A escolha fica salva neste navegador.
+
+- **No modo CLI**, o console ocupa a tela inteira e também é a tela de login. Ele já abre pedindo a senha num campo mascarado. Para entrar de novo depois de um `logout` ou de uma sessão expirada, digite `login`.
+- Antes do login, só funcionam `login`, `ui`, `cli`, `help` e `clear`. Os outros comandos respondem "faça login primeiro".
+- **Para trocar de modo a qualquer momento**, sem precisar entrar de novo:
+  - na CLI, digite `ui` ou clique em **Interface gráfica** no topo;
+  - na interface, clique em **Modo CLI** no topo ou digite `cli` no console;
+  - na tela de login, use **Mudar para linha de comando (CLI)**.
+- No modo CLI, `open <tela>` passa para a interface gráfica já na tela pedida.
 
 ## Sintaxe
 
@@ -279,6 +292,8 @@ schedule pause comercial; schedule pause noite
 | Agendas (criar, editar, pausar, retomar, excluir, execuções) | `schedule create/edit/pause/resume/rm/runs/show/list` |
 | Configurações → Token | `credential show`, `credential set`, `credential rm` |
 | Sair | `logout` |
+| Entrar (tela de login) | `login` (modo CLI) |
+| Trocar entre interface e CLI | `ui` / `cli` |
 | *(só no console)* | `all`, curingas, `--except`, `--state`, `restart`, `--at`/`--in`, `at`, `alias`, `--json`, sequências com `;` |
 
 ## Referência de comandos
@@ -1212,3 +1227,35 @@ logout
 ```
 
 Também: `sair`.
+
+## Sessão
+
+### `login`
+
+Entra com a senha do administrador (digitada num campo mascarado). No modo CLI, é o primeiro comando: antes do login só `login`, `ui`, `cli`, `help` e `clear` funcionam.
+
+```
+login
+```
+
+Também: `entrar`.
+
+### `ui`
+
+Passa para a interface gráfica (a sessão continua a mesma).
+
+```
+ui
+```
+
+Também: `interface`, `gui`.
+
+### `cli`
+
+Passa para o modo só linha de comando (a sessão continua a mesma).
+
+```
+cli
+```
+
+Também: `terminal`.

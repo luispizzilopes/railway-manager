@@ -1372,3 +1372,69 @@ details > summary {
     height: calc(100vh - 180px);
   }
 }
+
+/* ---------- escolha de modo e modo CLI ---------- */
+
+.mode-card {
+  width: min(460px, 100%);
+  padding: var(--space-6);
+  background: var(--bg-alt);
+}
+
+.mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.mode-option:hover,
+.mode-option:focus-visible {
+  border-color: var(--brand-border);
+  background: var(--surface-hover);
+  outline: none;
+}
+
+.cli-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-alt);
+}
+
+.cli-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.cli-head .side-brand {
+  height: auto;
+  padding: 0;
+  border: 0;
+}
+
+.cli-head .btn {
+  margin-left: auto;
+}
+
+.console-cli {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+}

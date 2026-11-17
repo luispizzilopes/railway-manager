@@ -176,3 +176,23 @@ Erros da API SHALL ser exibidos com a mensagem retornada e o código HTTP, inclu
 #### Scenario: Agenda inválida
 - **WHEN** `schedule create` recebe `400` com janelas em conflito
 - **THEN** o console mostra a mensagem e as janelas em conflito, e a agenda não é criada
+
+### Requirement: Modo somente CLI
+Antes do login, o frontend SHALL permitir escolher entre usar a interface gráfica ou somente a linha de comando, e SHALL lembrar a escolha neste navegador. No modo CLI, o console SHALL ocupar a tela inteira e servir também de tela de login: o comando `login` MUST pedir a senha num campo mascarado, e antes do login apenas `login`, `ui`, `cli`, `help` e `clear` SHALL ser executados; os demais MUST responder que é preciso fazer login. O usuário SHALL poder alternar entre os modos a qualquer momento, com os comandos `ui`/`cli` ou com um controle visível em cada modo e na tela de login, sem precisar entrar de novo.
+
+#### Scenario: Escolha antes do login
+- **WHEN** o administrador abre o app sem sessão e sem modo escolhido
+- **THEN** o app pergunta se ele quer a interface gráfica ou somente a linha de comando, antes de mostrar qualquer login
+
+#### Scenario: Login pela linha de comando
+- **WHEN** o administrador escolhe somente linha de comando
+- **THEN** o console abre em tela cheia pedindo a senha num campo mascarado, e com a senha correta passa a aceitar todos os comandos
+
+#### Scenario: Comando antes do login
+- **WHEN** no modo CLI sem sessão o administrador executa `status`
+- **THEN** o console responde "faça login primeiro: digite login" e nada é consultado
+
+#### Scenario: Alternar sem entrar de novo
+- **WHEN** o administrador autenticado no modo CLI executa `ui`
+- **THEN** a interface gráfica aparece com a mesma sessão, e o botão "Modo CLI" volta ao console em tela cheia
+

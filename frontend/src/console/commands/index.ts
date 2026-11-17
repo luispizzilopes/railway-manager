@@ -6,6 +6,7 @@ import { manageCommands } from './manage'
 import { miscCommands } from './misc'
 import { powerCommands } from './power'
 import { scheduleCommands } from './schedules'
+import { sessionCommands } from './session'
 
 export const COMMANDS: CommandDef[] = [
   ...powerCommands,
@@ -13,4 +14,5 @@ export const COMMANDS: CommandDef[] = [
   ...scheduleCommands,
   ...manageCommands,
   ...miscCommands,
+  ...sessionCommands,
 ]

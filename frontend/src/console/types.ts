@@ -1,6 +1,7 @@
 // Tipos do console: registro declarativo de comandos, invocação, blocos de saída e contexto.
 
 import type { api } from '../api/client'
+import type { Mode } from '../mode'
 import type {
   Dashboard,
   ItemResult,
@@ -138,6 +139,12 @@ export interface Ctx {
   /** `--json` global. */
   json: boolean
   logout(): Promise<void>
+  /** Sessão válida (no modo CLI o console também é a tela de login). */
+  authenticated: boolean
+  /** Entra com a senha do administrador. */
+  login(password: string): Promise<void>
+  mode: Mode
+  setMode(mode: Mode): void
   /** Intervalo do acompanhamento de operações. */
   pollMs: number
 }

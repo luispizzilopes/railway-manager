@@ -195,6 +195,11 @@ Voltar para a versão anterior depois da atualização exige restaurar esse back
 
 ## Console
 
+Antes do login, o app pergunta se você quer usar a **interface gráfica** ou **somente a
+linha de comando (CLI)**. No modo CLI, até o login é feito pelo console (`login`, com a
+senha num campo mascarado). Dá para trocar a qualquer momento, sem entrar de novo: `ui` e
+`cli` no console, ou os botões **Interface gráfica** / **Modo CLI** no topo.
+
 O console (menu **Console**, ou ``Ctrl+` `` / `Ctrl+K` em qualquer tela) executa comandos
 sobre a mesma API e com as mesmas regras da interface. `help` lista os comandos e
 `help <comando>` mostra opções e exemplos; a referência completa, com seletores, atalhos e
