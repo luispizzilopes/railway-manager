@@ -38,8 +38,17 @@ function ConsolePanel() {
   )
 }
 
-export function Layout({ onLogout, onMode }: { onLogout: () => void; onMode?: (mode: Mode) => void }) {
+export function Layout({
+  onLogout,
+  onMode,
+  mobile = false,
+}: {
+  onLogout: () => void
+  onMode?: (mode: Mode) => void
+  mobile?: boolean
+}) {
   const { pathname } = useLocation()
+  const nav = mobile ? NAV.filter((item) => item.to !== '/console') : NAV
   return (
     <ConsoleProvider onLogout={onLogout} mode="ui" onMode={onMode}>
       <div className="app">
@@ -49,7 +58,7 @@ export function Layout({ onLogout, onMode }: { onLogout: () => void; onMode?: (m
           </div>
           <nav className="nav">
             <span className="nav-label">Gerenciar</span>
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end}>
                 <Icon name={item.icon} />
                 {item.label}
@@ -71,7 +80,7 @@ export function Layout({ onLogout, onMode }: { onLogout: () => void; onMode?: (m
               <strong>{currentSection(pathname)}</strong>
             </div>
             <div className="topnav-right">
-              {onMode && (
+              {onMode && !mobile && (
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
@@ -90,7 +99,7 @@ export function Layout({ onLogout, onMode }: { onLogout: () => void; onMode?: (m
           </main>
         </div>
       </div>
-      <ConsolePanel />
+      {!mobile && <ConsolePanel />}
     </ConsoleProvider>
   )
 }

@@ -113,11 +113,29 @@ describe('escolha entre interface gráfica e CLI', () => {
 })
 
 describe('celular', () => {
-  it('avisa que celulares não são suportados', () => {
-    const ua = vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile')
-    mockFetch({ 'GET /api/session': { status: 401, json: { code: 'unauthorized', message: 'x' } } })
+  const asPhone = () =>
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile')
+
+  it('pula a escolha de modo e não oferece a CLI', async () => {
+    const ua = asPhone()
+    window.localStorage.setItem('rm:mode', 'cli')
+    mockFetch({ 'GET /api/session': () => ({ status: 401, json: { code: 'unauthorized', message: 'x' } }) })
     renderWithProviders(<App />)
-    expect(screen.getByRole('heading', { name: 'Celular não suportado' })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Senha')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /linha de comando/ })).not.toBeInTheDocument()
+    ua.mockRestore()
+  })
+
+  it('esconde o console e o modo CLI depois do login', async () => {
+    const ua = asPhone()
+    mockFetch({
+      'GET /api/session': { json: { authenticated: true } },
+      'GET /api/dashboard': dashboard([], { integration_ready: false, projects: [] }),
+    })
+    renderWithProviders(<App />, { route: '/console' })
+    expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Console' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Modo CLI' })).not.toBeInTheDocument()
     ua.mockRestore()
   })
 })

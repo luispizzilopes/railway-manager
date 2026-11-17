@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Route, Routes } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router'
 
 import { UNAUTHORIZED_EVENT, api } from './api/client'
 import { type Mode, readMode, writeMode } from './mode'
+import { useIsMobile } from './mobile'
 import { CliApp } from './pages/CliApp'
 import { ConsolePage } from './pages/ConsolePage'
 import { Dashboard } from './pages/Dashboard'
@@ -11,7 +12,6 @@ import { History } from './pages/History'
 import { Layout } from './pages/Layout'
 import { Login } from './pages/Login'
 import { ModeChooser } from './pages/ModeChooser'
-import { MobileNotice, isMobileDevice } from './pages/MobileNotice'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { Projects } from './pages/Projects'
 import { Schedules } from './pages/Schedules'
@@ -20,7 +20,10 @@ import { Settings } from './pages/Settings'
 export function App() {
   const queryClient = useQueryClient()
   const session = useQuery({ queryKey: ['session'], queryFn: api.session, retry: false, staleTime: Infinity })
-  const [mode, setModeState] = useState<Mode | null>(readMode)
+  const mobile = useIsMobile()
+  const [storedMode, setModeState] = useState<Mode | null>(readMode)
+  // No celular só existe a interface gráfica, sem escolha de modo.
+  const mode: Mode | null = mobile ? 'ui' : storedMode
 
   useEffect(() => {
     const expired = () => queryClient.setQueryData(['session'], null)
@@ -46,7 +49,6 @@ export function App() {
     queryClient.setQueryData(['session'], null)
   }
 
-  if (isMobileDevice()) return <MobileNotice />
   if (session.isPending) return null
   const authenticated = Boolean(session.data)
   // A escolha vem antes do login; com sessão e sem escolha, vale a interface gráfica.
@@ -54,17 +56,17 @@ export function App() {
   if (mode === 'cli') {
     return <CliApp authenticated={authenticated} onLogin={afterLogin} onLogout={logout} onMode={setMode} />
   }
-  if (!authenticated) return <Login onLogin={() => void afterLogin()} onCli={() => setMode('cli')} />
+  if (!authenticated) return <Login onLogin={() => void afterLogin()} onCli={mobile ? undefined : () => setMode('cli')} />
 
   return (
     <Routes>
-      <Route element={<Layout onLogout={logout} onMode={setMode} />}>
+      <Route element={<Layout onLogout={logout} onMode={mobile ? undefined : setMode} mobile={mobile} />}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="schedules" element={<Schedules />} />
         <Route path="history" element={<History />} />
-        <Route path="console" element={<ConsolePage />} />
+        <Route path="console" element={mobile ? <Navigate to="/" replace /> : <ConsolePage />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<p className="muted">Página não encontrada.</p>} />
       </Route>

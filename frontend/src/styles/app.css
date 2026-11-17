@@ -1438,3 +1438,88 @@ details > summary {
   border: 0;
   border-radius: 0;
 }
+
+/* ---------- celular ---------- */
+
+@media (max-width: 720px) {
+  .side {
+    position: sticky;
+    top: 0;
+    z-index: 11;
+    scrollbar-width: none;
+  }
+
+  .side-brand {
+    padding: 0 var(--space-3);
+  }
+
+  .nav a {
+    white-space: nowrap;
+  }
+
+  .side-foot .btn {
+    white-space: nowrap;
+  }
+
+  .topnav {
+    position: static;
+    height: 48px;
+    padding: 0 var(--space-3);
+  }
+
+  .crumbs > span {
+    display: none;
+  }
+
+  .main {
+    padding: var(--space-4) var(--space-3) var(--space-6);
+  }
+
+  .page-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-head > .row,
+  .page-head > .btn {
+    width: 100%;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .instance-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .backdrop {
+    padding: var(--space-2);
+    align-items: end;
+  }
+
+  .modal {
+    max-height: calc(100dvh - var(--space-4));
+  }
+
+  .modal-foot {
+    flex-wrap: wrap;
+  }
+
+  .table th,
+  .table td {
+    padding: 8px var(--space-3);
+  }
+
+  .input,
+  select.input,
+  textarea.input {
+    font-size: 16px; /* evita o zoom automático do iOS ao focar */
+  }
+
+  .login form.card,
+  .mode-card {
+    padding: var(--space-5);
+  }
+}
