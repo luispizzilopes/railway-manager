@@ -41,8 +41,23 @@ describe('console', () => {
     const panel = await screen.findByRole('region', { name: 'Console' })
     expect(within(panel).getByLabelText(/Comando/)).toHaveFocus()
     expect(screen.getByTestId('location')).toHaveTextContent('/history')
-    fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+    fireEvent.keyDown(window, { key: '`', ctrlKey: true })
     expect(screen.queryByRole('region', { name: 'Console' })).not.toBeInTheDocument()
+  })
+
+  it('Ctrl+K abre a paleta de comandos, que navega e abre o console', async () => {
+    mockFetch(ROUTES)
+    renderWithProviders(<Layout onLogout={() => undefined} />, { route: '/history' })
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+    const search = await screen.findByRole('combobox', { name: 'Buscar tela ou ação' })
+    expect(search).toHaveFocus()
+    await userEvent.type(search, 'agen{Enter}')
+    expect(screen.getByTestId('location')).toHaveTextContent('/schedules')
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+    await userEvent.type(await screen.findByRole('combobox'), 'painel{Enter}')
+    expect(await screen.findByRole('region', { name: 'Console' })).toBeInTheDocument()
   })
 
   it('executa, mostra a saída num log e navega no histórico', async () => {

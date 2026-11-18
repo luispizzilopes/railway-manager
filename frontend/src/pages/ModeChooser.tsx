@@ -1,3 +1,4 @@
+import { Brand } from '../components/Brand'
 import type { Mode } from '../mode'
 
 /** Antes do login: interface gráfica ou só linha de comando. A escolha fica salva. */
@@ -6,9 +7,7 @@ export function ModeChooser({ onChoose }: { onChoose: (mode: Mode) => void }) {
     <div className="login">
       <div className="card mode-card">
         <div className="login-head">
-          <div className="side-brand">
-            Railway<span>Manager</span>
-          </div>
+          <Brand />
           <h1>Como você quer usar?</h1>
           <p className="muted">Dá para trocar depois, a qualquer momento.</p>
         </div>

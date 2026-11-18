@@ -1,12 +1,9 @@
 import type { Freshness, ObservedState } from '../api/types'
-import { STATE_LABEL, formatDateTime, relativeTime } from '../format'
+import { formatDateTime, relativeTime } from '../format'
+import { StatusBadge } from './ui/StatusBadge'
 
 export function StateChip({ state, freshness }: { state: ObservedState; freshness?: Freshness }) {
-  return (
-    <span className={`chip chip-${state}`} data-freshness={freshness ?? 'fresh'}>
-      {STATE_LABEL[state]}
-    </span>
-  )
+  return <StatusBadge state={state} freshness={freshness} />
 }
 
 /** Horário da leitura com o frescor explícito em texto (não só cor). */

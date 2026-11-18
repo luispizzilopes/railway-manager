@@ -1,0 +1,73 @@
+@layer components {
+  .skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .skeleton-line {
+    display: block;
+    height: 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-active);
+  }
+
+  .empty {
+    padding: var(--space-7) var(--space-4);
+    text-align: center;
+    color: var(--text-2);
+  }
+
+  .empty h3 {
+    margin-bottom: var(--space-1);
+    color: var(--text);
+  }
+
+  .empty-action {
+    margin-top: var(--space-4);
+  }
+
+  .alert {
+    --a: var(--info);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-left: 3px solid var(--a);
+    border-radius: var(--radius-md);
+    background: color-mix(in oklab, var(--a) 9%, var(--surface));
+    font-size: var(--text-md);
+  }
+
+  .alert > :first-child {
+    flex: 1;
+  }
+
+  .alert-warn {
+    --a: var(--warn);
+  }
+
+  .alert-danger {
+    --a: var(--fail);
+  }
+
+  .alert-success {
+    --a: var(--ok);
+  }
+
+  .alert a {
+    color: inherit;
+    font-weight: 500;
+  }
+}
+
+@layer components {
+  .alert-info {
+    --a: var(--info);
+  }
+
+  .alert-text {
+    flex: 1;
+  }
+}

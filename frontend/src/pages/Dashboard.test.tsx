@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import { card, dashboard } from '../test/fixtures'
@@ -54,5 +55,78 @@ describe('dashboard', () => {
     expect(running).toHaveTextContent('3')
     expect(running).toHaveTextContent('1 dormindo')
     expect(screen.getByTestId('stat-Serviços monitorados')).toHaveTextContent('5')
+  })
+
+  const MIXED = [
+    card({ id: 'a', service_name: 'api', state: 'running' }),
+    card({ id: 'b', service_name: 'worker', state: 'stopped' }),
+    card({ id: 'c', service_name: 'cron', state: 'failed' }),
+  ]
+
+  it('destaca no topo o que exige atenção, com o motivo', async () => {
+    mockFetch({ 'GET /api/dashboard': dashboard(MIXED), 'POST /api/dashboard/refresh': { report: { refreshed: 3, not_found: 0, failed: 0 } } })
+    renderWithProviders(<Dashboard />)
+    const panel = await screen.findByRole('region', { name: 'Requer atenção' })
+    expect(within(panel).getByText('cron')).toBeInTheDocument()
+    expect(within(panel).queryByText('api')).not.toBeInTheDocument()
+    expect(within(panel).getByText(/production · Com falha/)).toBeInTheDocument()
+  })
+
+  it('sem pendências mostra só uma confirmação discreta', async () => {
+    mockFetch({ 'GET /api/dashboard': dashboard([card({ id: 'a' })]) })
+    renderWithProviders(<Dashboard />)
+    expect(await screen.findByText('Nenhum serviço requer atenção.')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Requer atenção' })).not.toBeInTheDocument()
+  })
+
+  it('filtra por estado e por nome, informa a contagem e limpa', async () => {
+    mockFetch({ 'GET /api/dashboard': dashboard(MIXED) })
+    renderWithProviders(<Dashboard />)
+    await screen.findAllByTestId('instance-row')
+    expect(screen.getByText('3 serviços')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Filtrar por estado'), 'failed')
+    expect(screen.getAllByTestId('instance-row')).toHaveLength(1)
+    expect(screen.getByText('1 serviço encontrado')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/?estado=failed')
+
+    await userEvent.type(screen.getByLabelText('Buscar serviço'), 'zzz')
+    expect(await screen.findByText('Nenhum serviço encontrado')).toBeInTheDocument()
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Limpar filtros' })[0])
+    expect(screen.getAllByTestId('instance-row')).toHaveLength(3)
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+  })
+
+  it('lê os filtros da URL', async () => {
+    mockFetch({ 'GET /api/dashboard': dashboard(MIXED) })
+    renderWithProviders(<Dashboard />, { route: '/?q=wor' })
+    const rows = await screen.findAllByTestId('instance-row')
+    expect(rows).toHaveLength(1)
+    expect(within(rows[0]).getByText('worker')).toBeInTheDocument()
+  })
+
+  it('erro de leitura mostra a mensagem com nova tentativa e mantém a tela', async () => {
+    let calls = 0
+    mockFetch({
+      'GET /api/dashboard': () => {
+        calls++
+        return calls === 1
+          ? { status: 500, json: { code: 'internal', message: 'falha ao ler o painel' } }
+          : { json: dashboard([card({ id: 'a' })]) }
+      },
+    })
+    renderWithProviders(<Dashboard />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('falha ao ler o painel')
+    await userEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    expect(await screen.findAllByTestId('instance-row')).toHaveLength(1)
+  })
+
+  it('mostra esqueleto enquanto carrega e estado vazio sem projetos', async () => {
+    mockFetch({ 'GET /api/dashboard': dashboard([], { projects: [], indicators: { projects: 0, instances: 0, running: 0, sleeping: 0, stopped: 0, failed: 0, other: 0 } }) })
+    renderWithProviders(<Dashboard />)
+    expect(screen.getByRole('status', { name: 'Carregando a visão geral…' })).toBeInTheDocument()
+    expect(await screen.findByText('Nenhum projeto gerenciado')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Importar projetos' })).toHaveAttribute('href', '/projects')
   })
 })

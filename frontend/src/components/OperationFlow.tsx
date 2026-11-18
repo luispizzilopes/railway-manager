@@ -8,8 +8,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api } from '../api/client'
 import type { OperationItem, Plan, PlanEntry, PowerKind, PowerTarget } from '../api/types'
 import { KIND_LABEL, RESULT_LABEL, STATUS_LABEL, formatDuration } from '../format'
-import { ErrorAlert, Modal } from './Modal'
+import { Modal } from './Modal'
 import { StateChip } from './StateChip'
+import { Button } from './ui/Button'
+import { ErrorState, Skeleton } from './ui/Feedback'
+import { Table } from './ui/Table'
 
 const ACTION_LABEL: Record<PlanEntry['action'], string> = {
   will_stop: 'Será desligada',
@@ -29,7 +32,7 @@ function PlanView({ plan }: { plan: Plan }) {
   return (
     <>
       <p>
-        <strong>{actionable.length}</strong> {actionable.length === 1 ? 'instância será afetada' : 'instâncias serão afetadas'}
+        <strong>{actionable.length}</strong> {actionable.length === 1 ? 'serviço será afetado' : 'serviços serão afetados'}
         {skipped > 0 && <>, {skipped} ignorada{skipped > 1 ? 's' : ''}</>}.{' '}
         <span className="subtle">
           {plan.estimate.mutations} chamada(s) de {plan.kind === 'stop' ? 'desligamento' : 'início'} ao Railway; o plano
@@ -39,8 +42,8 @@ function PlanView({ plan }: { plan: Plan }) {
       {groupBy(plan.entries, (e) => e.project_name).map(([project, entries]) => (
         <div key={project}>
           <div className="group-title">{project}</div>
-          <div className="card table-wrap">
-            <table className="table">
+          <div className="card">
+            <Table label={`Plano: ${project}`}>
               <thead>
                 <tr>
                   <th>Serviço</th>
@@ -72,7 +75,7 @@ function PlanView({ plan }: { plan: Plan }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         </div>
       ))}
@@ -80,39 +83,28 @@ function PlanView({ plan }: { plan: Plan }) {
   )
 }
 
+/** Andamento por serviço, em linha do tempo: cada item mostra resultado, estado final e duração. */
 export function Progress({ items }: { items: OperationItem[] }) {
   return (
     <>
       {groupBy(items, (i) => i.label.project_name).map(([project, rows]) => (
         <div key={project}>
           <div className="group-title">{project}</div>
-          <div className="card table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Serviço</th>
-                  <th>Ambiente</th>
-                  <th>Resultado</th>
-                  <th>Estado final</th>
-                  <th className="num">Duração</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((i) => (
-                  <tr key={i.id} data-testid="progress-item">
-                    <td>{i.label.service_name}</td>
-                    <td>{i.label.environment_name}</td>
-                    <td>
-                      <span className={`result result-${i.result}`}>{RESULT_LABEL[i.result]}</span>
-                      {i.error_message && <div className="subtle">{i.error_message}</div>}
-                    </td>
-                    <td>{i.final_state ? <StateChip state={i.final_state} /> : '—'}</td>
-                    <td className="num">{formatDuration(i.duration_ms)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ol className="timeline" aria-label={`Andamento: ${project}`}>
+            {rows.map((i) => (
+              <li key={i.id} className={`timeline-item timeline-${i.result}`} data-testid="progress-item">
+                <div className="timeline-head">
+                  <span className="mono">{i.label.service_name}</span>
+                  <span className="subtle">{i.label.environment_name}</span>
+                  <span className="spacer" />
+                  {i.final_state && <StateChip state={i.final_state} />}
+                  <span className="subtle mono">{formatDuration(i.duration_ms)}</span>
+                </div>
+                <span className={`result result-${i.result}`}>{RESULT_LABEL[i.result]}</span>
+                {i.error_message && <div className="subtle">{i.error_message}</div>}
+              </li>
+            ))}
+          </ol>
         </div>
       ))}
     </>
@@ -129,7 +121,7 @@ export function OperationFlow({
   kind: PowerKind
   target: PowerTarget
   title: string
-  /** Exige confirmação explícita do plano (obrigatório para mais de uma instância). */
+  /** Exige confirmação explícita do plano (obrigatório para mais de um serviço). */
   confirm?: boolean
   onClose: () => void
 }) {
@@ -185,37 +177,37 @@ export function OperationFlow({
   if (!operationId) {
     footer = (
       <>
-        <button type="button" className="btn" onClick={onClose}>
+        <Button onClick={onClose}>
           Cancelar
-        </button>
+        </Button>
         {plan && confirm && (
-          <button
-            type="button"
-            className={kind === 'stop' ? 'btn btn-danger' : 'btn btn-primary'}
+          <Button
+            variant={kind === 'stop' ? 'danger' : 'primary'}
             onClick={() => execute(plan)}
-            disabled={busy || actionable === 0}
+            loading={busy}
+            disabled={actionable === 0}
           >
             Confirmar: {KIND_LABEL[kind].toLowerCase()} {actionable}
-          </button>
+          </Button>
         )}
       </>
     )
   } else {
     footer = (
-      <button type="button" className="btn" onClick={onClose}>
+      <Button onClick={onClose}>
         {done ? 'Fechar' : 'Fechar (continua em segundo plano)'}
-      </button>
+      </Button>
     )
   }
 
   const op = progress.data?.operation
   return (
     <Modal title={title} onClose={onClose} footer={footer}>
-      <ErrorAlert error={error} />
-      {!plan && !error && <p className="muted">Lendo o estado atual no Railway…</p>}
+      <ErrorState error={error} />
+      {!plan && !error && <Skeleton lines={3} label="Lendo o estado atual no Railway…" />}
       {plan && !operationId && <PlanView plan={plan} />}
       {plan && !operationId && actionable === 0 && (
-        <div className="alert alert-info">Nada a fazer: todas as instâncias foram ignoradas.</div>
+        <div className="alert alert-info">Nada a fazer: todos os serviços foram ignorados.</div>
       )}
       {operationId && (
         <>
@@ -243,12 +235,12 @@ export function OperationResult({ operationId, onClose }: { operationId: string;
       title={op ? `${KIND_LABEL[op.kind]} — ${STATUS_LABEL[op.status]}` : 'Operação'}
       onClose={onClose}
       footer={
-        <button type="button" className="btn" onClick={onClose}>
+        <Button onClick={onClose}>
           Fechar
-        </button>
+        </Button>
       }
     >
-      <ErrorAlert error={detail.error} />
+      <ErrorState error={detail.error} onRetry={() => void detail.refetch()} />
       {detail.data && <Progress items={detail.data.items} />}
     </Modal>
   )

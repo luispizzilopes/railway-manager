@@ -1,5 +1,29 @@
-import { type ReactNode, useEffect, useId } from 'react'
+import { type ReactNode, useEffect, useId, useRef } from 'react'
 
+import { Icon } from './Icon'
+import { Button } from './ui/Button'
+import { ErrorState } from './ui/Feedback'
+import './ui/Dialog.css'
+
+const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+
+// Contador para suportar modais empilhados: o rolamento só volta quando o último fecha.
+let scrollLocks = 0
+let previousOverflow = ''
+
+function lockScroll() {
+  if (scrollLocks++ === 0) {
+    previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  }
+}
+
+function unlockScroll() {
+  if (--scrollLocks === 0) document.body.style.overflow = previousOverflow
+}
+
+/** Diálogo sobre o elemento nativo `<dialog>`: foco preso, fundo inerte e Esc de graça.
+ *  Ao fechar, o foco volta a quem abriu. */
 export function Modal({
   title,
   onClose,
@@ -12,25 +36,57 @@ export function Modal({
   footer?: ReactNode
 }) {
   const titleId = useId()
+  const ref = useRef<HTMLDialogElement>(null)
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    onCloseRef.current = onClose
+  })
+
+  useEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+    const opener = document.activeElement as HTMLElement | null
+    lockScroll()
+    const native = typeof dialog.showModal === 'function'
+    if (native) dialog.showModal()
+    else dialog.setAttribute('open', '')
+    // Foco inicial: primeiro campo do conteúdo; sem ele, o primeiro controle ou o próprio diálogo.
+    const first = dialog.querySelector<HTMLElement>('.modal-body input, .modal-body select, .modal-body textarea')
+    ;(first ?? dialog.querySelector<HTMLElement>(FOCUSABLE) ?? dialog).focus()
+
+    const onCancel = (e: Event) => {
+      e.preventDefault()
+      onCloseRef.current()
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCloseRef.current()
+    dialog.addEventListener('cancel', onCancel)
+    if (!native) window.addEventListener('keydown', onKey)
+    return () => {
+      dialog.removeEventListener('cancel', onCancel)
+      window.removeEventListener('keydown', onKey)
+      unlockScroll()
+      opener?.focus?.()
+    }
+  }, [])
+
   return (
-    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="modal-head">
-          <h2 id={titleId}>{title}</h2>
-          <span className="spacer" />
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Fechar">
-            ✕
-          </button>
-        </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-foot">{footer}</div>}
+    <dialog
+      ref={ref}
+      className="modal"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modal-head">
+        <h2 id={titleId}>{title}</h2>
+        <span className="spacer" />
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
+          <Icon name="close" />
+        </Button>
       </div>
-    </div>
+      <div className="modal-body">{children}</div>
+      {footer && <div className="modal-foot">{footer}</div>}
+    </dialog>
   )
 }
 
@@ -59,17 +115,10 @@ export function ConfirmDialog({
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn" onClick={onClose}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className={danger ? 'btn btn-danger' : 'btn btn-primary'}
-            onClick={onConfirm}
-            disabled={busy}
-          >
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>
             {confirmLabel}
-          </button>
+          </Button>
         </>
       }
     >
@@ -79,12 +128,6 @@ export function ConfirmDialog({
   )
 }
 
-export function ErrorAlert({ error }: { error: unknown }) {
-  if (!error) return null
-  const message = error instanceof Error ? error.message : String(error)
-  return (
-    <div className="alert alert-danger" role="alert">
-      {message}
-    </div>
-  )
+export function ErrorAlert({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  return <ErrorState error={error} onRetry={onRetry} />
 }

@@ -1,9 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 
 import { api, isUuid } from '../api/client'
 import type { Credential, CredentialKind } from '../api/types'
-import { ConfirmDialog, ErrorAlert } from '../components/Modal'
+import { ConfirmDialog } from '../components/Modal'
+import { Button } from '../components/ui/Button'
+import { ErrorState } from '../components/ui/Feedback'
+import { Field, Input, RadioGroup } from '../components/ui/Field'
+import { useFeedbackMutation } from '../components/useFeedbackMutation'
+import { type ThemePreference, useTheme } from '../theme'
 import { formatDateTime } from '../format'
 
 const STATUS_TEXT: Record<Credential['status'], string> = {
@@ -14,18 +19,16 @@ const STATUS_TEXT: Record<Credential['status'], string> = {
 
 /** Formulário de token. O valor digitado é descartado assim que enviado. */
 export function CredentialForm({ replacing, onSaved }: { replacing: boolean; onSaved?: () => void }) {
-  const queryClient = useQueryClient()
   const [kind, setKind] = useState<CredentialKind>('account')
   const [token, setToken] = useState('')
   const [workspace, setWorkspace] = useState('')
   const workspaceInvalid = kind === 'workspace' && workspace.trim() !== '' && !isUuid(workspace)
 
-  const save = useMutation({
+  const save = useFeedbackMutation({
     mutationFn: (input: { kind: CredentialKind; token: string; workspace_id?: string }) => api.saveCredential(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries()
-      onSaved?.()
-    },
+    success: 'Token validado e salvo.',
+    invalidate: [[]],
+    onSuccess: () => onSaved?.(),
   })
 
   function submit(e: FormEvent) {
@@ -38,75 +41,82 @@ export function CredentialForm({ replacing, onSaved }: { replacing: boolean; onS
 
   return (
     <form className="stack" onSubmit={submit} aria-label="Token do Railway">
-      <div className="field">
-        <span className="section-title">Tipo de token</span>
-        <div className="radio-row">
-          <label>
-            <input type="radio" name="kind" checked={kind === 'account'} onChange={() => setKind('account')} /> Conta
-          </label>
-          <label>
-            <input type="radio" name="kind" checked={kind === 'workspace'} onChange={() => setKind('workspace')} />{' '}
-            Workspace (recomendado)
-          </label>
-        </div>
-        <span className="hint">
-          Tokens de projeto não são suportados: eles valem para um único ambiente e não listam projetos.
-        </span>
-      </div>
+      <RadioGroup
+        legend="Tipo de token"
+        name="kind"
+        value={kind}
+        onChange={setKind}
+        options={[
+          { value: 'account', label: 'Conta' },
+          { value: 'workspace', label: 'Workspace (recomendado)' },
+        ]}
+      />
+      <span className="subtle">
+        Tokens de projeto não são suportados: eles valem para um único ambiente e não listam projetos.
+      </span>
       {kind === 'workspace' && (
-        <div className="field">
-          <label htmlFor="workspace">ID do workspace</label>
-          <input
-            id="workspace"
-            className="input mono"
-            value={workspace}
-            onChange={(e) => setWorkspace(e.target.value)}
-            aria-invalid={workspaceInvalid}
-            placeholder="00000000-0000-0000-0000-000000000000"
-            required
-          />
-          {workspaceInvalid && <span className="error-text">Informe um UUID válido.</span>}
-        </div>
+        <Field label="ID do workspace" error={workspaceInvalid ? 'Informe um UUID válido.' : undefined}>
+          {(p) => (
+            <Input
+              {...p}
+              className="mono"
+              value={workspace}
+              onChange={(e) => setWorkspace(e.target.value)}
+              placeholder="00000000-0000-0000-0000-000000000000"
+              required
+            />
+          )}
+        </Field>
       )}
-      <div className="field">
-        <label htmlFor="token">Token</label>
-        <input
-          id="token"
-          className="input mono"
-          type="password"
-          autoComplete="off"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          required
-        />
-        <span className="hint">Validado no Railway e guardado cifrado. Ele não é exibido novamente.</span>
-      </div>
-      <ErrorAlert error={save.error} />
+      <Field label="Token" hint="Validado no Railway e guardado cifrado. Ele não é exibido novamente.">
+        {(p) => (
+          <Input {...p} className="mono" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} required />
+        )}
+      </Field>
       {save.isSuccess && <div className="alert alert-success">Token validado e salvo.</div>}
       <div className="row">
-        <button
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           type="submit"
-          disabled={save.isPending || !token.trim() || workspaceInvalid || (kind === 'workspace' && !workspace.trim())}
+          loading={save.isPending}
+          disabled={!token.trim() || workspaceInvalid || (kind === 'workspace' && !workspace.trim())}
         >
           {save.isPending ? 'Validando…' : replacing ? 'Substituir token' : 'Validar e salvar'}
-        </button>
+        </Button>
       </div>
     </form>
   )
 }
 
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: 'Seguir o sistema' },
+  { value: 'light', label: 'Claro' },
+  { value: 'dark', label: 'Escuro' },
+]
+
+function Appearance() {
+  const { preference, setPreference } = useTheme()
+  return (
+    <div className="card" style={{ marginTop: 'var(--space-4)' }}>
+      <div className="card-head">
+        <h3>Aparência</h3>
+      </div>
+      <div className="card-body">
+        <RadioGroup legend="Tema" name="theme" value={preference} options={THEME_OPTIONS} onChange={setPreference} />
+      </div>
+    </div>
+  )
+}
+
 export function Settings() {
-  const queryClient = useQueryClient()
   const credential = useQuery({ queryKey: ['credential'], queryFn: api.credential })
   const [replacing, setReplacing] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
-  const remove = useMutation({
+  const remove = useFeedbackMutation({
     mutationFn: api.removeCredential,
-    onSuccess: () => {
-      setConfirmRemove(false)
-      void queryClient.invalidateQueries()
-    },
+    success: 'Token removido.',
+    invalidate: [[]],
+    onSuccess: () => setConfirmRemove(false),
   })
   const current = credential.data?.credential ?? null
 
@@ -118,7 +128,7 @@ export function Settings() {
           <p className="muted">Token usado para falar com a API do Railway.</p>
         </div>
       </div>
-      <ErrorAlert error={credential.error} />
+      <ErrorState error={credential.error} onRetry={() => void credential.refetch()} />
       <div className="card">
         <div className="card-head">
           <h3>Token do Railway</h3>
@@ -159,12 +169,10 @@ export function Settings() {
                 <CredentialForm replacing onSaved={() => setReplacing(false)} />
               ) : (
                 <div className="row">
-                  <button type="button" className="btn" onClick={() => setReplacing(true)}>
-                    Substituir
-                  </button>
-                  <button type="button" className="btn btn-ghost" onClick={() => setConfirmRemove(true)}>
+                  <Button onClick={() => setReplacing(true)}>Substituir</Button>
+                  <Button variant="ghost" onClick={() => setConfirmRemove(true)}>
                     Remover
-                  </button>
+                  </Button>
                 </div>
               )}
             </>
@@ -173,6 +181,7 @@ export function Settings() {
           )}
         </div>
       </div>
+      <Appearance />
       {confirmRemove && (
         <ConfirmDialog
           title="Remover token"

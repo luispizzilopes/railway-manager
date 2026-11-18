@@ -1,31 +1,35 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { api, isUuid } from '../api/client'
 import type { InstanceImportReport, InstanceView, PowerKind, PowerTarget, Project } from '../api/types'
-import { ConfirmDialog, ErrorAlert, Modal } from '../components/Modal'
+import { ConfirmDialog, Modal } from '../components/Modal'
 import { OperationFlow } from '../components/OperationFlow'
 import { FreshnessNote, StateChip } from '../components/StateChip'
-import { KIND_LABEL, SYNC_LABEL, relativeTime } from '../format'
+import { Button } from '../components/ui/Button'
+import { EmptyState, ErrorState, Skeleton } from '../components/ui/Feedback'
+import { Field, Input, Select } from '../components/ui/Field'
+import { Table } from '../components/ui/Table'
+import { Tabs } from '../components/ui/Tabs'
+import { useFeedbackMutation } from '../components/useFeedbackMutation'
+import { KIND_LABEL, SYNC_LABEL, formatDays, relativeTime } from '../format'
 
 type Flow = { kind: PowerKind; target: PowerTarget; title: string; confirm: boolean }
 
 /** Associação manual: Service ID + Environment ID, validados no Railway. */
 export function AssociateForm({ projectId, onDone }: { projectId: string; onDone: () => void }) {
-  const queryClient = useQueryClient()
   const [service, setService] = useState('')
   const [environment, setEnvironment] = useState('')
   const [touched, setTouched] = useState(false)
   const serviceInvalid = !isUuid(service)
   const environmentInvalid = !isUuid(environment)
-  const associate = useMutation({
+  const associate = useFeedbackMutation({
     mutationFn: () =>
       api.associateInstance(projectId, { service_id: service.trim(), environment_id: environment.trim() }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries()
-      onDone()
-    },
+    success: 'Serviço associado.',
+    invalidate: [[]],
+    onSuccess: () => onDone(),
   })
 
   function submit(e: FormEvent) {
@@ -36,43 +40,26 @@ export function AssociateForm({ projectId, onDone }: { projectId: string; onDone
   }
 
   return (
-    <form className="stack" onSubmit={submit} aria-label="Associar instância">
+    <form className="stack" onSubmit={submit} aria-label="Associar serviço">
       <div className="form-grid">
-        <div className="field">
-          <label htmlFor="service-id">Railway Service ID</label>
-          <input
-            id="service-id"
-            className="input mono"
-            value={service}
-            onChange={(e) => setService(e.target.value)}
-            aria-invalid={touched && serviceInvalid}
-          />
-          {touched && serviceInvalid && <span className="error-text">UUID inválido.</span>}
-        </div>
-        <div className="field">
-          <label htmlFor="environment-id">Railway Environment ID</label>
-          <input
-            id="environment-id"
-            className="input mono"
-            value={environment}
-            onChange={(e) => setEnvironment(e.target.value)}
-            aria-invalid={touched && environmentInvalid}
-          />
-          {touched && environmentInvalid && <span className="error-text">UUID inválido.</span>}
-        </div>
+        <Field label="Railway Service ID" error={touched && serviceInvalid ? 'UUID inválido.' : undefined}>
+          {(p) => <Input {...p} className="mono" value={service} onChange={(e) => setService(e.target.value)} />}
+        </Field>
+        <Field label="Railway Environment ID" error={touched && environmentInvalid ? 'UUID inválido.' : undefined}>
+          {(p) => <Input {...p} className="mono" value={environment} onChange={(e) => setEnvironment(e.target.value)} />}
+        </Field>
       </div>
-      <ErrorAlert error={associate.error} />
+      <ErrorState error={associate.error} />
       <div className="row">
-        <button className="btn btn-primary" type="submit" disabled={associate.isPending}>
+        <Button variant="primary" type="submit" loading={associate.isPending}>
           Associar
-        </button>
+        </Button>
       </div>
     </form>
   )
 }
 
 function ImportInstances({ projectId, onClose }: { projectId: string; onClose: () => void }) {
-  const queryClient = useQueryClient()
   const discovery = useQuery({
     queryKey: ['discover-instances', projectId],
     queryFn: () => api.discoverInstances(projectId),
@@ -80,7 +67,7 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
   const [selected, setSelected] = useState<string[]>([])
   const [report, setReport] = useState<InstanceImportReport | null>(null)
   const key = (env: string, service: string) => `${env}|${service}`
-  const importMany = useMutation({
+  const importMany = useFeedbackMutation({
     mutationFn: () =>
       api.importInstances(
         projectId,
@@ -89,10 +76,11 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
           return { environment_id, service_id }
         }),
       ),
+    success: (r) => `${r.imported.length} serviço(s) importado(s).`,
+    invalidate: [[]],
     onSuccess: (r) => {
       setReport(r)
       setSelected([])
-      void queryClient.invalidateQueries()
     },
   })
   const toggle = (k: string) => setSelected((s) => (s.includes(k) ? s.filter((x) => x !== k) : [...s, k]))
@@ -131,25 +119,18 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
 
   return (
     <Modal
-      title="Importar instâncias do Railway"
+      title="Importar serviços do Railway"
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn" onClick={onClose}>
-            Fechar
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={selected.length === 0 || importMany.isPending}
-            onClick={() => importMany.mutate()}
-          >
+          <Button onClick={onClose}>Fechar</Button>
+          <Button variant="primary" disabled={selected.length === 0} loading={importMany.isPending} onClick={() => importMany.mutate()}>
             Importar {selected.length || ''}
-          </button>
+          </Button>
         </>
       }
     >
-      <ErrorAlert error={discovery.error ?? importMany.error} />
+      <ErrorState error={discovery.error ?? importMany.error} onRetry={discovery.error ? () => void discovery.refetch() : undefined} />
       {report && (
         <div className="alert alert-success" role="status">
           {report.imported.length} importada(s)
@@ -157,7 +138,7 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
           {report.failed.length > 0 && `, ${report.failed.length} com falha`}.
         </div>
       )}
-      {discovery.isPending && <p className="muted">Consultando o Railway…</p>}
+      {discovery.isPending && <Skeleton lines={4} label="Consultando o Railway…" />}
       {regular.map(renderEnv)}
       {ephemeral.length > 0 && (
         <details>
@@ -170,15 +151,13 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
 }
 
 function EditProject({ project, onClose }: { project: Project; onClose: () => void }) {
-  const queryClient = useQueryClient()
   const [name, setName] = useState(project.display_name ?? '')
   const [description, setDescription] = useState(project.description ?? '')
-  const save = useMutation({
+  const save = useFeedbackMutation({
     mutationFn: () => api.editProject(project.id, { display_name: name || null, description: description || null }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries()
-      onClose()
-    },
+    success: 'Projeto atualizado.',
+    invalidate: [[]],
+    onSuccess: () => onClose(),
   })
   return (
     <Modal
@@ -186,31 +165,21 @@ function EditProject({ project, onClose }: { project: Project; onClose: () => vo
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn" onClick={onClose}>
-            Cancelar
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button onClick={onClose}>Cancelar</Button>
+          <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending}>
             Salvar
-          </button>
+          </Button>
         </>
       }
     >
       <p className="subtle">Altera apenas os dados locais. O Railway Project ID não é editável.</p>
-      <div className="field">
-        <label htmlFor="edit-name">Nome de exibição</label>
-        <input
-          id="edit-name"
-          className="input"
-          value={name}
-          placeholder={project.name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="edit-description">Descrição</label>
-        <input id="edit-description" className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
-      </div>
-      <ErrorAlert error={save.error} />
+      <Field label="Nome de exibição">
+        {(p) => <Input {...p} value={name} placeholder={project.name} onChange={(e) => setName(e.target.value)} />}
+      </Field>
+      <Field label="Descrição">
+        {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
+      </Field>
+      <ErrorState error={save.error} />
     </Modal>
   )
 }
@@ -218,7 +187,6 @@ function EditProject({ project, onClose }: { project: Project; onClose: () => vo
 export function ProjectDetail() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const project = useQuery({ queryKey: ['project', id], queryFn: () => api.project(id) })
   const instances = useQuery({ queryKey: ['instances', id], queryFn: () => api.instances(id) })
   const environments = useQuery({ queryKey: ['environments', id], queryFn: () => api.environments(id) })
@@ -227,22 +195,22 @@ export function ProjectDetail() {
   const [removeInstance, setRemoveInstance] = useState<InstanceView | null>(null)
   const [flow, setFlow] = useState<Flow | null>(null)
   const [envFilter, setEnvFilter] = useState('')
+  const [tab, setTab] = useState('services')
 
-  const sync = useMutation({ mutationFn: () => api.syncProject(id), onSettled: () => queryClient.invalidateQueries() })
-  const remove = useMutation({
+  const sync = useFeedbackMutation({ mutationFn: () => api.syncProject(id), success: 'Projeto sincronizado.', invalidate: [[]] })
+  const remove = useFeedbackMutation({
     mutationFn: () => api.removeProject(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries()
-      navigate('/projects')
-    },
+    success: 'Projeto removido do gerenciamento.',
+    invalidate: [[]],
+    onSuccess: () => navigate('/projects'),
   })
-  const unlink = useMutation({
+  const unlink = useFeedbackMutation({
     mutationFn: (instance: string) => api.removeInstance(instance),
-    onSuccess: () => {
-      setRemoveInstance(null)
-      void queryClient.invalidateQueries()
-    },
+    success: 'Serviço removido.',
+    invalidate: [[]],
+    onSuccess: () => setRemoveInstance(null),
   })
+  const schedules = useQuery({ queryKey: ['schedules', id], queryFn: () => api.schedules(id), enabled: tab === 'schedules' })
 
   const p = project.data?.project
   const ready = dashboard.data?.integration_ready ?? false
@@ -256,14 +224,14 @@ export function ProjectDetail() {
   const shown = envFilter ? views.filter((v) => v.environment.id === envFilter) : views
   const name = p?.display_name ?? p?.name ?? ''
 
-  if (project.error) return <ErrorAlert error={project.error} />
-  if (!p) return <p className="muted">Carregando…</p>
+  if (project.error) return <ErrorState error={project.error} onRetry={() => void project.refetch()} />
+  if (!p) return <Skeleton lines={4} label="Carregando projeto…" />
 
   return (
     <>
       <div className="page-head">
         <div>
-          <p className="subtle">
+          <p className="crumb">
             <Link to="/projects">Projetos</Link> /
           </p>
           <h1>{name}</h1>
@@ -273,29 +241,108 @@ export function ProjectDetail() {
           {p.description && <p className="muted">{p.description}</p>}
         </div>
         <div className="row">
-          <button type="button" className="btn" onClick={() => sync.mutate()} disabled={sync.isPending || !ready}>
+          <Button onClick={() => sync.mutate()} loading={sync.isPending} disabled={!ready}>
             {sync.isPending ? 'Sincronizando…' : 'Sincronizar'}
-          </button>
-          <button type="button" className="btn" onClick={() => setModal('edit')}>
-            Editar
-          </button>
-          <button type="button" className="btn btn-ghost" onClick={() => setModal('remove')}>
+          </Button>
+          <Button onClick={() => setModal('edit')}>Editar</Button>
+          <Button variant="ghost" onClick={() => setModal('remove')}>
             Remover do gerenciamento
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="stack">
-        <ErrorAlert error={sync.error ?? instances.error} />
+        <ErrorState error={instances.error} onRetry={() => void instances.refetch()} />
         {p.sync_status === 'not_found' && (
           <div className="alert alert-danger">O Railway informa que este projeto não existe mais. Os dados locais foram mantidos.</div>
         )}
 
+        <Tabs
+          label="Seções do projeto"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'services', label: 'Serviços', count: views.length },
+            { id: 'environments', label: 'Ambientes', count: environments.data?.environments.length },
+            { id: 'schedules', label: 'Agendas', count: schedules.data?.schedules.length },
+          ]}
+        />
+
+        {tab === 'environments' && (
+          <div className="card">
+            {!environments.data ? (
+              <Skeleton lines={3} />
+            ) : environments.data.environments.length === 0 ? (
+              <EmptyState title="Nenhum ambiente">Sincronize o projeto para carregar os ambientes.</EmptyState>
+            ) : (
+              <Table label="Ambientes">
+                <thead>
+                  <tr>
+                    <th>Ambiente</th>
+                    <th>Tipo</th>
+                    <th className="num">Serviços gerenciados</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {environments.data.environments.map((e) => (
+                    <tr key={e.id}>
+                      <td className="mono">{e.name}</td>
+                      <td>{e.is_ephemeral ? 'Efêmero (PR)' : 'Permanente'}</td>
+                      <td className="num">{views.filter((v) => v.environment.id === e.id).length}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </div>
+        )}
+
+        {tab === 'schedules' && (
+          <div className="card">
+            <ErrorState error={schedules.error} onRetry={() => void schedules.refetch()} />
+            {schedules.isPending ? (
+              <Skeleton lines={3} />
+            ) : schedules.data && schedules.data.schedules.length === 0 ? (
+              <EmptyState
+                title="Nenhuma agenda neste projeto"
+                action={
+                  <Link to="/schedules" className="btn">
+                    Ir para Agendas
+                  </Link>
+                }
+              >
+                Agendas ligam e desligam os serviços automaticamente em horários definidos.
+              </EmptyState>
+            ) : (
+              <Table label="Agendas do projeto">
+                <thead>
+                  <tr>
+                    <th>Agenda</th>
+                    <th>Dias</th>
+                    <th>Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedules.data?.schedules.map(({ schedule: sc }) => (
+                    <tr key={sc.id}>
+                      <td>
+                        <Link to="/schedules">{sc.name}</Link>
+                      </td>
+                      <td>{formatDays(sc.days)}</td>
+                      <td>{sc.paused_reason ? 'Pausada' : sc.enabled ? 'Ativa' : 'Desativada'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </div>
+        )}
+
+        {tab === 'services' && (
         <div className="card">
           <div className="card-head">
-            <h3>Instâncias</h3>
-            <select
-              className="select"
+            <h3>Serviços</h3>
+            <Select
               style={{ width: 'auto' }}
               aria-label="Filtrar por ambiente"
               value={envFilter}
@@ -307,13 +354,12 @@ export function ProjectDetail() {
                   {e.name}
                 </option>
               ))}
-            </select>
+            </Select>
             <span className="spacer" />
             {(['start', 'stop'] as const).map((kind) => (
-              <button
+              <Button
                 key={kind}
-                type="button"
-                className="btn btn-sm"
+                size="sm"
                 disabled={!ready || shown.length === 0}
                 onClick={() =>
                   setFlow({
@@ -325,23 +371,19 @@ export function ProjectDetail() {
                 }
               >
                 {kind === 'start' ? 'Iniciar' : 'Desligar'} {envFilter ? 'ambiente' : 'todos'}
-              </button>
+              </Button>
             ))}
-            <button type="button" className="btn btn-sm" onClick={() => setModal('associate')}>
+            <Button size="sm" onClick={() => setModal('associate')}>
               Associar por ID
-            </button>
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => setModal('import')} disabled={!ready}>
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => setModal('import')} disabled={!ready}>
               Importar do Railway
-            </button>
+            </Button>
           </div>
           {views.length === 0 ? (
-            <div className="empty">
-              <h3>Nenhuma instância gerenciada</h3>
-              <p>Importe serviços de um ambiente para controlar desligar/iniciar.</p>
-            </div>
+            <EmptyState title="Nenhum serviço gerenciado">Importe serviços de um ambiente para controlar desligar/iniciar.</EmptyState>
           ) : (
-            <div className="table-wrap">
-              <table className="table">
+            <Table label="Serviços">
                 <thead>
                   <tr>
                     <th>Serviço</th>
@@ -379,9 +421,8 @@ export function ProjectDetail() {
                         </td>
                         <td className="num">
                           <div className="row" style={{ justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              className="btn btn-sm"
+                            <Button
+                              size="sm"
                               disabled={!ready || v.instance.not_found || card?.busy}
                               onClick={() =>
                                 setFlow({
@@ -393,25 +434,25 @@ export function ProjectDetail() {
                               }
                             >
                               {off ? 'Iniciar' : 'Desligar'}
-                            </button>
-                            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setRemoveInstance(v)}>
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setRemoveInstance(v)}>
                               Remover
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+            </Table>
           )}
         </div>
+        )}
       </div>
 
       {modal === 'import' && <ImportInstances projectId={id} onClose={() => setModal(null)} />}
       {modal === 'associate' && (
-        <Modal title="Associar instância" onClose={() => setModal(null)}>
+        <Modal title="Associar serviço" onClose={() => setModal(null)}>
           <AssociateForm projectId={id} onDone={() => setModal(null)} />
         </Modal>
       )}
@@ -422,7 +463,7 @@ export function ProjectDetail() {
           message={
             <>
               <p>
-                <strong>{name}</strong> sai da lista local com seus ambientes, serviços e instâncias.
+                <strong>{name}</strong> sai da lista local com seus ambientes e serviços.
               </p>
               <p className="muted">Nada é alterado no Railway. O histórico de operações é mantido.</p>
             </>
@@ -437,7 +478,7 @@ export function ProjectDetail() {
       )}
       {removeInstance && (
         <ConfirmDialog
-          title="Remover instância"
+          title="Remover serviço"
           message={
             <p>
               Desvincular <strong>{removeInstance.service.name}</strong> em <strong>{removeInstance.environment.name}</strong>?

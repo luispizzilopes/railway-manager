@@ -225,16 +225,19 @@ export function ConsoleProvider({
     if (interrupted) clearInterruptedRestart({ store })
   }, [interrupted, store])
 
-  // Atalhos globais: Ctrl+` e Ctrl+K alternam o painel.
+  // Atalhos globais: Ctrl+` alterna o painel. Ctrl+K abre a paleta de comandos (no Layout);
+  // na página do console e no modo CLI ele só leva o foco à linha de comando.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key.toLowerCase() === 'k')) {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const focusOnly = pathname === '/console' || mode === 'cli'
+      if (e.key === '`') {
         e.preventDefault()
-        if (pathname === '/console' || mode === 'cli') {
-          document.getElementById('console-input')?.focus()
-        } else {
-          setOpen((o) => !o)
-        }
+        if (focusOnly) document.getElementById('console-input')?.focus()
+        else setOpen((o) => !o)
+      } else if (e.key.toLowerCase() === 'k' && focusOnly) {
+        e.preventDefault()
+        document.getElementById('console-input')?.focus()
       }
     }
     window.addEventListener('keydown', onKey)

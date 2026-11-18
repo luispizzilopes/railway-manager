@@ -5,7 +5,14 @@ import { BrowserRouter } from 'react-router'
 
 import { App } from './App'
 import { ApiError } from './api/client'
-import './styles/app.css'
+import '@fontsource/ibm-plex-mono/400.css'
+import '@fontsource/ibm-plex-mono/500.css'
+import '@fontsource/ibm-plex-sans/400.css'
+import '@fontsource/ibm-plex-sans/500.css'
+import '@fontsource/ibm-plex-sans/600.css'
+import { ToastProvider } from './components/ui/Toast'
+import './styles/index.css'
+import { applyTheme } from './theme'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,11 +24,15 @@ const queryClient = new QueryClient({
   },
 })
 
+applyTheme()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

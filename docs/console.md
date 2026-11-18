@@ -25,7 +25,7 @@ O console usa a mesma API, as mesmas regras e a mesma auditoria da interface. To
 ## Abrir o console
 
 - **Página:** item **Console** no menu lateral (`/console`).
-- **Painel em qualquer tela:** ``Ctrl+` `` (crase) ou `Ctrl+K` abre e fecha um painel na parte de baixo da tela, sem sair da tela atual. No macOS, `Cmd` também funciona. `Esc` fecha o painel.
+- **Painel em qualquer tela:** ``Ctrl+` `` (crase) abre e fecha um painel na parte de baixo da tela, sem sair da tela atual. No macOS, `Cmd` também funciona. `Esc` fecha o painel.
 
 A saída e o comando em andamento são os mesmos no painel e na página: dá para começar num e continuar no outro. O console exige sessão válida. Se a sessão expirar, ele mostra o erro e o app volta para o login.
 
@@ -218,7 +218,7 @@ Depois de executar, o console acompanha a operação até o fim, mostrando cada 
 | `Ctrl+C` | interrompe o comando em andamento ou cancela a pergunta; sem comando em andamento, limpa a linha |
 | `Ctrl+L` | limpa a saída |
 | `Esc` | cancela a pergunta, sai da busca ou fecha o painel |
-| ``Ctrl+` `` / `Ctrl+K` | abre ou fecha o painel |
+| ``Ctrl+` `` | abre ou fecha o painel (`Ctrl+K` abre a paleta de comandos, que também abre o console) |
 
 O histórico e os apelidos ficam **neste navegador**. Se o armazenamento do navegador estiver indisponível (janela privada, bloqueio), o console funciona normalmente, só que sem guardar o histórico.
 

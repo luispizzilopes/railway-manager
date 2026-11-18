@@ -1,25 +1,28 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { Link } from 'react-router'
 
 import { api, isUuid } from '../api/client'
 import type { ProjectImportReport } from '../api/types'
-import { ErrorAlert, Modal } from '../components/Modal'
+import { Modal } from '../components/Modal'
+import { Button } from '../components/ui/Button'
+import { EmptyState, ErrorState, Skeleton } from '../components/ui/Feedback'
+import { Field, Input } from '../components/ui/Field'
+import { Table } from '../components/ui/Table'
+import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { SYNC_LABEL, relativeTime } from '../format'
 
 /** Cadastro manual por Railway Project ID. */
 export function RegisterProjectForm({ onDone }: { onDone: () => void }) {
-  const queryClient = useQueryClient()
   const [id, setId] = useState('')
   const [name, setName] = useState('')
   const [touched, setTouched] = useState(false)
   const invalid = id.trim() !== '' && !isUuid(id)
-  const create = useMutation({
+  const create = useFeedbackMutation({
     mutationFn: () => api.createProject(id.trim(), name.trim() || undefined),
-    onSuccess: () => {
-      void queryClient.invalidateQueries()
-      onDone()
-    },
+    success: 'Projeto cadastrado.',
+    invalidate: [[]],
+    onSuccess: () => onDone(),
   })
 
   function submit(e: FormEvent) {
@@ -31,47 +34,45 @@ export function RegisterProjectForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form className="stack" onSubmit={submit} aria-label="Cadastrar projeto">
-      <div className="field">
-        <label htmlFor="railway-project-id">Railway Project ID</label>
-        <input
-          id="railway-project-id"
-          className="input mono"
-          value={id}
-          onChange={(e) => setId(e.target.value)}
-          onBlur={() => setTouched(true)}
-          aria-invalid={touched && (invalid || !id.trim())}
-          placeholder="00000000-0000-0000-0000-000000000000"
-        />
-        {touched && (invalid || !id.trim()) && (
-          <span className="error-text">Informe o ID do projeto (UUID), como aparece nas configurações do projeto.</span>
+      <Field
+        label="Railway Project ID"
+        error={touched && (invalid || !id.trim()) ? 'Informe o ID do projeto (UUID), como aparece nas configurações do projeto.' : undefined}
+      >
+        {(p) => (
+          <Input
+            {...p}
+            className="mono"
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            onBlur={() => setTouched(true)}
+            placeholder="00000000-0000-0000-0000-000000000000"
+          />
         )}
-      </div>
-      <div className="field">
-        <label htmlFor="display-name">Nome de exibição (opcional)</label>
-        <input id="display-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
-        <span className="hint">O nome e a descrição vêm do Railway; este nome só muda aqui.</span>
-      </div>
-      <ErrorAlert error={create.error} />
+      </Field>
+      <Field label="Nome de exibição (opcional)" hint="O nome e a descrição vêm do Railway; este nome só muda aqui.">
+        {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />}
+      </Field>
+      <ErrorState error={create.error} />
       <div className="row">
-        <button className="btn btn-primary" type="submit" disabled={create.isPending}>
+        <Button variant="primary" type="submit" loading={create.isPending}>
           {create.isPending ? 'Validando no Railway…' : 'Cadastrar'}
-        </button>
+        </Button>
       </div>
     </form>
   )
 }
 
 function DiscoverProjects({ onClose }: { onClose: () => void }) {
-  const queryClient = useQueryClient()
   const discovery = useQuery({ queryKey: ['discover-projects'], queryFn: api.discoverProjects })
   const [selected, setSelected] = useState<string[]>([])
   const [report, setReport] = useState<ProjectImportReport | null>(null)
-  const importMany = useMutation({
+  const importMany = useFeedbackMutation({
     mutationFn: () => api.importProjects(selected),
+    success: (r) => `${r.imported.length} projeto(s) importado(s).`,
+    invalidate: [[]],
     onSuccess: (r) => {
       setReport(r)
       setSelected([])
-      void queryClient.invalidateQueries()
     },
   })
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
@@ -82,21 +83,14 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn" onClick={onClose}>
-            Fechar
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={selected.length === 0 || importMany.isPending}
-            onClick={() => importMany.mutate()}
-          >
+          <Button onClick={onClose}>Fechar</Button>
+          <Button variant="primary" disabled={selected.length === 0} loading={importMany.isPending} onClick={() => importMany.mutate()}>
             Importar {selected.length || ''}
-          </button>
+          </Button>
         </>
       }
     >
-      <ErrorAlert error={discovery.error ?? importMany.error} />
+      <ErrorState error={discovery.error} onRetry={() => void discovery.refetch()} />
       {report && (
         <div className="alert alert-success" role="status">
           {report.imported.length} importado(s)
@@ -104,7 +98,7 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
           {report.failed.length > 0 && `, ${report.failed.length} com falha: ${report.failed.map((f) => f.reason).join('; ')}`}.
         </div>
       )}
-      {discovery.isPending && <p className="muted">Consultando o Railway…</p>}
+      {discovery.isPending && <Skeleton lines={4} label="Consultando o Railway…" />}
       {discovery.data?.workspaces.map((group) => (
         <div key={group.workspace?.id ?? 'sem-workspace'}>
           <div className="group-title">{group.workspace?.name ?? 'Sem workspace'}</div>
@@ -138,6 +132,10 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
 export function Projects() {
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const [mode, setMode] = useState<'discover' | 'manual' | null>(null)
+  const [filter, setFilter] = useState('')
+  const all = projects.data?.projects ?? []
+  const q = filter.trim().toLowerCase()
+  const shown = q ? all.filter((p) => (p.display_name ?? p.name).toLowerCase().includes(q)) : all
 
   return (
     <>
@@ -147,49 +145,74 @@ export function Projects() {
           <p className="muted">Projetos do Railway sob gerenciamento. Nada aqui cria ou exclui projetos no Railway.</p>
         </div>
         <div className="row">
-          <button type="button" className="btn" onClick={() => setMode('manual')}>
-            Cadastrar por ID
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => setMode('discover')}>
+          <Button onClick={() => setMode('manual')}>Cadastrar por ID</Button>
+          <Button variant="primary" onClick={() => setMode('discover')}>
             Importar da conta
-          </button>
+          </Button>
         </div>
       </div>
-      <ErrorAlert error={projects.error} />
-      {projects.data && projects.data.projects.length === 0 && (
-        <div className="card empty">
-          <h3>Nenhum projeto ainda</h3>
-          <p>Importe a partir da conta ou cadastre pelo Railway Project ID.</p>
+      <ErrorState error={projects.error} onRetry={() => void projects.refetch()} retrying={projects.isFetching} />
+      {projects.isPending && (
+        <div className="card">
+          <Skeleton lines={4} label="Carregando projetos…" />
         </div>
       )}
-      {projects.data && projects.data.projects.length > 0 && (
-        <div className="card table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Projeto</th>
-                <th>Railway Project ID</th>
-                <th>Sincronização</th>
-                <th>Cadastrado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.data.projects.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <Link to={`/projects/${p.id}`}>{p.display_name ?? p.name}</Link>
-                    {p.description && <div className="subtle">{p.description}</div>}
-                  </td>
-                  <td className="mono">{p.railway_project_id}</td>
-                  <td>
-                    <span className={p.sync_status === 'ok' ? '' : 'result result-failed'}>{SYNC_LABEL[p.sync_status]}</span>
-                    <div className="subtle">{relativeTime(p.last_synced_at)}</div>
-                  </td>
-                  <td>{relativeTime(p.created_at)}</td>
+      {projects.data && all.length === 0 && (
+        <div className="card">
+          <EmptyState
+            title="Nenhum projeto ainda"
+            action={
+              <Button variant="primary" onClick={() => setMode('discover')}>
+                Importar da conta
+              </Button>
+            }
+          >
+            Importe a partir da conta ou cadastre pelo Railway Project ID.
+          </EmptyState>
+        </div>
+      )}
+      {all.length > 0 && (
+        <div className="toolbar" role="search" style={{ marginBottom: 'var(--space-3)' }}>
+          <Input type="search" aria-label="Buscar projeto" placeholder="Buscar projeto…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <span className="toolbar-count" aria-live="polite">
+            {shown.length} {shown.length === 1 ? 'projeto' : 'projetos'}
+          </span>
+        </div>
+      )}
+      {all.length > 0 && (
+        <div className="card">
+          {shown.length === 0 ? (
+            <EmptyState title="Nenhum projeto encontrado" action={<Button onClick={() => setFilter('')}>Limpar busca</Button>}>
+              Nenhum projeto corresponde à busca.
+            </EmptyState>
+          ) : (
+            <Table label="Projetos">
+              <thead>
+                <tr>
+                  <th>Projeto</th>
+                  <th>Railway Project ID</th>
+                  <th>Sincronização</th>
+                  <th>Cadastrado</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {shown.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <Link to={`/projects/${p.id}`}>{p.display_name ?? p.name}</Link>
+                      {p.description && <div className="subtle">{p.description}</div>}
+                    </td>
+                    <td className="mono">{p.railway_project_id}</td>
+                    <td>
+                      <span className={p.sync_status === 'ok' ? '' : 'result result-failed'}>{SYNC_LABEL[p.sync_status]}</span>
+                      <div className="subtle">{relativeTime(p.last_synced_at)}</div>
+                    </td>
+                    <td>{relativeTime(p.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
         </div>
       )}
       {mode === 'discover' && <DiscoverProjects onClose={() => setMode(null)} />}

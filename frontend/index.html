@@ -3,12 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23bfa5ff' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M12 3v8'/%3E%3Cpath d='M6.3 7.3a8 8 0 1 0 11.4 0'/%3E%3C/svg%3E" />
-    <meta name="theme-color" content="#131415" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <style>
+      /* Ordem das camadas fixada antes de qualquer CSS: o CSS dos componentes pode chegar ao bundle antes de styles/index.css. */
+      @layer reset, tokens, base, components, pages, utilities;
+    </style>
+    <script>
+      // Aplica o tema antes da primeira pintura (mesma regra de src/theme.ts).
+      try {
+        var t = localStorage.getItem('rm:theme')
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.dataset.theme = t
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light'
+      }
+    </script>
     <title>Railway Manager</title>
   </head>
   <body>

@@ -1,64 +1,45 @@
-// Ícones de traço simples para a navegação.
+// Ícones da interface (Phosphor, peso "regular"): traço humanista, bem diferente do conjunto genérico de contornos.
 
-const PATHS = {
-  overview: (
-    <>
-      <rect x="3" y="3" width="7" height="9" rx="1.5" />
-      <rect x="14" y="3" width="7" height="5" rx="1.5" />
-      <rect x="14" y="12" width="7" height="9" rx="1.5" />
-      <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </>
-  ),
-  projects: (
-    <>
-      <path d="M12 3 3 7.5l9 4.5 9-4.5L12 3Z" />
-      <path d="m3 12 9 4.5 9-4.5" />
-      <path d="m3 16.5 9 4.5 9-4.5" />
-    </>
-  ),
-  schedules: (
-    <>
-      <rect x="3" y="4.5" width="18" height="16.5" rx="2" />
-      <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
-      <path d="M12 13v3l2 1.5" />
-    </>
-  ),
-  history: (
-    <>
-      <path d="M3 12a9 9 0 1 0 2.6-6.4L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l3.5 2" />
-    </>
-  ),
-  settings: (
-    <>
-      <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" />
-      <circle cx="15" cy="6" r="2" />
-      <circle cx="9" cy="12" r="2" />
-      <circle cx="17" cy="18" r="2" />
-    </>
-  ),
-  console: (
-    <>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="m7 9 3 3-3 3M13 15h4" />
-    </>
-  ),
-  logout: (
-    <>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <path d="m16 17 5-5-5-5" />
-      <path d="M21 12H9" />
-    </>
-  ),
-}
+import {
+  CalendarDots,
+  CaretRight,
+  Check,
+  ClockCounterClockwise,
+  Funnel,
+  MagnifyingGlass,
+  Moon,
+  type Icon as PhosphorIcon,
+  SignOut,
+  SlidersHorizontal,
+  Square,
+  SquaresFour,
+  Stack,
+  Sun,
+  TerminalWindow,
+  X,
+} from '@phosphor-icons/react'
 
-export type IconName = keyof typeof PATHS
+const ICONS = {
+  overview: SquaresFour,
+  projects: Stack,
+  schedules: CalendarDots,
+  history: ClockCounterClockwise,
+  settings: SlidersHorizontal,
+  console: TerminalWindow,
+  logout: SignOut,
+  search: MagnifyingGlass,
+  sun: Sun,
+  moon: Moon,
+  check: Check,
+  filter: Funnel,
+  chevron: CaretRight,
+  close: X,
+  stop: Square,
+} satisfies Record<string, PhosphorIcon>
+
+export type IconName = keyof typeof ICONS
 
 export function Icon({ name }: { name: IconName }) {
-  return (
-    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
-      {PATHS[name]}
-    </svg>
-  )
+  const Glyph = ICONS[name]
+  return <Glyph className="icon" aria-hidden="true" />
 }

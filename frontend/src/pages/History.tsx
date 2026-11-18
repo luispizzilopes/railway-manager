@@ -3,10 +3,13 @@ import { type FormEvent, useState } from 'react'
 import { useSearchParams } from 'react-router'
 
 import { api } from '../api/client'
-import type { HistoryFilters, ItemResult } from '../api/types'
-import { ErrorAlert } from '../components/Modal'
+import type { HistoryEntry, HistoryFilters, ItemResult } from '../api/types'
 import { StateChip } from '../components/StateChip'
-import { KIND_LABEL, RESULT_LABEL, formatDateTime, formatDuration } from '../format'
+import { Button } from '../components/ui/Button'
+import { EmptyState, ErrorState, Skeleton } from '../components/ui/Feedback'
+import { Field, Input, Select } from '../components/ui/Field'
+import { Table } from '../components/ui/Table'
+import { KIND_LABEL, RESULT_LABEL, formatDateTime, formatDuration, shortId } from '../format'
 
 const FILTER_KEYS = ['project', 'service', 'environment', 'kind', 'result', 'trigger', 'from', 'to'] as const
 const PER_PAGE = 50
@@ -60,98 +63,88 @@ export function History() {
       <div className="page-head">
         <div>
           <h1>Histórico</h1>
-          <p className="muted">Cada instância de cada operação, da mais recente para a mais antiga.</p>
+          <p className="muted">Cada serviço de cada operação, da mais recente para a mais antiga.</p>
         </div>
       </div>
 
       <form className="card card-body" onSubmit={apply} aria-label="Filtros" style={{ marginBottom: 'var(--space-4)' }}>
         <div className="form-grid">
-          <div className="field">
-            <label htmlFor="f-project">Projeto</label>
-            <select id="f-project" className="select" value={draft.project ?? ''} onChange={set('project')}>
-              <option value="">Todos</option>
-              {projects.data?.projects.map((p) => (
-                <option key={p.id} value={p.railway_project_id}>
-                  {p.display_name ?? p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="f-service">Railway Service ID</label>
-            <input id="f-service" className="input mono" value={draft.service ?? ''} onChange={set('service')} />
-          </div>
-          <div className="field">
-            <label htmlFor="f-environment">Ambiente</label>
-            <input
-              id="f-environment"
-              className="input"
-              placeholder="ex.: production"
-              value={draft.environment ?? ''}
-              onChange={set('environment')}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="f-kind">Tipo</label>
-            <select id="f-kind" className="select" value={draft.kind ?? ''} onChange={set('kind')}>
-              <option value="">Todos</option>
-              <option value="stop">Desligar</option>
-              <option value="start">Iniciar</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="f-result">Resultado</label>
-            <select id="f-result" className="select" value={draft.result ?? ''} onChange={set('result')}>
-              <option value="">Todos</option>
-              {(Object.keys(RESULT_LABEL) as ItemResult[]).map((r) => (
-                <option key={r} value={r}>
-                  {RESULT_LABEL[r]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="f-trigger">Origem</label>
-            <select id="f-trigger" className="select" value={draft.trigger ?? ''} onChange={set('trigger')}>
-              <option value="">Todas</option>
-              <option value="manual">Manual</option>
-              <option value="schedule">Agenda</option>
-              <option value="scheduled_action">Ação agendada</option>
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="f-from">De</label>
-            <input id="f-from" className="input" type="date" value={draft.from ?? ''} onChange={set('from')} />
-          </div>
-          <div className="field">
-            <label htmlFor="f-to">Até</label>
-            <input id="f-to" className="input" type="date" value={draft.to ?? ''} onChange={set('to')} />
-          </div>
+          <Field label="Projeto">
+            {(p) => (
+              <Select {...p} value={draft.project ?? ''} onChange={set('project')}>
+                <option value="">Todos</option>
+                {projects.data?.projects.map((pr) => (
+                  <option key={pr.id} value={pr.railway_project_id}>
+                    {pr.display_name ?? pr.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Railway Service ID">
+            {(p) => <Input {...p} className="mono" value={draft.service ?? ''} onChange={set('service')} />}
+          </Field>
+          <Field label="Ambiente">
+            {(p) => <Input {...p} placeholder="ex.: production" value={draft.environment ?? ''} onChange={set('environment')} />}
+          </Field>
+          <Field label="Tipo">
+            {(p) => (
+              <Select {...p} value={draft.kind ?? ''} onChange={set('kind')}>
+                <option value="">Todos</option>
+                <option value="stop">Desligar</option>
+                <option value="start">Iniciar</option>
+              </Select>
+            )}
+          </Field>
+          <Field label="Resultado">
+            {(p) => (
+              <Select {...p} value={draft.result ?? ''} onChange={set('result')}>
+                <option value="">Todos</option>
+                {(Object.keys(RESULT_LABEL) as ItemResult[]).map((r) => (
+                  <option key={r} value={r}>
+                    {RESULT_LABEL[r]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Origem">
+            {(p) => (
+              <Select {...p} value={draft.trigger ?? ''} onChange={set('trigger')}>
+                <option value="">Todas</option>
+                <option value="manual">Manual</option>
+                <option value="schedule">Agenda</option>
+                <option value="scheduled_action">Ação agendada</option>
+              </Select>
+            )}
+          </Field>
+          <Field label="De">{(p) => <Input {...p} type="date" value={draft.from ?? ''} onChange={set('from')} />}</Field>
+          <Field label="Até">{(p) => <Input {...p} type="date" value={draft.to ?? ''} onChange={set('to')} />}</Field>
         </div>
         <div className="row" style={{ marginTop: 'var(--space-3)' }}>
-          <button type="submit" className="btn btn-primary">
+          <Button type="submit" variant="primary">
             Filtrar
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => {
               setDraft({})
               setParams(new URLSearchParams())
             }}
           >
             Limpar
-          </button>
+          </Button>
         </div>
       </form>
 
-      <ErrorAlert error={history.error} />
+      <ErrorState error={history.error} onRetry={() => void history.refetch()} retrying={history.isFetching} />
       <div className="card">
+        {history.isPending && <Skeleton lines={6} label="Carregando histórico…" />}
         {history.data && history.data.items.length === 0 ? (
-          <div className="empty">Nenhuma operação encontrada com esses filtros.</div>
+          <EmptyState title="Nenhuma operação encontrada com esses filtros." />
         ) : (
-          <div className="table-wrap">
-            <table className="table">
+          history.data && (
+            <Table label="Histórico de operações">
               <thead>
                 <tr>
                   <th>Quando</th>
@@ -160,41 +153,14 @@ export function History() {
                   <th>Antes → depois</th>
                   <th>Resultado</th>
                   <th className="num">Duração</th>
+                  <th />
                 </tr>
               </thead>
-              <tbody>
-                {history.data?.items.map(({ item, kind, created_at, trigger, schedule_name, scheduled_action_label }) => (
-                  <tr key={item.id} data-testid="history-row">
-                    <td>{formatDateTime(created_at)}</td>
-                    <td>
-                      {KIND_LABEL[kind]}
-                      <div className="subtle">
-                        {trigger === 'schedule'
-                          ? `agenda: ${schedule_name}`
-                          : trigger === 'scheduled_action'
-                            ? `ação agendada: ${scheduled_action_label ?? ''}`
-                            : 'manual'}
-                      </div>
-                    </td>
-                    <td>
-                      {item.label.project_name} · {item.label.service_name} · {item.label.environment_name}
-                    </td>
-                    <td>
-                      <span className="row">
-                        <StateChip state={item.previous_state} /> →{' '}
-                        {item.final_state ? <StateChip state={item.final_state} /> : '—'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`result result-${item.result}`}>{RESULT_LABEL[item.result]}</span>
-                      {item.error_message && <div className="subtle">{item.error_message}</div>}
-                    </td>
-                    <td className="num">{formatDuration(item.duration_ms)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              {history.data.items.map((entry) => (
+                <HistoryRow key={entry.item.id} entry={entry} />
+              ))}
+            </Table>
+          )
         )}
         {history.data && history.data.total > 0 && (
           <div className="pagination">
@@ -202,16 +168,92 @@ export function History() {
               {history.data.total} registro(s) · página {page} de {pages}
             </span>
             <div className="row">
-              <button type="button" className="btn btn-sm" disabled={page <= 1} onClick={() => goTo(page - 1)}>
+              <Button size="sm" disabled={page <= 1} onClick={() => goTo(page - 1)}>
                 Anterior
-              </button>
-              <button type="button" className="btn btn-sm" disabled={page >= pages} onClick={() => goTo(page + 1)}>
+              </Button>
+              <Button size="sm" disabled={page >= pages} onClick={() => goTo(page + 1)}>
                 Próxima
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </div>
     </>
+  )
+}
+
+/** Linha do histórico; o detalhe (identificadores, horários, quem pediu) abre sob demanda. */
+function HistoryRow({ entry }: { entry: HistoryEntry }) {
+  const [open, setOpen] = useState(false)
+  const { item, kind, created_at, trigger, schedule_name, scheduled_action_label, requested_by } = entry
+  return (
+    <tbody>
+      <tr data-testid="history-row">
+        <td className="when">{formatDateTime(created_at)}</td>
+        <td>
+          {KIND_LABEL[kind]}
+          <div className="subtle">
+            {trigger === 'schedule'
+              ? `agenda: ${schedule_name}`
+              : trigger === 'scheduled_action'
+                ? `ação agendada: ${scheduled_action_label ?? ''}`
+                : 'manual'}
+          </div>
+        </td>
+        <td>
+          {item.label.project_name} · <span className="mono">{item.label.service_name}</span> · {item.label.environment_name}
+        </td>
+        <td>
+          <span className="row">
+            <StateChip state={item.previous_state} /> →{' '}
+            {item.final_state ? <StateChip state={item.final_state} /> : '—'}
+          </span>
+        </td>
+        <td>
+          <span className={`result result-${item.result}`}>{RESULT_LABEL[item.result]}</span>
+          {item.error_message && <div className="subtle">{item.error_message}</div>}
+        </td>
+        <td className="num">{formatDuration(item.duration_ms)}</td>
+        <td>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={open}
+            aria-label={`${open ? 'Ocultar' : 'Ver'} detalhes de ${item.label.service_name}`}
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? 'Ocultar' : 'Detalhes'}
+          </Button>
+        </td>
+      </tr>
+      {open && (
+        <tr className="detail-row">
+          <td colSpan={7}>
+            <dl className="detail-list">
+              <div>
+                <dt>Pedido por</dt>
+                <dd>{requested_by}</dd>
+              </div>
+              <div>
+                <dt>Operação</dt>
+                <dd className="mono">{shortId(item.operation_id)}</dd>
+              </div>
+              <div>
+                <dt>Deployment</dt>
+                <dd className="mono">{item.deployment_id ? shortId(item.deployment_id) : '—'}</dd>
+              </div>
+              <div>
+                <dt>Início</dt>
+                <dd>{item.started_at ? formatDateTime(item.started_at) : '—'}</dd>
+              </div>
+              <div>
+                <dt>Fim</dt>
+                <dd>{item.finished_at ? formatDateTime(item.finished_at) : '—'}</dd>
+              </div>
+            </dl>
+          </td>
+        </tr>
+      )}
+    </tbody>
   )
 }

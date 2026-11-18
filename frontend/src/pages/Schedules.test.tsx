@@ -213,6 +213,8 @@ describe('ações agendadas', () => {
       'POST /api/scheduled-actions/a-1/cancel': { ...pending, status: 'cancelled' },
     })
     renderWithProviders(<Schedules />)
+    expect(screen.queryByTestId('pending-action')).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('tab', { name: /Ações agendadas/ }))
     const row = await screen.findByTestId('pending-action')
     expect(row).toHaveTextContent('Desligar')
     expect(row).toHaveTextContent('todos os projetos')
@@ -220,5 +222,19 @@ describe('ações agendadas', () => {
     expect(row).toHaveTextContent('fim do dia')
     await userEvent.click(within(row).getByRole('button', { name: 'Cancelar' }))
     await waitFor(() => expect(calls.some((c) => c.url === '/api/scheduled-actions/a-1/cancel')).toBe(true))
+  })
+
+  it('a aba escolhida fica na URL e esconde a outra seção', async () => {
+    mockFetch({
+      ...routes,
+      'GET /api/scheduled-actions': { items: [], total: 0, page: 1, per_page: 50, default_timezone: 'America/Sao_Paulo' },
+    })
+    renderWithProviders(<Schedules />, { route: '/schedules?aba=acoes' })
+    expect(await screen.findByText('Nenhuma ação pendente.')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Ações agendadas/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('button', { name: 'Nova agenda' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: /^Agendas/ }))
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/schedules$/)
+    expect(screen.getByRole('button', { name: 'Nova agenda' })).toBeInTheDocument()
   })
 })

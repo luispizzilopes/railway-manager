@@ -76,6 +76,13 @@ describe('histórico', () => {
     expect(await screen.findByTestId('history-row')).toHaveTextContent('ação agendada: todos os projetos')
     expect(screen.getByLabelText('Origem')).toHaveValue('scheduled_action')
     expect(calls.find((c) => c.url.startsWith('/api/history'))!.url).toContain('trigger=scheduled_action')
+
+    // O detalhe abre sob demanda.
+    expect(screen.queryByText('Pedido por')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Ver detalhes de api/ }))
+    expect(screen.getByText('Pedido por')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Ocultar detalhes de api/ }))
+    expect(screen.queryByText('Pedido por')).not.toBeInTheDocument()
   })
 
   it('filtersFrom ignora vazios e página 1', () => {

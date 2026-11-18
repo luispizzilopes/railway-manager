@@ -1,39 +1,170 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 
 import { api } from '../api/client'
-import type { Dashboard as DashboardData, InstanceCard, PowerKind, PowerTarget } from '../api/types'
-import { ErrorAlert } from '../components/Modal'
+import type { Dashboard as DashboardData, InstanceCard, ObservedState, PowerKind, PowerTarget } from '../api/types'
+import { Icon } from '../components/Icon'
 import { OperationFlow } from '../components/OperationFlow'
-import { FreshnessNote, StateChip } from '../components/StateChip'
-import { KIND_LABEL, STATUS_LABEL, formatTime, relativeTime } from '../format'
+import { FreshnessNote } from '../components/StateChip'
+import { Button } from '../components/ui/Button'
+import { EmptyState, ErrorState, Skeleton } from '../components/ui/Feedback'
+import { Input, Select } from '../components/ui/Field'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table } from '../components/ui/Table'
+import { useFeedbackMutation } from '../components/useFeedbackMutation'
+import { KIND_LABEL, STATE_LABEL, STATUS_LABEL, formatTime, relativeTime } from '../format'
 
 /** Intervalo da atualização automática enquanto a tela está aberta. */
 export const AUTO_REFRESH_MS = 60_000
 
 type Flow = { kind: PowerKind; target: PowerTarget; title: string; confirm: boolean }
+type Segment = { state: ObservedState; count: number }
+type Project = DashboardData['projects'][number]
 
-function Indicators({ data }: { data: DashboardData }) {
+const SEGMENT_ORDER: ObservedState[] = ['running', 'sleeping', 'transitioning', 'awaiting_approval', 'stopped', 'failed', 'unknown']
+
+/** Barra segmentada com a proporção de serviços em cada estado. */
+function StateBar({ segments, className = '' }: { segments: Segment[]; className?: string }) {
+  const total = segments.reduce((n, s) => n + s.count, 0)
+  return (
+    <div className={`statebar ${className}`} role="img" aria-label={segments.map((s) => `${s.count} ${STATE_LABEL[s.state]}`).join(', ')}>
+      {total === 0 ? (
+        <span className="statebar-seg statebar-empty" style={{ flexGrow: 1 }} />
+      ) : (
+        segments
+          .filter((s) => s.count > 0)
+          .map((s) => (
+            <span key={s.state} className={`statebar-seg seg-${s.state}`} style={{ flexGrow: s.count }} title={`${STATE_LABEL[s.state]}: ${s.count}`} />
+          ))
+      )}
+    </div>
+  )
+}
+
+function countStates(cards: InstanceCard[]): Segment[] {
+  return SEGMENT_ORDER.map((state) => ({ state, count: cards.filter((c) => c.state === state).length }))
+}
+
+/** Resumo de saúde: frase curta, proporção por estado e as contagens do painel. */
+function Summary({ data }: { data: DashboardData }) {
   const i = data.indicators
+  const segments: Segment[] = [
+    { state: 'running', count: i.running },
+    { state: 'sleeping', count: i.sleeping },
+    { state: 'stopped', count: i.stopped },
+    { state: 'failed', count: i.failed },
+    { state: 'unknown', count: i.other },
+  ]
+  const pct = i.instances > 0 ? Math.round(((i.running + i.sleeping) / i.instances) * 100) : null
+  const headline =
+    i.instances === 0
+      ? 'Nenhum serviço monitorado'
+      : i.failed > 0
+        ? `${i.failed} ${i.failed === 1 ? 'serviço com falha' : 'serviços com falha'}`
+        : `${i.running + i.sleeping} de ${i.instances} serviços em operação`
   const stats = [
     { label: 'Projetos', value: i.projects },
     { label: 'Serviços monitorados', value: i.instances },
-    { label: 'Ativos', value: i.running, note: i.sleeping ? `${i.sleeping} dormindo` : undefined },
+    { label: 'Ativos', value: i.running, note: i.sleeping ? `${i.sleeping} dormindo` : undefined, tone: 'running' },
     { label: 'Desligados', value: i.stopped },
-    { label: 'Com falha', value: i.failed },
+    { label: 'Com falha', value: i.failed, tone: i.failed > 0 ? 'alert' : undefined },
     { label: 'Outros estados', value: i.other },
   ]
   return (
-    <div className="stats">
-      {stats.map((s) => (
-        <div className="card stat" key={s.label} data-testid={`stat-${s.label}`}>
-          <div className="stat-value">{s.value}</div>
-          <div className="stat-label">{s.label}</div>
-          {s.note && <div className="stat-note">{s.note}</div>}
+    <section className="card" aria-label="Resumo" data-testid="health-panel">
+      <div className="summary">
+        <div className="summary-top">
+          <span className="summary-headline">{headline}</span>
+          {pct !== null && (
+            <span className="summary-pct" title="Serviços ativos ou dormindo">
+              <span className="mono">{pct}%</span> em operação
+            </span>
+          )}
+        </div>
+        <StateBar segments={segments} />
+        <ul className="legend">
+          {segments.filter((s) => s.count > 0 || s.state !== 'unknown').map((s) => (
+            <li key={s.state}>
+              <span className={`dot dot-${s.state}`} />
+              <span className="legend-label">{STATE_LABEL[s.state]}</span>
+              <span className="legend-count">{s.count}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="stats">
+        {stats.map((s) => (
+          <div className={`stat${s.tone ? ` stat-${s.tone}` : ''}`} key={s.label} data-testid={`stat-${s.label}`}>
+            <div className="stat-label">{s.label}</div>
+            <div className="stat-value">{s.value}</div>
+            {s.note && <div className="stat-note">{s.note}</div>}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+type Attention = { card: InstanceCard; project: Project['project']; environment: string; reason: string }
+
+/** Serviços que exigem atenção, com o motivo em texto. */
+function attentionItems(projects: Project[]): Attention[] {
+  const items: Attention[] = []
+  for (const { project, environments } of projects) {
+    for (const { environment, instances } of environments) {
+      for (const card of instances) {
+        const reason = card.not_found
+          ? 'Não encontrado no Railway'
+          : card.state === 'failed'
+            ? 'Com falha'
+            : card.state === 'awaiting_approval'
+              ? 'Aguardando aprovação'
+              : card.freshness === 'unavailable'
+                ? 'Leitura indisponível'
+                : card.freshness === 'stale'
+                  ? 'Leitura desatualizada'
+                  : null
+        if (reason) items.push({ card, project, environment: environment.name, reason })
+      }
+    }
+  }
+  return items
+}
+
+function AttentionPanel({ items, ready, onStart }: { items: Attention[]; ready: boolean; onStart: (a: Attention) => void }) {
+  if (items.length === 0) {
+    return (
+      <p className="all-clear">
+        <Icon name="check" />
+        Nenhum serviço requer atenção.
+      </p>
+    )
+  }
+  return (
+    <section className="card attention" aria-label="Requer atenção">
+      <div className="card-head">
+        <h3>Requer atenção</h3>
+        <span className="subtle">{items.length}</span>
+      </div>
+      {items.map((a) => (
+        <div className="attention-item" key={a.card.id}>
+          <StatusBadge state={a.card.state} freshness={a.card.freshness} />
+          <span className="attention-name">{a.card.service_name}</span>
+          <span className="subtle">
+            {a.project.display_name ?? a.project.name} · {a.environment} · {a.reason}
+          </span>
+          <span className="spacer" />
+          {a.card.state === 'failed' && !a.card.not_found && !a.card.busy ? (
+            <Button size="sm" disabled={!ready} onClick={() => onStart(a)}>
+              Iniciar
+            </Button>
+          ) : (
+            <Link to={`/projects/${a.project.id}`}>Ver projeto</Link>
+          )}
         </div>
       ))}
-    </div>
+    </section>
   )
 }
 
@@ -48,38 +179,58 @@ export function InstanceRow({
 }) {
   const off = card.state === 'stopped' || card.state === 'failed'
   return (
-    <div className="instance-row" data-testid="instance-row" data-freshness={card.freshness}>
-      <span className="instance-name">{card.service_name}</span>
-      <StateChip state={card.state} freshness={card.freshness} />
-      <span>
+    <tr className={`instance-row row-${card.state}`} data-testid="instance-row" data-freshness={card.freshness}>
+      <td>
+        <span className="instance-name">{card.service_name}</span>
+      </td>
+      <td>
+        <StatusBadge state={card.state} freshness={card.freshness} />
+      </td>
+      <td>
         {card.not_found ? (
           <span className="freshness freshness-unavailable">Não encontrado no Railway</span>
         ) : (
           <FreshnessNote freshness={card.freshness} observedAt={card.last_observed_at} error={card.last_sync_error} />
         )}
-      </span>
-      <span className="row">
+      </td>
+      <td className="actions">
         {card.busy ? (
           <span className="subtle">operação em andamento</span>
         ) : (
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={disabled || card.not_found}
-            onClick={() => onAction(off ? 'start' : 'stop')}
-          >
+          <Button size="sm" disabled={disabled || card.not_found} onClick={() => onAction(off ? 'start' : 'stop')}>
             {off ? 'Iniciar' : 'Desligar'}
-          </button>
+          </Button>
         )}
-      </span>
-    </div>
+      </td>
+    </tr>
   )
 }
+
+function ProjectSummary({ cards }: { cards: InstanceCard[] }) {
+  const running = cards.filter((c) => c.state === 'running' || c.state === 'sleeping').length
+  return (
+    <span className="project-summary" title={`${running} de ${cards.length} em operação`}>
+      <StateBar segments={countStates(cards)} className="statebar-sm" />
+      <span className="mono">
+        {running}/{cards.length}
+      </span>
+    </span>
+  )
+}
+
+const STATE_FILTERS: ObservedState[] = ['running', 'sleeping', 'stopped', 'transitioning', 'failed', 'awaiting_approval', 'unknown']
 
 export function Dashboard() {
   const queryClient = useQueryClient()
   const [flow, setFlow] = useState<Flow | null>(null)
   const [selected, setSelected] = useState<string[]>([])
+  const [params, setParams] = useSearchParams()
+  const query = params.get('q') ?? ''
+  const stateFilter = params.get('estado') ?? ''
+  const projectFilter = params.get('projeto') ?? ''
+  const envFilter = params.get('ambiente') ?? ''
+  const filtering = Boolean(query || stateFilter || projectFilter || envFilter)
+
   const dashboard = useQuery({
     queryKey: ['dashboard'],
     queryFn: api.dashboard,
@@ -99,14 +250,55 @@ export function Dashboard() {
     refetchInterval: AUTO_REFRESH_MS,
     refetchOnWindowFocus: false,
   })
-  const refresh = useMutation({
+  const refresh = useFeedbackMutation({
     mutationFn: api.refresh,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+    success: 'Estados atualizados.',
+    invalidate: [['dashboard']],
   })
 
   const data = dashboard.data
-  const toggle = (id: string) =>
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+
+  function setFilter(key: string, value: string) {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  const attention = useMemo(() => (data ? attentionItems(data.projects) : []), [data])
+
+  // Filtros: mantém só projetos, ambientes e serviços que correspondem.
+  const visible = useMemo(() => {
+    if (!data) return []
+    const q = query.trim().toLowerCase()
+    return data.projects
+      .filter(({ project }) => !projectFilter || project.id === projectFilter)
+      .map((p) => ({
+        ...p,
+        environments: p.environments
+          .filter(({ environment }) => !envFilter || environment.name === envFilter)
+          .map((e) => ({
+            ...e,
+            instances: e.instances.filter(
+              (c) => (!q || c.service_name.toLowerCase().includes(q)) && (!stateFilter || c.state === stateFilter),
+            ),
+          }))
+          .filter((e) => !filtering || e.instances.length > 0),
+      }))
+      .filter((p) => !filtering || p.environments.length > 0)
+  }, [data, query, stateFilter, projectFilter, envFilter, filtering])
+
+  const matches = visible.reduce((n, p) => n + p.environments.reduce((m, e) => m + e.instances.length, 0), 0)
+  const environmentNames = useMemo(
+    () => [...new Set((data?.projects ?? []).flatMap((p) => p.environments.map((e) => e.environment.name)))],
+    [data],
+  )
 
   return (
     <>
@@ -114,7 +306,14 @@ export function Dashboard() {
         <div>
           <h1>Visão geral</h1>
           <p className="muted">
-            {data ? `Atualizado ${relativeTime(data.generated_at)}` : 'Carregando…'}
+            {data ? (
+              <span className={`live${paused ? ' live-paused' : ''}`}>
+                <span className="live-dot" aria-hidden="true" />
+                {paused ? 'Atualização pausada (cota do Railway)' : 'Atualização automática'} · atualizado {relativeTime(data.generated_at)}
+              </span>
+            ) : (
+              'Carregando…'
+            )}
             {data?.rate_limit.remaining != null && data.rate_limit.limit != null && (
               <span className="subtle">
                 {' '}
@@ -128,10 +327,8 @@ export function Dashboard() {
             <>
               <span className="subtle">{selected.length} projeto(s) selecionado(s)</span>
               {(['start', 'stop'] as const).map((kind) => (
-                <button
+                <Button
                   key={kind}
-                  type="button"
-                  className="btn"
                   disabled={!ready}
                   onClick={() =>
                     setFlow({
@@ -143,23 +340,18 @@ export function Dashboard() {
                   }
                 >
                   {KIND_LABEL[kind]} selecionados
-                </button>
+                </Button>
               ))}
             </>
           )}
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => refresh.mutate()}
-            disabled={refresh.isPending || !ready}
-          >
-            {refresh.isPending ? 'Atualizando…' : 'Atualizar estados'}
-          </button>
+          <Button variant="primary" onClick={() => refresh.mutate()} loading={refresh.isPending} disabled={!ready}>
+            Atualizar estados
+          </Button>
         </div>
       </div>
 
       <div className="stack">
-        <ErrorAlert error={dashboard.error ?? refresh.error} />
+        <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} retrying={dashboard.isFetching} />
         {data?.alerts.map((a) => (
           <div key={a.code + a.message} className={a.code === 'rate_limited' ? 'alert alert-warn' : 'alert alert-danger'} role="alert">
             <span>
@@ -169,19 +361,102 @@ export function Dashboard() {
           </div>
         ))}
 
-        {data && <Indicators data={data} />}
+        {dashboard.isPending && (
+          <div className="card">
+            <Skeleton lines={5} label="Carregando a visão geral…" />
+          </div>
+        )}
+
+        {data && (
+          <>
+            <AttentionPanel
+              items={attention}
+              ready={ready}
+              onStart={({ card, project, environment }) =>
+                setFlow({
+                  kind: 'start',
+                  target: { type: 'instance', instance_id: card.id },
+                  title: `Iniciar ${card.service_name} (${environment}) — ${project.display_name ?? project.name}`,
+                  confirm: false,
+                })
+              }
+            />
+            <Summary data={data} />
+          </>
+        )}
       </div>
 
       {data && data.projects.length === 0 && (
-        <div className="card empty">
-          <h3>Nenhum projeto gerenciado</h3>
-          <p>
-            <Link to="/projects">Importe projetos</Link> da sua conta do Railway para começar.
-          </p>
+        <div className="card" style={{ marginTop: 'var(--space-4)' }}>
+          <EmptyState
+            title="Nenhum projeto gerenciado"
+            action={
+              <Link to="/projects" className="btn btn-primary">
+                Importar projetos
+              </Link>
+            }
+          >
+            Importe projetos da sua conta do Railway para começar.
+          </EmptyState>
         </div>
       )}
 
-      {data?.projects.map(({ project, environments, next_action }) => (
+      {data && data.projects.length > 0 && (
+        <div className="toolbar" role="search" style={{ margin: 'var(--space-5) 0 var(--space-3)' }}>
+          <Input
+            type="search"
+            aria-label="Buscar serviço"
+            placeholder="Buscar serviço…"
+            value={query}
+            onChange={(e) => setFilter('q', e.target.value)}
+          />
+          <Select aria-label="Filtrar por estado" value={stateFilter} onChange={(e) => setFilter('estado', e.target.value)}>
+            <option value="">Todos os estados</option>
+            {STATE_FILTERS.map((st) => (
+              <option key={st} value={st}>
+                {STATE_LABEL[st]}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Filtrar por projeto" value={projectFilter} onChange={(e) => setFilter('projeto', e.target.value)}>
+            <option value="">Todos os projetos</option>
+            {data.projects.map(({ project }) => (
+              <option key={project.id} value={project.id}>
+                {project.display_name ?? project.name}
+              </option>
+            ))}
+          </Select>
+          <Select aria-label="Filtrar por ambiente" value={envFilter} onChange={(e) => setFilter('ambiente', e.target.value)}>
+            <option value="">Todos os ambientes</option>
+            {environmentNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
+          {filtering && (
+            <Button variant="ghost" onClick={() => setParams({}, { replace: true })}>
+              Limpar filtros
+            </Button>
+          )}
+          <span className="toolbar-count" aria-live="polite">
+            {filtering ? `${matches} ${matches === 1 ? 'serviço encontrado' : 'serviços encontrados'}` : `${matches} ${matches === 1 ? 'serviço' : 'serviços'}`}
+          </span>
+        </div>
+      )}
+
+      {data && data.projects.length > 0 && filtering && visible.length === 0 && (
+        <div className="card">
+          <EmptyState
+            title="Nenhum serviço encontrado"
+            action={<Button onClick={() => setParams({}, { replace: true })}>Limpar filtros</Button>}
+          >
+            Nenhum serviço corresponde aos filtros aplicados.
+          </EmptyState>
+        </div>
+      )}
+
+      {visible.map(({ project, environments, next_action }) => (
         <section key={project.id} className="card project-card" aria-label={project.display_name ?? project.name}>
           <div className="card-head">
             <input
@@ -201,11 +476,11 @@ export function Dashboard() {
               </span>
             )}
             <span className="spacer" />
+            {environments.length > 0 && <ProjectSummary cards={environments.flatMap((e) => e.instances)} />}
             {(['start', 'stop'] as const).map((kind) => (
-              <button
+              <Button
                 key={kind}
-                type="button"
-                className="btn btn-sm"
+                size="sm"
                 disabled={!ready || environments.length === 0}
                 onClick={() =>
                   setFlow({
@@ -217,34 +492,50 @@ export function Dashboard() {
                 }
               >
                 {kind === 'start' ? 'Iniciar todos' : 'Desligar todos'}
-              </button>
+              </Button>
             ))}
           </div>
           {environments.length === 0 && (
             <div className="card-body muted">
-              Nenhuma instância gerenciada. <Link to={`/projects/${project.id}`}>Importar instâncias</Link>
+              Nenhum serviço gerenciado. <Link to={`/projects/${project.id}`}>Importar serviços</Link>
             </div>
           )}
-          {environments.map(({ environment, instances }) => (
-            <div key={environment.id} className="env-group">
-              <div className="env-label">{environment.name}</div>
-              {instances.map((card) => (
-                <InstanceRow
-                  key={card.id}
-                  card={card}
-                  disabled={!ready}
-                  onAction={(kind) =>
-                    setFlow({
-                      kind,
-                      target: { type: 'instance', instance_id: card.id },
-                      title: `${KIND_LABEL[kind]} ${card.service_name} (${environment.name})`,
-                      confirm: false,
-                    })
-                  }
-                />
+          {environments.length > 0 && (
+            <Table label={`Serviços de ${project.display_name ?? project.name}`} className="table-services">
+              <thead>
+                <tr>
+                  <th>Serviço</th>
+                  <th>Estado</th>
+                  <th>Leitura</th>
+                  <th className="actions">Ações</th>
+                </tr>
+              </thead>
+              {environments.map(({ environment, instances }) => (
+                <tbody key={environment.id}>
+                  <tr className="env-row">
+                    <th colSpan={4} scope="colgroup">
+                      {environment.name}
+                    </th>
+                  </tr>
+                  {instances.map((card) => (
+                    <InstanceRow
+                      key={card.id}
+                      card={card}
+                      disabled={!ready}
+                      onAction={(kind) =>
+                        setFlow({
+                          kind,
+                          target: { type: 'instance', instance_id: card.id },
+                          title: `${KIND_LABEL[kind]} ${card.service_name} (${environment.name})`,
+                          confirm: false,
+                        })
+                      }
+                    />
+                  ))}
+                </tbody>
               ))}
-            </div>
-          ))}
+            </Table>
+          )}
         </section>
       ))}
 
@@ -255,35 +546,33 @@ export function Dashboard() {
             <span className="spacer" />
             <Link to="/history">Ver histórico</Link>
           </div>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Quando</th>
-                  <th>Tipo</th>
-                  <th>Projetos</th>
-                  <th>Resultado</th>
-                  <th className="num">Itens</th>
+          <Table label="Últimas operações">
+            <thead>
+              <tr>
+                <th>Quando</th>
+                <th>Tipo</th>
+                <th>Projetos</th>
+                <th>Resultado</th>
+                <th className="num">Itens</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.recent_operations.map((s) => (
+                <tr key={s.operation.id}>
+                  <td>{relativeTime(s.operation.created_at)}</td>
+                  <td>{KIND_LABEL[s.operation.kind]}</td>
+                  <td>{s.projects.join(', ')}</td>
+                  <td>
+                    <span className={`result result-${s.operation.status}`}>{STATUS_LABEL[s.operation.status]}</span>
+                  </td>
+                  <td className="num">
+                    {s.succeeded}✓ {s.failed > 0 && `${s.failed}✗ `}
+                    {s.skipped > 0 && `${s.skipped} ignorado(s)`}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {data.recent_operations.map((s) => (
-                  <tr key={s.operation.id}>
-                    <td>{relativeTime(s.operation.created_at)}</td>
-                    <td>{KIND_LABEL[s.operation.kind]}</td>
-                    <td>{s.projects.join(', ')}</td>
-                    <td>
-                      <span className={`result result-${s.operation.status}`}>{STATUS_LABEL[s.operation.status]}</span>
-                    </td>
-                    <td className="num">
-                      {s.succeeded}✓ {s.failed > 0 && `${s.failed}✗ `}
-                      {s.skipped > 0 && `${s.skipped} ignorado(s)`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </Table>
         </section>
       )}
 

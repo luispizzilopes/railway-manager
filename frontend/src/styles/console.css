@@ -1,0 +1,272 @@
+/* Console: saída e linha de comando, painel inferior, modo CLI e escolha de modo. */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.console {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+}
+
+.console-page {
+  height: calc(100vh - 220px);
+  min-height: 360px;
+}
+
+.console-panel {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+}
+
+.console-log {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.console-options {
+  padding: var(--space-1) var(--space-4);
+  color: var(--text-2);
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+
+.console-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.console-line-prompt {
+  background: var(--warn-soft);
+}
+
+.con-prompt-label {
+  color: var(--accent-text);
+  white-space: nowrap;
+}
+
+.console-line-prompt .con-prompt-label {
+  color: var(--warn);
+}
+
+.console-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+}
+
+.con-input-echo {
+  color: var(--text-2);
+}
+
+.con-prompt-sign {
+  color: var(--accent-text);
+}
+
+.con-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.con-tone-muted {
+  color: var(--text-3);
+}
+
+.con-tone-error {
+  color: var(--fail);
+}
+
+.con-tone-success {
+  color: var(--ok);
+}
+
+.con-tone-warn {
+  color: var(--warn);
+}
+
+.con-tone-info {
+  color: var(--info);
+}
+
+.con-muted {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+
+.con-title {
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.con-table-wrap {
+  overflow-x: auto;
+}
+
+.con-table {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.con-table th,
+.con-table td {
+  text-align: left;
+  padding: 2px var(--space-3) 2px 0;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.con-table th {
+  color: var(--text-3);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+
+.con-json {
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: var(--text-sm);
+}
+
+.con-id {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent-text);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.console-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  height: 45vh;
+  min-height: 220px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-pop);
+  resize: vertical;
+  overflow: hidden;
+}
+
+.console-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.console-drawer-head .btn {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .console-drawer {
+    height: 70vh;
+  }
+
+  .console-page {
+    height: calc(100vh - 180px);
+  }
+}
+
+/* ---------- escolha de modo e modo CLI ---------- */
+
+.mode-card {
+  width: min(460px, 100%);
+  padding: var(--space-6);
+  background: var(--surface-sunken);
+}
+
+.mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.mode-option:hover,
+.mode-option:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  outline: none;
+}
+
+.cli-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-sunken);
+}
+
+.cli-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.cli-head .side-brand {
+  height: auto;
+  padding: 0;
+  border: 0;
+}
+
+.cli-head .btn {
+  margin-left: auto;
+}
+
+.console-cli {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+}
+

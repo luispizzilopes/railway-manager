@@ -1,11 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 
 import { ApiError, api } from '../api/client'
 import type { Project, ScheduleInput, ScheduleView, ScheduleWindow } from '../api/types'
-import { ConfirmDialog, ErrorAlert, Modal } from '../components/Modal'
+import { ConfirmDialog, Modal } from '../components/Modal'
+import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { OperationResult } from '../components/OperationFlow'
 import { DAY_LABEL, KIND_LABEL, RUN_LABEL, formatDays, formatInZone } from '../format'
+import { Button } from '../components/ui/Button'
+import { EmptyState, ErrorState, Skeleton } from '../components/ui/Feedback'
+import { Input, Select } from '../components/ui/Field'
+import { Table } from '../components/ui/Table'
+import { Tabs } from '../components/ui/Tabs'
 
 /** Fusos mais usados; o campo aceita qualquer nome IANA. */
 export const COMMON_TIMEZONES = [
@@ -33,12 +40,6 @@ const projectName = (projects: Project[] | undefined, id: string) => {
 
 function windowsLabel(windows: ScheduleWindow[]): string {
   return windows.map((w) => `${w.start}–${w.end}`).join(', ')
-}
-
-function targetLabel(view: ScheduleView): string {
-  const t = view.schedule.target
-  if (t.type === 'instances') return `${t.instance_ids.length} serviço(s) selecionado(s)`
-  return t.environment_id ? 'Projeto inteiro (um ambiente)' : 'Projeto inteiro'
 }
 
 // ---------- editor ----------
@@ -122,7 +123,6 @@ export function ScheduleEditor({
   onSaved: (saved: ScheduleView) => void
   onClose: () => void
 }) {
-  const queryClient = useQueryClient()
   const [draft, setDraft] = useState<Draft>(() => draftFrom(view, defaultTimezone, projects[0]?.id ?? ''))
   const [touched, setTouched] = useState(false)
   const errors = draftErrors(draft)
@@ -139,13 +139,12 @@ export function ScheduleEditor({
     enabled: Boolean(draft.project_id),
   })
 
-  const save = useMutation({
+  const save = useFeedbackMutation({
     mutationFn: (input: ScheduleInput) =>
       view ? api.updateSchedule(view.schedule.id, input) : api.createSchedule(input),
-    onSuccess: (saved) => {
-      void queryClient.invalidateQueries()
-      onSaved(saved)
-    },
+    success: view ? 'Agenda atualizada.' : 'Agenda criada.',
+    invalidate: [[]],
+    onSuccess: (saved) => onSaved(saved),
   })
 
   function submit(e: FormEvent) {
@@ -177,12 +176,12 @@ export function ScheduleEditor({
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn" onClick={onClose}>
+          <Button onClick={onClose}>
             Cancelar
-          </button>
-          <button type="submit" form="schedule-form" className="btn btn-primary" disabled={save.isPending}>
+          </Button>
+          <Button variant="primary" type="submit" form="schedule-form" loading={save.isPending}>
             {view ? 'Salvar' : 'Criar agenda'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -190,9 +189,8 @@ export function ScheduleEditor({
         <div className="form-grid">
           <div className="field">
             <label htmlFor="schedule-name">Nome</label>
-            <input
+            <Input
               id="schedule-name"
-              className="input"
               value={draft.name}
               placeholder="ex.: horário comercial"
               onChange={(e) => set({ name: e.target.value })}
@@ -200,9 +198,8 @@ export function ScheduleEditor({
           </div>
           <div className="field">
             <label htmlFor="schedule-project">Projeto</label>
-            <select
+            <Select
               id="schedule-project"
-              className="select"
               value={draft.project_id}
               disabled={Boolean(view)}
               onChange={(e) => set({ project_id: e.target.value, environment_id: '', instance_ids: [] })}
@@ -212,13 +209,12 @@ export function ScheduleEditor({
                   {p.display_name ?? p.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="field">
             <label htmlFor="schedule-timezone">Fuso horário</label>
-            <input
+            <Input
               id="schedule-timezone"
-              className="input"
               list="timezones"
               value={draft.timezone}
               onChange={(e) => set({ timezone: e.target.value })}
@@ -257,9 +253,8 @@ export function ScheduleEditor({
         {draft.targetType === 'project' ? (
           <div className="field">
             <label htmlFor="schedule-environment">Ambiente</label>
-            <select
+            <Select
               id="schedule-environment"
-              className="select"
               value={draft.environment_id}
               onChange={(e) => set({ environment_id: e.target.value })}
             >
@@ -269,7 +264,7 @@ export function ScheduleEditor({
                   {env.name}
                 </option>
               ))}
-            </select>
+            </Select>
             <span className="hint">Serviços importados depois entram automaticamente.</span>
           </div>
         ) : (
@@ -295,15 +290,15 @@ export function ScheduleEditor({
           <span className="section-title">Dias</span>
           <div className="row" role="group" aria-label="Dias da semana">
             {DAY_LABEL.map((label, day) => (
-              <button
+              <Button
                 key={label}
-                type="button"
-                className={draft.days.includes(day) ? 'btn btn-sm btn-primary' : 'btn btn-sm'}
+                variant={draft.days.includes(day) ? 'primary' : 'secondary'}
+                size="sm"
                 aria-pressed={draft.days.includes(day)}
                 onClick={() => toggleDay(day)}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -316,9 +311,8 @@ export function ScheduleEditor({
                 <span className="subtle" style={{ width: 64 }}>
                   Janela {i + 1}
                 </span>
-                <input
+                <Input
                   type="time"
-                  className="input"
                   style={{ width: 130 }}
                   aria-label={`Início da janela ${i + 1}`}
                   aria-invalid={conflicts.includes(i + 1)}
@@ -326,9 +320,8 @@ export function ScheduleEditor({
                   onChange={(e) => setWindow(i, { start: e.target.value })}
                 />
                 <span className="subtle">até</span>
-                <input
+                <Input
                   type="time"
-                  className="input"
                   style={{ width: 130 }}
                   aria-label={`Fim da janela ${i + 1}`}
                   aria-invalid={conflicts.includes(i + 1)}
@@ -336,24 +329,20 @@ export function ScheduleEditor({
                   onChange={(e) => setWindow(i, { end: e.target.value })}
                 />
                 {w.end < w.start && <span className="subtle">termina no dia seguinte</span>}
-                <button
-                  type="button"
-                  className="btn btn-sm btn-ghost"
+                <Button variant="ghost" size="sm"
                   aria-label={`Remover janela ${i + 1}`}
                   onClick={() => set({ windows: draft.windows.filter((_, j) => j !== i) })}
                 >
                   Remover
-                </button>
+                </Button>
               </div>
             ))}
             <div>
-              <button
-                type="button"
-                className="btn btn-sm"
+              <Button size="sm"
                 onClick={() => set({ windows: [...draft.windows, { start: '13:00', end: '18:00' }] })}
               >
                 Adicionar janela
-              </button>
+              </Button>
             </div>
           </div>
           <span className="hint">Liga no início e desliga no fim de cada janela, nos dias marcados.</span>
@@ -364,7 +353,7 @@ export function ScheduleEditor({
             <span>{errors.join(' ')}</span>
           </div>
         )}
-        <ErrorAlert error={save.error} />
+        <ErrorState error={save.error} />
       </form>
     </Modal>
   )
@@ -382,9 +371,9 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
       title={view.schedule.name}
       onClose={onClose}
       footer={
-        <button type="button" className="btn" onClick={onClose}>
+        <Button onClick={onClose}>
           Fechar
-        </button>
+        </Button>
       }
     >
       <p className="muted">
@@ -408,11 +397,11 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
       </div>
       <div>
         <div className="group-title">Últimas execuções</div>
-        <ErrorAlert error={runs.error} />
+        <ErrorState error={runs.error} />
         {runs.data && runs.data.items.length === 0 && <p className="subtle">Nenhuma execução ainda.</p>}
         {runs.data && runs.data.items.length > 0 && (
-          <div className="card table-wrap">
-            <table className="table">
+          <div className="card">
+            <Table label="Execuções da agenda">
               <thead>
                 <tr>
                   <th>Horário</th>
@@ -432,15 +421,15 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
                     </td>
                     <td className="num">
                       {r.operation_id && (
-                        <button type="button" className="btn btn-sm" onClick={() => setOperation(r.operation_id)}>
+                        <Button size="sm" onClick={() => setOperation(r.operation_id)}>
                           Ver operação
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
       </div>
@@ -452,33 +441,32 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
 
 /** Ações pendentes criadas pelo console (`stop all --at 18:00`), com cancelamento. */
 export function PendingActions() {
-  const queryClient = useQueryClient()
   const actions = useQuery({
     queryKey: ['scheduled-actions', 'pending'],
     queryFn: () => api.scheduledActions('pending'),
     refetchInterval: 60_000,
   })
-  const cancel = useMutation({
+  const cancel = useFeedbackMutation({
     mutationFn: (id: string) => api.cancelScheduledAction(id),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['scheduled-actions'] }),
+    success: 'Ação cancelada.',
+    invalidate: [['scheduled-actions']],
   })
   const items = actions.data?.items ?? []
-  if (!actions.data && !actions.error) return null
+  if (!actions.data && !actions.error) return <Skeleton lines={3} label="Carregando ações agendadas…" />
   return (
-    <section aria-labelledby="pending-actions" className="stack">
-      <div>
-        <h2 id="pending-actions">Ações agendadas</h2>
-        <p className="subtle">
-          Ações únicas criadas pelo console, por exemplo <code>stop all --at 18:00</code>. Veja{' '}
-          <code>help stop</code> no console.
-        </p>
-      </div>
-      <ErrorAlert error={actions.error ?? cancel.error} />
+    <section aria-label="Ações agendadas" className="stack">
+      <p className="subtle">
+        Ações únicas criadas pelo console, por exemplo <code>stop all --at 18:00</code>. Veja <code>help stop</code> no
+        console.
+      </p>
+      <ErrorState error={actions.error ?? cancel.error} />
       {items.length === 0 ? (
-        <div className="card empty">Nenhuma ação pendente.</div>
+        <div className="card">
+          <EmptyState title="Nenhuma ação pendente." />
+        </div>
       ) : (
-        <div className="card table-wrap">
-          <table className="table">
+        <div className="card">
+          <Table label="Ações agendadas">
             <thead>
               <tr>
                 <th>Ação</th>
@@ -496,19 +484,17 @@ export function PendingActions() {
                   <td className="mono">{formatInZone(a.run_at, actions.data!.default_timezone)}</td>
                   <td>{a.note ?? ''}</td>
                   <td className="num">
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-ghost"
+                    <Button variant="ghost" size="sm"
                       disabled={cancel.isPending}
                       onClick={() => cancel.mutate(a.id)}
                     >
                       Cancelar
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       )}
     </section>
@@ -518,25 +504,31 @@ export function PendingActions() {
 // ---------- lista ----------
 
 export function Schedules() {
-  const queryClient = useQueryClient()
   const schedules = useQuery({ queryKey: ['schedules'], queryFn: () => api.schedules() })
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const [editing, setEditing] = useState<ScheduleView | 'new' | null>(null)
   const [detail, setDetail] = useState<ScheduleView | null>(null)
   const [removing, setRemoving] = useState<ScheduleView | null>(null)
   const [warnings, setWarnings] = useState<string[]>([])
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('aba') === 'acoes' ? 'actions' : 'schedules'
+  const pending = useQuery({
+    queryKey: ['scheduled-actions', 'pending'],
+    queryFn: () => api.scheduledActions('pending'),
+    refetchInterval: 60_000,
+  })
 
-  const toggle = useMutation({
+  const toggle = useFeedbackMutation({
     mutationFn: (view: ScheduleView) =>
       view.schedule.enabled ? api.pauseSchedule(view.schedule.id) : api.resumeSchedule(view.schedule.id),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['schedules'] }),
+    success: (_, view) => (view.schedule.enabled ? 'Agenda pausada.' : 'Agenda retomada.'),
+    invalidate: [['schedules']],
   })
-  const remove = useMutation({
+  const remove = useFeedbackMutation({
     mutationFn: (id: string) => api.deleteSchedule(id),
-    onSuccess: () => {
-      setRemoving(null)
-      void queryClient.invalidateQueries()
-    },
+    success: 'Agenda excluída.',
+    invalidate: [[]],
+    onSuccess: () => setRemoving(null),
   })
 
   const list = schedules.data?.schedules ?? []
@@ -549,39 +541,64 @@ export function Schedules() {
           <h1>Agendas</h1>
           <p className="muted">Liga e desliga projetos ou serviços automaticamente nos horários definidos.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={projectList.length === 0}
-          onClick={() => setEditing('new')}
-        >
-          Nova agenda
-        </button>
+        {tab === 'schedules' && (
+          <Button variant="primary" disabled={projectList.length === 0} onClick={() => setEditing('new')}>
+            Nova agenda
+          </Button>
+        )}
       </div>
 
+      <Tabs
+        label="Seções de agendas"
+        value={tab}
+        onChange={(id) => setParams(id === 'actions' ? { aba: 'acoes' } : {}, { replace: true })}
+        items={[
+          { id: 'schedules', label: 'Agendas', count: schedules.data?.schedules.length },
+          { id: 'actions', label: 'Ações agendadas', count: pending.data?.items.length },
+        ]}
+      />
+      <div style={{ marginTop: 'var(--space-4)' }}>
+        {tab === 'actions' && <PendingActions />}
+      </div>
+
+
+      {tab === 'schedules' && (
       <div className="stack">
-        <ErrorAlert error={schedules.error ?? toggle.error} />
+        <ErrorState error={schedules.error ?? toggle.error} />
         {warnings.length > 0 && (
           <div className="alert alert-warn" role="status">
             <span>
               Agenda salva com avisos: {warnings.join(' ')}{' '}
-              <button type="button" className="btn btn-sm btn-ghost" onClick={() => setWarnings([])}>
+              <Button variant="ghost" size="sm" onClick={() => setWarnings([])}>
                 Dispensar
-              </button>
+              </Button>
             </span>
           </div>
         )}
 
+        {schedules.isPending && (
+          <div className="card">
+            <Skeleton lines={4} label="Carregando agendas…" />
+          </div>
+        )}
         {schedules.data && list.length === 0 && (
-          <div className="card empty">
-            <h3>Nenhuma agenda</h3>
-            <p>Crie uma agenda para ligar e desligar serviços nos horários de uso.</p>
+          <div className="card">
+            <EmptyState
+              title="Nenhuma agenda"
+              action={
+                <Button variant="primary" disabled={projectList.length === 0} onClick={() => setEditing('new')}>
+                  Nova agenda
+                </Button>
+              }
+            >
+              Crie uma agenda para ligar e desligar serviços nos horários de uso.
+            </EmptyState>
           </div>
         )}
 
         {list.length > 0 && (
-          <div className="card table-wrap">
-            <table className="table">
+          <div className="card">
+            <Table label="Agendas">
               <thead>
                 <tr>
                   <th>Agenda</th>
@@ -599,11 +616,10 @@ export function Schedules() {
                   const next = view.next_runs[0]
                   return (
                     <tr key={s.id} data-testid="schedule-row">
-                      <td>
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDetail(view)}>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <Button variant="ghost" size="sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setDetail(view)}>
                           {s.name}
-                        </button>
-                        <div className="subtle">{targetLabel(view)}</div>
+                        </Button>
                       </td>
                       <td>{projectName(projectList, s.project_id)}</td>
                       <td>{formatDays(s.days)}</td>
@@ -625,22 +641,22 @@ export function Schedules() {
                       </td>
                       <td className="num">
                         <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
-                          <button type="button" className="btn btn-sm" onClick={() => toggle.mutate(view)}>
+                          <Button size="sm" onClick={() => toggle.mutate(view)}>
                             {s.enabled ? 'Pausar' : 'Retomar'}
-                          </button>
-                          <button type="button" className="btn btn-sm" onClick={() => setEditing(view)}>
+                          </Button>
+                          <Button size="sm" onClick={() => setEditing(view)}>
                             Editar
-                          </button>
-                          <button type="button" className="btn btn-sm btn-ghost" onClick={() => setRemoving(view)}>
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setRemoving(view)}>
                             Excluir
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
         {list.length > 0 && (
@@ -648,8 +664,8 @@ export function Schedules() {
             O agendador age só nos horários: ligar ou desligar manualmente vale até o próximo evento.
           </p>
         )}
-        <PendingActions />
       </div>
+      )}
 
       {editing && (
         <ScheduleEditor

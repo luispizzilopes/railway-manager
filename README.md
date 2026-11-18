@@ -41,10 +41,11 @@ arquivo SQLite; o token do Railway é guardado cifrado.
   fuso da agenda — ex.: seg–sex, ligado das 07:00 às 12:00 e das 13:00 às 18:00. Detalhes em
   [Agendas](#agendas).
 - **Console de comandos**: tudo o que a interface faz, em uma linha, na página **Console** ou
-  num painel aberto com ``Ctrl+` `` / `Ctrl+K` em qualquer tela — `stop all`, `start all --env
+  num painel aberto com ``Ctrl+` `` em qualquer tela — `stop all`, `start all --env
   production`, `restart */api@production`, `stop all --at 18:00`, seletores com curinga,
   simulação (`--dry-run`), apelidos e `--json`. Detalhes em [Console](#console) e a referência
-  completa em [`docs/console.md`](docs/console.md).
+  completa em [`docs/console.md`](docs/console.md). A identidade visual e os componentes da interface estão em
+  [`docs/design-system.md`](docs/design-system.md).
 
 Fora do escopo desta versão: expressões cron livres, feriados, criar/excluir projetos ou serviços,
 notificações, múltiplas contas, custos.
@@ -200,7 +201,7 @@ linha de comando (CLI)**. No modo CLI, até o login é feito pelo console (`logi
 senha num campo mascarado). Dá para trocar a qualquer momento, sem entrar de novo: `ui` e
 `cli` no console, ou os botões **Interface gráfica** / **Modo CLI** no topo.
 
-O console (menu **Console**, ou ``Ctrl+` `` / `Ctrl+K` em qualquer tela) executa comandos
+O console (menu **Console**, ou ``Ctrl+` `` em qualquer tela) executa comandos
 sobre a mesma API e com as mesmas regras da interface. `help` lista os comandos e
 `help <comando>` mostra opções e exemplos; a referência completa, com seletores, atalhos e
 receitas, está em [`docs/console.md`](docs/console.md).

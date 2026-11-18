@@ -1,11 +1,19 @@
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
+import { Brand } from '../components/Brand'
+import { CommandPalette, type PaletteItem } from '../components/CommandPalette'
 import { Icon, type IconName } from '../components/Icon'
+import { ThemeToggle } from '../components/ThemeToggle'
+import { Button } from '../components/ui/Button'
 import { Console } from '../console/Console'
 import { ConsoleProvider, useConsole } from '../console/ConsoleProvider'
 import type { Mode } from '../mode'
+import { useTheme } from '../theme'
 
-const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
+type NavItem = { to: string; label: string; icon: IconName; end?: boolean }
+
+const NAV: NavItem[] = [
   { to: '/', label: 'Visão geral', icon: 'overview', end: true },
   { to: '/projects', label: 'Projetos', icon: 'projects' },
   { to: '/schedules', label: 'Agendas', icon: 'schedules' },
@@ -13,11 +21,6 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/console', label: 'Console', icon: 'console' },
   { to: '/settings', label: 'Configurações', icon: 'settings' },
 ]
-
-function currentSection(pathname: string): string {
-  const match = [...NAV].reverse().find((n) => (n.end ? pathname === n.to : pathname.startsWith(n.to)))
-  return match?.label ?? 'Visão geral'
-}
 
 /** Painel do console aberto por atalho em qualquer tela (exceto na própria página). */
 function ConsolePanel() {
@@ -28,13 +31,56 @@ function ConsolePanel() {
     <section className="console-drawer" aria-label="Console">
       <header className="console-drawer-head">
         <strong>Console</strong>
-        <span className="subtle">Ctrl+` ou Ctrl+K fecha · Esc fecha</span>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
+        <span className="subtle">Ctrl+` ou Esc fecha</span>
+        <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
           Fechar
-        </button>
+        </Button>
       </header>
       <Console variant="panel" onClose={() => setOpen(false)} />
     </section>
+  )
+}
+
+/** Atalho no topo que abre a paleta de comandos. */
+function CommandBar({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button type="button" className="cmdbar" title="Ir para uma tela ou abrir o console" onClick={onOpen}>
+      <Icon name="search" />
+      <span>Executar comando…</span>
+      <kbd>Ctrl K</kbd>
+    </button>
+  )
+}
+
+/** Paleta aberta por Ctrl+K: telas, console, tema e modo CLI. */
+function Palette({ nav, onMode, mobile, onClose }: { nav: NavItem[]; onMode?: (mode: Mode) => void; mobile: boolean; onClose: () => void }) {
+  const navigate = useNavigate()
+  const { setOpen } = useConsole()
+  const { theme, setPreference } = useTheme()
+  const items = useMemo<PaletteItem[]>(() => {
+    const list: PaletteItem[] = nav.map((n) => ({ id: n.to, label: n.label, hint: 'Ir para', icon: n.icon, run: () => navigate(n.to) }))
+    if (!mobile) list.push({ id: 'console-panel', label: 'Abrir painel do console', hint: 'Ctrl+`', icon: 'console', run: () => setOpen(true) })
+    list.push({
+      id: 'theme',
+      label: theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro',
+      icon: theme === 'dark' ? 'sun' : 'moon',
+      run: () => setPreference(theme === 'dark' ? 'light' : 'dark'),
+    })
+    if (onMode && !mobile) list.push({ id: 'cli', label: 'Mudar para o modo CLI', icon: 'console', run: () => onMode('cli') })
+    return list
+  }, [nav, navigate, setOpen, theme, setPreference, onMode, mobile])
+  return <CommandPalette items={items} onClose={onClose} />
+}
+
+/** Alternância de tema na barra lateral (desktop), com rótulo. */
+function ThemeRow() {
+  const { theme, setPreference } = useTheme()
+  const dark = theme === 'dark'
+  return (
+    <Button variant="ghost" onClick={() => setPreference(dark ? 'light' : 'dark')}>
+      <Icon name={dark ? 'sun' : 'moon'} />
+      {dark ? 'Tema claro' : 'Tema escuro'}
+    </Button>
   )
 }
 
@@ -48,15 +94,27 @@ export function Layout({
   mobile?: boolean
 }) {
   const { pathname } = useLocation()
+  const [palette, setPalette] = useState(false)
   const nav = mobile ? NAV.filter((item) => item.to !== '/console') : NAV
+
+  // Ctrl+K abre a paleta (na página do console ele leva o foco à linha de comando).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && pathname !== '/console') {
+        e.preventDefault()
+        setPalette((o) => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pathname])
+
   return (
     <ConsoleProvider onLogout={onLogout} mode="ui" onMode={onMode}>
       <div className="app">
         <aside className="side">
-          <div className="side-brand">
-            Railway<span>Manager</span>
-          </div>
-          <nav className="nav">
+          <Brand />
+          <nav className="nav" aria-label="Principal">
             <span className="nav-label">Gerenciar</span>
             {nav.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end}>
@@ -66,32 +124,30 @@ export function Layout({
             ))}
           </nav>
           <div className="side-foot">
-            <button type="button" className="btn btn-ghost" onClick={onLogout}>
+            <ThemeRow />
+            <Button variant="ghost" onClick={onLogout}>
               <Icon name="logout" />
               Sair
-            </button>
+            </Button>
           </div>
         </aside>
         <div className="content">
           <header className="topnav">
-            <div className="crumbs">
-              <span>Railway Manager</span>
-              <span className="sep">/</span>
-              <strong>{currentSection(pathname)}</strong>
-            </div>
+            <Brand className="topnav-brand" />
+            {!mobile && <CommandBar onOpen={() => setPalette(true)} />}
             <div className="topnav-right">
+              {mobile && <ThemeToggle />}
               {onMode && !mobile && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  title="Usar só a linha de comando (a sessão continua)"
-                  onClick={() => onMode('cli')}
-                >
+                <Button variant="ghost" size="sm" title="Usar só a linha de comando (a sessão continua)" onClick={() => onMode('cli')}>
                   <Icon name="console" />
                   Modo CLI
-                </button>
+                </Button>
               )}
-              <span className="env-pill">admin</span>
+              {mobile && (
+                <Button variant="ghost" size="sm" onClick={onLogout}>
+                  Sair
+                </Button>
+              )}
             </div>
           </header>
           <main className="main">
@@ -100,6 +156,7 @@ export function Layout({
         </div>
       </div>
       {!mobile && <ConsolePanel />}
+      {palette && <Palette nav={nav} onMode={onMode} mobile={mobile} onClose={() => setPalette(false)} />}
     </ConsoleProvider>
   )
 }

@@ -1,0 +1,111 @@
+@layer components {
+  .badge {
+    --c: var(--idle);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 8px 0 6px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--c) 12%, transparent);
+    color: var(--c);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .badge-icon {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .badge-running {
+    --c: var(--ok);
+  }
+
+  .badge-sleeping {
+    --c: var(--info);
+  }
+
+  .badge-transitioning,
+  .badge-awaiting_approval {
+    --c: var(--warn);
+  }
+
+  .badge-failed {
+    --c: var(--fail);
+  }
+
+  /* Dado antigo ou indisponível perde a cor; o texto ao lado explica o motivo. */
+  .badge[data-freshness='stale'],
+  .badge[data-freshness='unavailable'] {
+    --c: var(--idle);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+
+  .freshness {
+    font-size: var(--text-sm);
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+
+  .freshness-stale {
+    color: var(--warn);
+  }
+
+  .freshness-unavailable {
+    color: var(--fail);
+  }
+
+  /* Resultado de operação/itens: ponto + texto. */
+  .result {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-md);
+    color: var(--text-2);
+  }
+
+  .result::before {
+    content: '';
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .result-succeeded,
+  .result-run-executed {
+    color: var(--ok);
+  }
+
+  .result-failed,
+  .result-timed_out,
+  .result-interrupted,
+  .result-partially_failed,
+  .result-run-missed,
+  .result-run-failed {
+    color: var(--fail);
+  }
+
+  .result-pending,
+  .result-running,
+  .result-verifying,
+  .result-run-late {
+    color: var(--warn);
+  }
+
+  .result-skipped,
+  .result-run-skipped,
+  .result-run-pending {
+    color: var(--text-2);
+  }
+}

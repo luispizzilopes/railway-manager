@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 
+import { Brand } from '../components/Brand'
+import { Button } from '../components/ui/Button'
 import { Console } from '../console/Console'
 import { ConsoleProvider, useConsole } from '../console/ConsoleProvider'
 import { COMMANDS } from '../console/commands'
@@ -35,13 +37,11 @@ export function CliApp({
   return (
     <div className="cli-app">
       <header className="cli-head">
-        <div className="side-brand">
-          Railway<span>Manager</span>
-        </div>
+        <Brand />
         <span className="subtle">linha de comando · {authenticated ? 'autenticado' : 'não autenticado'}</span>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onMode('ui')}>
+        <Button variant="ghost" size="sm" onClick={() => onMode('ui')}>
           Interface gráfica
-        </button>
+        </Button>
       </header>
       <ConsoleProvider
         onLogout={onLogout}
