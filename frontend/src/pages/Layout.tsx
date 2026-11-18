@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { Brand } from '../components/Brand'
@@ -24,6 +24,68 @@ const NAV: NavItem[] = [
   { to: '/users', label: 'Usuários', icon: 'users', master: true },
   { to: '/settings', label: 'Configurações', icon: 'settings' },
 ]
+
+/** Telas que ficam na barra do celular; as demais vão para o menu "Mais". */
+const MOBILE_PRIMARY = ['/', '/projects', '/schedules', '/history']
+
+/** Navegação do celular: abas principais e um menu "Mais" com o restante. */
+function MobileNav({ items }: { items: NavItem[] }) {
+  const { pathname } = useLocation()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const primary = items.filter((i) => MOBILE_PRIMARY.includes(i.to))
+  const more = items.filter((i) => !MOBILE_PRIMARY.includes(i.to))
+  const moreActive = more.some((i) => pathname === i.to || pathname.startsWith(`${i.to}/`))
+
+  // Trocar de tela, tocar fora ou apertar Esc fecha o menu.
+  useEffect(() => setOpen(false), [pathname])
+  useEffect(() => {
+    if (!open) return
+    const outside = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  return (
+    <nav className="nav" aria-label="Principal">
+      {primary.map((item) => (
+        <NavLink key={item.to} to={item.to} end={item.end}>
+          <Icon name={item.icon} />
+          {item.label}
+        </NavLink>
+      ))}
+      <div className="nav-more" ref={ref}>
+        <button
+          type="button"
+          className={moreActive ? 'nav-more-btn active' : 'nav-more-btn'}
+          aria-expanded={open}
+          aria-haspopup="true"
+          onClick={() => setOpen((o) => !o)}
+        >
+          <Icon name="more" />
+          Mais
+        </button>
+        {open && (
+          <div className="nav-more-menu" aria-label="Mais telas">
+            {more.map((item) => (
+              <NavLink key={item.to} to={item.to}>
+                <Icon name={item.icon} />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        )}
+      </div>
+    </nav>
+  )
+}
 
 /** Painel do console aberto por atalho em qualquer tela (exceto na própria página). */
 function ConsolePanel() {
@@ -118,15 +180,19 @@ export function Layout({
       <div className="app">
         <aside className="side">
           <Brand />
-          <nav className="nav" aria-label="Principal">
-            <span className="nav-label">Gerenciar</span>
-            {nav.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end}>
-                <Icon name={item.icon} />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+          {mobile ? (
+            <MobileNav items={nav} />
+          ) : (
+            <nav className="nav" aria-label="Principal">
+              <span className="nav-label">Gerenciar</span>
+              {nav.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.end}>
+                  <Icon name={item.icon} />
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          )}
           <div className="side-foot">
             <ThemeRow />
             <Button variant="ghost" onClick={onLogout}>
@@ -147,7 +213,7 @@ export function Layout({
                   Modo CLI
                 </Button>
               )}
-              {session.username && session.role && (
+              {!mobile && session.username && session.role && (
                 <span className="subtle" data-testid="whoami">
                   {session.username} · {ROLE_LABEL[session.role]}
                 </span>

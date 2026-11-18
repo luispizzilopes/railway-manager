@@ -128,7 +128,7 @@ export function Users() {
       <div className="page-head">
         <div>
           <h1>Usuários</h1>
-          <p className="muted">Quem pode entrar e o que cada pessoa pode fazer. O usuário master é definido no ambiente.</p>
+          <p className="muted">Quem pode entrar e o que cada pessoa pode fazer.</p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
           Novo usuário
