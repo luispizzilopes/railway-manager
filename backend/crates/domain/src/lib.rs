@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod credential;
 pub mod deployment;
 pub mod ids;
+pub mod logs;
 pub mod operation;
 pub mod power;
 pub mod schedule;

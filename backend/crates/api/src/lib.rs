@@ -11,6 +11,7 @@ use application::credentials::CredentialService;
 use application::dashboard::DashboardService;
 use application::history::HistoryService;
 use application::inventory::InventoryService;
+use application::logs::LogsService;
 use application::ports::{Clock, SessionRepository};
 use application::power::PowerService;
 use application::projects::ProjectService;
@@ -35,6 +36,7 @@ pub struct AppState {
     pub dashboard: Arc<DashboardService>,
     pub schedules: Arc<ScheduleService>,
     pub scheduled_actions: Arc<ScheduledActionService>,
+    pub logs: Arc<LogsService>,
     pub scheduler: Arc<SchedulerService>,
     pub sessions: Arc<dyn SessionRepository>,
     pub clock: Arc<dyn Clock>,
@@ -68,6 +70,8 @@ fn api(state: AppState) -> Router<AppState> {
         )
         .route("/projects/{id}/instances/import", post(import_instances))
         .route("/instances/{id}", delete(delete_instance))
+        .route("/instances/{id}/logs", get(instance_logs))
+        .route("/instances/{id}/deployments", get(instance_deployments))
         .route("/services/{id}", delete(delete_service))
         .route("/operations/plan", post(plan_operation))
         .route("/operations", post(execute_operation))

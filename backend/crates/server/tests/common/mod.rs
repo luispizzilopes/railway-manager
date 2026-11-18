@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use application::credentials::{CredentialService, RegisterCredential};
 use application::inventory::InventoryService;
+use application::logs::LogsService;
 use application::ports::{Clock, SystemClock};
 use application::power::{PowerConfig, PowerService};
 use application::projects::ProjectService;
@@ -31,6 +32,7 @@ pub struct Harness {
     pub power: Arc<PowerService>,
     pub schedules: Arc<ScheduleService>,
     pub actions: Arc<ScheduledActionService>,
+    pub logs: Arc<LogsService>,
     pub scheduler: Arc<SchedulerService>,
     /// Presente quando o harness usa relógio manual.
     pub clock: Option<Arc<ManualClock>>,
@@ -143,6 +145,11 @@ pub async fn harness_with_clock(
         clock.clone(),
         chrono_tz::UTC,
     ));
+    let logs = Arc::new(LogsService::new(
+        inventory_repo.clone(),
+        credentials.clone(),
+        railway.clone(),
+    ));
     let scheduler = Arc::new(SchedulerService::new(
         schedules.clone(),
         actions.clone(),
@@ -166,6 +173,7 @@ pub async fn harness_with_clock(
         power,
         schedules,
         actions,
+        logs,
         scheduler,
         clock: None,
     }

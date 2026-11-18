@@ -11,6 +11,7 @@ import { Dashboard } from './pages/Dashboard'
 import { History } from './pages/History'
 import { Layout } from './pages/Layout'
 import { Login } from './pages/Login'
+import { Logs } from './pages/Logs'
 import { ModeChooser } from './pages/ModeChooser'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { Projects } from './pages/Projects'
@@ -64,6 +65,7 @@ export function App() {
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
+        <Route path="logs" element={<Logs />} />
         <Route path="schedules" element={<Schedules />} />
         <Route path="history" element={<History />} />
         <Route path="console" element={mobile ? <Navigate to="/" replace /> : <ConsolePage />} />

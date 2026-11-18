@@ -10,7 +10,8 @@ use domain::ids::{
     RailwayDeploymentId, RailwayEnvironmentId, RailwayProjectId, RailwayServiceId,
     RailwayWorkspaceId,
 };
-use domain::power::StopMechanism;
+use domain::logs::{LogLine, LogQuery};
+use domain::power::{DeploymentRecord, StopMechanism};
 use domain::state::InstanceSnapshot;
 use secrecy::{ExposeSecret, SecretString};
 use serde::Serialize;
@@ -191,6 +192,32 @@ pub trait RailwayGateway: Send + Sync {
         token: &RailwayToken,
         id: &RailwayDeploymentId,
     ) -> RailwayResult<Deployment>;
+
+    /// Deployments recentes do serviço no ambiente (inclui `REMOVED`), do mais novo
+    /// para o mais antigo. Somente leitura.
+    async fn recent_deployments(
+        &self,
+        token: &RailwayToken,
+        environment: &RailwayEnvironmentId,
+        service: &RailwayServiceId,
+        first: u32,
+    ) -> RailwayResult<Vec<DeploymentRecord>>;
+
+    /// Logs de runtime do deployment, em ordem cronológica crescente. Somente leitura.
+    async fn deployment_logs(
+        &self,
+        token: &RailwayToken,
+        id: &RailwayDeploymentId,
+        query: &LogQuery,
+    ) -> RailwayResult<Vec<LogLine>>;
+
+    /// Logs de build do deployment, em ordem cronológica crescente. Somente leitura.
+    async fn build_logs(
+        &self,
+        token: &RailwayToken,
+        id: &RailwayDeploymentId,
+        query: &LogQuery,
+    ) -> RailwayResult<Vec<LogLine>>;
 
     fn rate_limit_status(&self) -> RateLimitStatus;
 }

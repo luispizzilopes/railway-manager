@@ -14,6 +14,8 @@ import { Table } from '../components/ui/Table'
 import { Tabs } from '../components/ui/Tabs'
 import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { KIND_LABEL, SYNC_LABEL, formatDays, relativeTime } from '../format'
+import { DEFAULT_FILTERS, type LogFilterState, filtersToParams } from '../logs/filters'
+import { LogsPanel } from '../logs/LogsPanel'
 
 type Flow = { kind: PowerKind; target: PowerTarget; title: string; confirm: boolean }
 
@@ -194,6 +196,8 @@ export function ProjectDetail() {
   const [modal, setModal] = useState<'import' | 'associate' | 'edit' | 'remove' | null>(null)
   const [removeInstance, setRemoveInstance] = useState<InstanceView | null>(null)
   const [flow, setFlow] = useState<Flow | null>(null)
+  const [logsFor, setLogsFor] = useState<InstanceView | null>(null)
+  const [logFilters, setLogFilters] = useState<LogFilterState>(DEFAULT_FILTERS)
   const [envFilter, setEnvFilter] = useState('')
   const [tab, setTab] = useState('services')
 
@@ -435,6 +439,18 @@ export function ProjectDetail() {
                             >
                               {off ? 'Iniciar' : 'Desligar'}
                             </Button>
+                            <Button
+                              size="sm"
+                              aria-label={`Logs de ${v.service.name} (${v.environment.name})`}
+                              aria-pressed={logsFor?.instance.id === v.instance.id}
+                              disabled={v.instance.not_found}
+                              onClick={() => {
+                                setLogFilters(DEFAULT_FILTERS)
+                                setLogsFor(logsFor?.instance.id === v.instance.id ? null : v)
+                              }}
+                            >
+                              Logs
+                            </Button>
                             <Button size="sm" variant="ghost" onClick={() => setRemoveInstance(v)}>
                               Remover
                             </Button>
@@ -445,6 +461,30 @@ export function ProjectDetail() {
                   })}
                 </tbody>
             </Table>
+          )}
+          {logsFor && (
+            <LogsPanel
+              // Trocar de serviço recomeça o painel (filtros e acompanhamento).
+              key={logsFor.instance.id}
+              instanceId={logsFor.instance.id}
+              filters={logFilters}
+              onChange={setLogFilters}
+              fileName={`${name}-${logsFor.service.name}-${logsFor.environment.name}`}
+              title={`Logs de ${logsFor.service.name} (${logsFor.environment.name})`}
+              actions={
+                <>
+                  <Link
+                    className="btn btn-sm"
+                    to={`/logs?${filtersToParams(logFilters, new URLSearchParams({ instance: logsFor.instance.id })).toString()}`}
+                  >
+                    Abrir em tela cheia
+                  </Link>
+                  <Button size="sm" variant="ghost" onClick={() => setLogsFor(null)}>
+                    Fechar
+                  </Button>
+                </>
+              }
+            />
           )}
         </div>
         )}

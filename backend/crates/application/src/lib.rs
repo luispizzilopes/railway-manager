@@ -5,6 +5,7 @@ pub mod dashboard;
 pub mod error;
 pub mod history;
 pub mod inventory;
+pub mod logs;
 pub mod ports;
 pub mod power;
 pub mod projects;

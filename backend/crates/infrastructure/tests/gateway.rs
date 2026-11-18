@@ -389,3 +389,116 @@ async fn falha_que_e_o_deploy_mais_recente_continua_com_falha() {
     .await;
     assert_eq!(state, ObservedState::Failed);
 }
+
+fn environment() -> RailwayEnvironmentId {
+    RailwayEnvironmentId::parse(&uuid(10)).unwrap()
+}
+
+fn deployment_id(n: u32) -> RailwayDeploymentId {
+    RailwayDeploymentId::parse(&uuid(n)).unwrap()
+}
+
+fn log_query(limit: u32) -> domain::logs::LogQuery {
+    domain::logs::LogQuery {
+        start: None,
+        end: None,
+        filter: None,
+        limit,
+    }
+}
+
+#[tokio::test]
+async fn logs_de_runtime_normalizam_severidade_e_ordenam() {
+    use domain::logs::LogSeverity;
+    let server = MockServer::start().await;
+    on(
+        &server,
+        "DeploymentLogs",
+        Some(json!({ "variables": { "deploymentId": uuid(7), "limit": 200 } })),
+        json!({ "data": { "deploymentLogs": [
+            { "timestamp": "2026-11-18T10:00:02.000Z", "message": "depois", "severity": "ERROR" },
+            { "timestamp": "2026-11-18T10:00:01.000Z", "message": "antes", "severity": "warning" },
+            { "timestamp": "2026-11-18T10:00:03.000Z", "message": "sem nível", "severity": null },
+            { "timestamp": "lixo", "message": "ignorada", "severity": "info" }
+        ]}}),
+    )
+    .await;
+    let lines = client(&server)
+        .deployment_logs(&token(), &deployment_id(7), &log_query(200))
+        .await
+        .unwrap();
+    let messages: Vec<_> = lines.iter().map(|l| l.message.as_str()).collect();
+    assert_eq!(messages, ["antes", "depois", "sem nível"]);
+    assert_eq!(lines[0].severity, Some(LogSeverity::Warn));
+    assert_eq!(lines[1].severity, Some(LogSeverity::Error));
+    assert_eq!(lines[2].severity, None);
+}
+
+#[tokio::test]
+async fn logs_de_build_usam_a_query_de_build_e_enviam_filtros() {
+    let server = MockServer::start().await;
+    on(
+        &server,
+        "BuildLogs",
+        Some(json!({ "variables": { "deploymentId": uuid(7), "filter": "@level:error", "limit": 50 } })),
+        json!({ "data": { "buildLogs": [
+            { "timestamp": "2026-11-18T10:00:00Z", "message": "falhou", "severity": "error" }
+        ]}}),
+    )
+    .await;
+    let mut query = log_query(50);
+    query.filter = Some("@level:error".into());
+    let lines = client(&server)
+        .build_logs(&token(), &deployment_id(7), &query)
+        .await
+        .unwrap();
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0].message, "falhou");
+}
+
+#[tokio::test]
+async fn logs_de_deploy_inexistente_sao_nao_encontrado() {
+    use application::railway::RailwayError;
+    let server = MockServer::start().await;
+    on(
+        &server,
+        "DeploymentLogs",
+        None,
+        json!({ "data": null, "errors": [{ "message": "Deployment not found" }] }),
+    )
+    .await;
+    let err = client(&server)
+        .deployment_logs(&token(), &deployment_id(7), &log_query(10))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, RailwayError::NotFound(_)), "{err:?}");
+}
+
+#[tokio::test]
+async fn deploys_recentes_trazem_data_e_ordem_da_api() {
+    let server = MockServer::start().await;
+    on(
+        &server,
+        "Deployments",
+        Some(json!({ "variables": { "first": 20, "input": { "environmentId": uuid(10), "serviceId": uuid(20) } } })),
+        json!({ "data": { "deployments": { "edges": [
+            { "node": { "id": uuid(2), "status": "SUCCESS", "canRedeploy": true, "deploymentStopped": false,
+                "createdAt": "2026-11-18T09:00:00Z", "meta": {} } },
+            { "node": { "id": uuid(1), "status": "FAILED", "canRedeploy": true, "deploymentStopped": false,
+                "createdAt": "2026-11-17T09:00:00Z", "meta": {} } }
+        ]}}}),
+    )
+    .await;
+    let recent = client(&server)
+        .recent_deployments(
+            &token(),
+            &environment(),
+            &RailwayServiceId::parse(&uuid(20)).unwrap(),
+            20,
+        )
+        .await
+        .unwrap();
+    assert_eq!(recent.len(), 2);
+    assert_eq!(recent[0].deployment.id.as_str(), uuid(2));
+    assert!(recent[0].created_at > recent[1].created_at);
+}

@@ -46,6 +46,10 @@ arquivo SQLite; o token do Railway é guardado cifrado.
   simulação (`--dry-run`), apelidos e `--json`. Detalhes em [Console](#console) e a referência
   completa em [`docs/console.md`](docs/console.md). A identidade visual e os componentes da interface estão em
   [`docs/design-system.md`](docs/design-system.md).
+- **Logs**: logs de execução e de build de cada serviço, na tela **Logs** (escolha projeto,
+  ambiente e serviço) e no botão **Logs** de cada serviço na tela do projeto. Filtros por
+  deploy, período, severidade e texto, acompanhamento ao vivo (consulta a cada 3 s, que
+  pausa com a aba oculta) e cópia/download do trecho exibido. Detalhes em [Logs](#logs).
 
 Fora do escopo desta versão: expressões cron livres, feriados, criar/excluir projetos ou serviços,
 notificações, múltiplas contas, custos.
@@ -230,6 +234,22 @@ A primeira inicialização reconstrói de novo a tabela de operações no SQLite
 "ação agendada"). Os dados são preservados, mas **faça um backup antes**, como na
 [atualização das agendas](#atualizando-de-uma-versão-sem-agendas); voltar para a versão
 anterior depois de alguma ação agendada ter sido executada exige restaurar o backup.
+
+## Logs
+
+Os logs são lidos do Railway (`deploymentLogs` e `buildLogs`, somente leitura) pelo backend,
+com o token armazenado; o navegador nunca recebe o token. A tela **Logs** guarda o serviço e
+os filtros na URL (`/logs?instance=…&severity=error`), então o link reabre a mesma consulta.
+
+- Sem deploy escolhido, vale o deploy mais recente; a lista de deploys recentes permite ver
+  o de uma falha antiga. Deploys antigos, logs de build e intervalos com data final não são
+  acompanhados ao vivo.
+- Cada consulta traz até 1000 linhas (padrão 200); acima disso vêm as mais recentes e a tela
+  avisa que há mais. A tela mantém no máximo 5000 linhas.
+- O manager **não grava** o conteúdo dos logs (nem no banco, nem no histórico) e **não
+  mascara** nada: se a aplicação imprime segredos, eles aparecem para quem tem acesso ao
+  manager.
+- O acompanhamento ao vivo consome o rate limit do Railway (uma consulta por tela aberta).
 
 ## Limitações conhecidas
 

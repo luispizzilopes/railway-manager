@@ -18,6 +18,7 @@ const NAV: NavItem[] = [
   { to: '/projects', label: 'Projetos', icon: 'projects' },
   { to: '/schedules', label: 'Agendas', icon: 'schedules' },
   { to: '/history', label: 'Histórico', icon: 'history' },
+  { to: '/logs', label: 'Logs', icon: 'logs' },
   { to: '/console', label: 'Console', icon: 'console' },
   { to: '/settings', label: 'Configurações', icon: 'settings' },
 ]

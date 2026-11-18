@@ -12,7 +12,10 @@ import type {
   HistoryEntry,
   HistoryFilters,
   InstanceImportReport,
+  DeploymentSummary,
   InstanceView,
+  LogsFilters,
+  LogsResponse,
   OperationDetail,
   Page,
   Plan,
@@ -77,6 +80,12 @@ export function historyQuery(filters: HistoryFilters | Record<string, string | n
   return query ? `?${query}` : ''
 }
 
+/** Querystring dos logs: `severity` vira lista separada por vírgula. */
+export function logsQuery(filters: LogsFilters): string {
+  const { severity, ...rest } = filters
+  return historyQuery({ ...rest, severity: severity?.length ? severity.join(',') : undefined })
+}
+
 export const api = {
   session: () => get<{ authenticated: boolean }>('/api/session'),
   login: (password: string) => post<void>('/api/session', { password }),
@@ -110,6 +119,10 @@ export const api = {
     post<InstanceImportReport>(`/api/projects/${project}/instances/import`, { instances }),
   associateInstance: (project: Uuid, input: { environment_id: string; service_id: string }) =>
     post<{ instance: InstanceView }>(`/api/projects/${project}/instances`, input),
+  instanceLogs: (instance: Uuid, filters: LogsFilters = {}) =>
+    get<LogsResponse>(`/api/instances/${instance}/logs${logsQuery(filters)}`),
+  instanceDeployments: (instance: Uuid) =>
+    get<{ deployments: DeploymentSummary[] }>(`/api/instances/${instance}/deployments`),
   removeInstance: (id: Uuid) => request<void>('DELETE', `/api/instances/${id}`),
   removeService: (id: Uuid) => request<void>('DELETE', `/api/services/${id}`),
 

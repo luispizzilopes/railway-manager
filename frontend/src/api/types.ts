@@ -416,3 +416,39 @@ export interface ScheduledActionInput {
   target: ActionTarget
   note?: string | null
 }
+
+export type LogSeverity = 'error' | 'warn' | 'info' | 'debug'
+export type LogKind = 'runtime' | 'build'
+
+export interface LogLine {
+  /** ISO 8601 em UTC. */
+  timestamp: string
+  severity: LogSeverity | null
+  message: string
+}
+
+export interface LogsResponse {
+  deployment_id: Uuid | null
+  deployment_status: string | null
+  /** O deploy lido é o mais recente da instância. */
+  is_current: boolean
+  truncated: boolean
+  lines: LogLine[]
+}
+
+export interface DeploymentSummary {
+  id: Uuid
+  status: string
+  created_at: string | null
+  is_current: boolean
+}
+
+export interface LogsFilters {
+  type?: LogKind
+  deployment_id?: string
+  start?: string
+  end?: string
+  severity?: LogSeverity[]
+  q?: string
+  limit?: number
+}

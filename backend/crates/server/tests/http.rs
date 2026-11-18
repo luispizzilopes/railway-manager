@@ -1159,3 +1159,177 @@ async fn acoes_agendadas_validacao() {
         StatusCode::OK
     );
 }
+
+// ---------- logs ----------
+
+fn log_line(second: u32, severity: &str, message: &str) -> domain::logs::LogLine {
+    domain::logs::LogLine {
+        timestamp: chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2026, 11, 18, 10, 0, second)
+            .unwrap(),
+        severity: domain::logs::LogSeverity::parse(severity),
+        message: message.into(),
+    }
+}
+
+/// ID local da instância `api@production` do cenário `seed`.
+async fn api_instance_id(app: &App, project: &str) -> String {
+    let reply = app.get(&format!("/api/projects/{project}/instances")).await;
+    reply.json["instances"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["service"]["name"] == "api")
+        .unwrap()["instance"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
+#[tokio::test]
+async fn logs_exigem_sessao_e_nao_chamam_o_railway() {
+    let app = app().await;
+    let reply = app
+        .get(&format!("/api/instances/{}/logs", rid::<String>(1)))
+        .await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+    let reply = app
+        .get(&format!("/api/instances/{}/deployments", rid::<String>(1)))
+        .await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+    assert!(app.railway.calls().is_empty());
+}
+
+#[tokio::test]
+async fn logs_via_http_com_filtros_e_sem_efeitos_colaterais() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    let instance = api_instance_id(&app, &project).await;
+    app.railway.with_runtime_logs(
+        100,
+        vec![
+            log_line(1, "info", "iniciando <b>servidor</b>"),
+            log_line(2, "error", "falha ao conectar"),
+            log_line(3, "warn", "lento"),
+        ],
+    );
+
+    let reply = app.get(&format!("/api/instances/{instance}/logs")).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    assert_eq!(reply.json["deployment_id"], json!(rid::<String>(100)));
+    assert_eq!(reply.json["is_current"], json!(true));
+    assert_eq!(reply.json["truncated"], json!(false));
+    let lines = reply.json["lines"].as_array().unwrap();
+    assert_eq!(lines.len(), 3);
+    assert_eq!(lines[0]["severity"], "info");
+    // A mensagem é devolvida como veio; quem exibe a trata como texto.
+    assert_eq!(lines[0]["message"], "iniciando <b>servidor</b>");
+
+    let reply = app
+        .get(&format!(
+            "/api/instances/{instance}/logs?severity=error,warn&q=LENTO&limit=50"
+        ))
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    assert_eq!(reply.json["lines"].as_array().unwrap().len(), 1);
+
+    let reply = app
+        .get(&format!("/api/instances/{instance}/deployments"))
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.text);
+    assert_eq!(
+        reply.json["deployments"][0]["id"],
+        json!(rid::<String>(100))
+    );
+    assert_eq!(reply.json["deployments"][0]["is_current"], json!(true));
+
+    // Somente leitura: nenhuma operação no histórico.
+    let history = app.get("/api/history").await;
+    assert_eq!(history.json["total"], json!(0), "{}", history.text);
+}
+
+#[tokio::test]
+async fn logs_com_parametros_invalidos_ou_alheios() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    let instance = api_instance_id(&app, &project).await;
+    app.railway
+        .with_runtime_logs(100, vec![log_line(1, "info", "ok")]);
+    let before = app.railway.calls().len();
+
+    for query in [
+        "limit=5000",
+        "limit=abc",
+        "start=ontem",
+        "start=2026-11-18T11:00:00Z&end=2026-11-18T10:00:00Z",
+        "severity=barulho",
+        "type=http",
+        "deployment_id=nao-e-uuid",
+    ] {
+        let reply = app
+            .get(&format!("/api/instances/{instance}/logs?{query}"))
+            .await;
+        assert_eq!(
+            reply.status,
+            StatusCode::BAD_REQUEST,
+            "{query}: {}",
+            reply.text
+        );
+    }
+    assert_eq!(app.railway.calls().len(), before, "nada foi ao Railway");
+
+    // Deploy do worker (101) não pertence à instância `api`.
+    let reply = app
+        .get(&format!(
+            "/api/instances/{instance}/logs?deployment_id={}",
+            rid::<String>(101)
+        ))
+        .await;
+    assert_eq!(
+        reply.status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "{}",
+        reply.text
+    );
+
+    let reply = app
+        .get(&format!("/api/instances/{}/logs", rid::<String>(999)))
+        .await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn logs_respondem_429_quando_o_railway_limita() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    let instance = api_instance_id(&app, &project).await;
+    app.railway.fail_next(
+        "recent_deployments",
+        RailwayError::RateLimited {
+            retry_after_secs: 7,
+        },
+    );
+    let reply = app.get(&format!("/api/instances/{instance}/logs")).await;
+    assert_eq!(
+        reply.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "{}",
+        reply.text
+    );
+    assert_eq!(reply.json["details"]["retry_after_secs"], json!(7));
+}
+
+#[tokio::test]
+async fn logs_nunca_expoem_o_token_nem_gravam_conteudo() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    let instance = api_instance_id(&app, &project).await;
+    app.railway
+        .with_runtime_logs(100, vec![log_line(1, "info", "mensagem-secreta-do-log")]);
+    let reply = app.get(&format!("/api/instances/{instance}/logs")).await;
+    assert_eq!(reply.status, StatusCode::OK);
+    app.assert_token_never_leaked();
+}

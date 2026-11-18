@@ -1,6 +1,7 @@
 // Ícones da interface (Phosphor, peso "regular"): traço humanista, bem diferente do conjunto genérico de contornos.
 
 import {
+  Article,
   CalendarDots,
   CaretRight,
   Check,
@@ -24,6 +25,7 @@ const ICONS = {
   projects: Stack,
   schedules: CalendarDots,
   history: ClockCounterClockwise,
+  logs: Article,
   settings: SlidersHorizontal,
   console: TerminalWindow,
   logout: SignOut,

@@ -11,7 +11,8 @@ use domain::ids::{
     RailwayDeploymentId, RailwayEnvironmentId, RailwayProjectId, RailwayServiceId,
     RailwayWorkspaceId,
 };
-use domain::power::StopMechanism;
+use domain::logs::{LogLine, LogQuery};
+use domain::power::{DeploymentRecord, StopMechanism};
 use domain::state::InstanceSnapshot;
 
 use crate::railway::*;
@@ -59,6 +60,10 @@ struct State {
     max_in_flight: usize,
     next_deployment: u32,
     rate_limit: RateLimitStatus,
+    runtime_logs: HashMap<RailwayDeploymentId, Vec<LogLine>>,
+    build_logs: HashMap<RailwayDeploymentId, Vec<LogLine>>,
+    /// Histórico de deployments por instância; sem entrada, usa o snapshot atual.
+    histories: HashMap<(RailwayEnvironmentId, RailwayServiceId), Vec<DeploymentRecord>>,
 }
 
 pub struct FakeRailway {
@@ -127,6 +132,26 @@ impl FakeRailway {
                 name: name.into(),
             },
         );
+        self
+    }
+
+    /// Logs de runtime do deployment `deployment_n`.
+    pub fn with_runtime_logs(&self, deployment_n: u32, lines: Vec<LogLine>) -> &Self {
+        self.lock().runtime_logs.insert(rid(deployment_n), lines);
+        self
+    }
+
+    /// Logs de build do deployment `deployment_n`.
+    pub fn with_build_logs(&self, deployment_n: u32, lines: Vec<LogLine>) -> &Self {
+        self.lock().build_logs.insert(rid(deployment_n), lines);
+        self
+    }
+
+    /// Histórico de deployments (do mais novo para o mais antigo) de uma instância.
+    pub fn with_history(&self, env: u32, service: u32, history: Vec<DeploymentRecord>) -> &Self {
+        self.lock()
+            .histories
+            .insert((rid(env), rid(service)), history);
         self
     }
 
@@ -644,9 +669,77 @@ impl RailwayGateway for FakeRailway {
         .await
     }
 
+    async fn recent_deployments(
+        &self,
+        token: &RailwayToken,
+        environment: &RailwayEnvironmentId,
+        service: &RailwayServiceId,
+        first: u32,
+    ) -> RailwayResult<Vec<DeploymentRecord>> {
+        self.enter(
+            format!("recent_deployments({environment},{service})"),
+            token,
+        )?;
+        let s = self.lock();
+        let key = (environment.clone(), service.clone());
+        let mut records = match s.histories.get(&key) {
+            Some(history) => history.clone(),
+            None => s
+                .instances
+                .get(&key)
+                .and_then(|i| i.snapshot.latest.clone())
+                .map(|deployment| DeploymentRecord {
+                    deployment,
+                    created_at: None,
+                    is_redeploy: false,
+                })
+                .into_iter()
+                .collect(),
+        };
+        records.truncate(first as usize);
+        Ok(records)
+    }
+
+    async fn deployment_logs(
+        &self,
+        token: &RailwayToken,
+        id: &RailwayDeploymentId,
+        query: &LogQuery,
+    ) -> RailwayResult<Vec<LogLine>> {
+        self.enter(format!("deployment_logs({id})"), token)?;
+        let lines = self
+            .lock()
+            .runtime_logs
+            .get(id)
+            .cloned()
+            .unwrap_or_default();
+        Ok(window(lines, query))
+    }
+
+    async fn build_logs(
+        &self,
+        token: &RailwayToken,
+        id: &RailwayDeploymentId,
+        query: &LogQuery,
+    ) -> RailwayResult<Vec<LogLine>> {
+        self.enter(format!("build_logs({id})"), token)?;
+        let lines = self.lock().build_logs.get(id).cloned().unwrap_or_default();
+        Ok(window(lines, query))
+    }
+
     fn rate_limit_status(&self) -> RateLimitStatus {
         self.lock().rate_limit.clone()
     }
+}
+
+/// Aplica o intervalo e o limite como o Railway: as `limit` linhas mais recentes.
+fn window(mut lines: Vec<LogLine>, query: &LogQuery) -> Vec<LogLine> {
+    lines.retain(|l| {
+        query.start.is_none_or(|s| l.timestamp >= s) && query.end.is_none_or(|e| l.timestamp <= e)
+    });
+    lines.sort_by_key(|l| l.timestamp);
+    let skip = lines.len().saturating_sub(query.limit as usize);
+    lines.split_off(skip)
 }
 
 fn hide(mut instance: RailwayServiceInstance, hide_removed: bool) -> RailwayServiceInstance {

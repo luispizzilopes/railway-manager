@@ -9,6 +9,7 @@ use application::credentials::CredentialService;
 use application::dashboard::DashboardService;
 use application::history::HistoryService;
 use application::inventory::InventoryService;
+use application::logs::LogsService;
 use application::ports::{Clock, OperationRepository, SystemClock};
 use application::power::{PowerConfig, PowerService};
 use application::projects::ProjectService;
@@ -107,6 +108,11 @@ pub fn build_state(
         clock.clone(),
         config.scheduler.timezone,
     ));
+    let logs = Arc::new(LogsService::new(
+        inventory_repo.clone(),
+        credentials.clone(),
+        railway.clone(),
+    ));
     let scheduler = Arc::new(SchedulerService::new(
         schedules.clone(),
         scheduled_actions.clone(),
@@ -147,6 +153,7 @@ pub fn build_state(
         dashboard,
         schedules,
         scheduled_actions,
+        logs,
         scheduler,
         sessions: Arc::new(SqliteSessions::new(pool)),
         clock,

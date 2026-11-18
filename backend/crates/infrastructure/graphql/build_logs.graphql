@@ -1,0 +1,7 @@
+query BuildLogs($deploymentId: String!, $startDate: DateTime, $endDate: DateTime, $filter: String, $limit: Int) {
+  buildLogs(deploymentId: $deploymentId, startDate: $startDate, endDate: $endDate, filter: $filter, limit: $limit) {
+    timestamp
+    message
+    severity
+  }
+}

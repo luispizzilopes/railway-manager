@@ -12,6 +12,7 @@ use domain::ids::{
     RailwayDeploymentId, RailwayEnvironmentId, RailwayProjectId, RailwayServiceId,
     RailwayWorkspaceId,
 };
+use domain::logs::{LogLine, LogQuery, LogSeverity};
 use domain::power::{DeploymentRecord, StopMechanism, restart_source};
 use domain::state::InstanceSnapshot;
 
@@ -134,6 +135,25 @@ fn parse_id<T>(
 }
 
 /// `NotFound` vira `None`: o recurso deixou de existir ou não é acessível.
+/// Converte as linhas do Railway: descarta datas ilegíveis, normaliza a severidade e
+/// ordena por horário (estável, preservando a ordem de linhas simultâneas).
+fn log_lines(raw: impl Iterator<Item = (String, Option<String>, String)>) -> Vec<LogLine> {
+    let mut lines: Vec<LogLine> = raw
+        .filter_map(|(timestamp, severity, message)| {
+            let timestamp = chrono::DateTime::parse_from_rfc3339(&timestamp)
+                .ok()?
+                .to_utc();
+            Some(LogLine {
+                timestamp,
+                severity: severity.as_deref().and_then(LogSeverity::parse),
+                message,
+            })
+        })
+        .collect();
+    lines.sort_by_key(|l| l.timestamp);
+    lines
+}
+
 fn optional<T>(result: RailwayResult<T>) -> RailwayResult<Option<T>> {
     match result {
         Ok(value) => Ok(Some(value)),
@@ -577,6 +597,65 @@ impl RailwayGateway for RailwayClient {
             .execute::<ops::DeploymentRedeploy>(token, vars)
             .await?;
         deployment_from_redeploy(data.deployment_redeploy)
+    }
+
+    async fn recent_deployments(
+        &self,
+        token: &RailwayToken,
+        environment: &RailwayEnvironmentId,
+        service: &RailwayServiceId,
+        first: u32,
+    ) -> RailwayResult<Vec<DeploymentRecord>> {
+        self.history(token, environment, service, i64::from(first))
+            .await
+    }
+
+    async fn deployment_logs(
+        &self,
+        token: &RailwayToken,
+        id: &RailwayDeploymentId,
+        query: &LogQuery,
+    ) -> RailwayResult<Vec<LogLine>> {
+        let vars = ops::deployment_logs::Variables {
+            deployment_id: id.to_string(),
+            start_date: query.start.map(|d| d.to_rfc3339()),
+            end_date: query.end.map(|d| d.to_rfc3339()),
+            filter: query.filter.clone(),
+            limit: Some(i64::from(query.limit)),
+        };
+        let data = self
+            .transport
+            .execute::<ops::DeploymentLogs>(token, vars)
+            .await?;
+        Ok(log_lines(
+            data.deployment_logs
+                .into_iter()
+                .map(|l| (l.timestamp, l.severity, l.message)),
+        ))
+    }
+
+    async fn build_logs(
+        &self,
+        token: &RailwayToken,
+        id: &RailwayDeploymentId,
+        query: &LogQuery,
+    ) -> RailwayResult<Vec<LogLine>> {
+        let vars = ops::build_logs::Variables {
+            deployment_id: id.to_string(),
+            start_date: query.start.map(|d| d.to_rfc3339()),
+            end_date: query.end.map(|d| d.to_rfc3339()),
+            filter: query.filter.clone(),
+            limit: Some(i64::from(query.limit)),
+        };
+        let data = self
+            .transport
+            .execute::<ops::BuildLogs>(token, vars)
+            .await?;
+        Ok(log_lines(
+            data.build_logs
+                .into_iter()
+                .map(|l| (l.timestamp, l.severity, l.message)),
+        ))
     }
 
     fn rate_limit_status(&self) -> RateLimitStatus {

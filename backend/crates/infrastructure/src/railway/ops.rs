@@ -128,3 +128,21 @@ pub struct DeploymentStop;
     variables_derives = "Debug, Clone"
 )]
 pub struct DeploymentRedeploy;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/railway.schema.json",
+    query_path = "graphql/deployment_logs.graphql",
+    response_derives = "Debug, Clone",
+    variables_derives = "Debug, Clone"
+)]
+pub struct DeploymentLogs;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/railway.schema.json",
+    query_path = "graphql/build_logs.graphql",
+    response_derives = "Debug, Clone",
+    variables_derives = "Debug, Clone"
+)]
+pub struct BuildLogs;

@@ -4,3 +4,4 @@
 @import './base.css' layer(base);
 @import './pages.css' layer(pages);
 @import './console.css' layer(pages);
+@import './logs.css' layer(pages);
