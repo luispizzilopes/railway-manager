@@ -14,16 +14,21 @@ async function login(ctx: Ctx) {
     note(ctx, 'você já está autenticado', 'info')
     return
   }
-  const password = await ctx.secret('Senha do administrador')
+  const username = await ctx.ask('Usuário')
+  if (!username) {
+    note(ctx, 'cancelado')
+    return false
+  }
+  const password = await ctx.secret('Senha')
   if (!password) {
     note(ctx, 'cancelado')
     return false
   }
   try {
-    await ctx.login(password)
+    await ctx.login(username, password)
   } catch (err) {
-    // 401 aqui é senha errada, não sessão expirada.
-    if (err instanceof ApiError && err.status === 401) throw new CommandError('senha incorreta')
+    // 401 aqui é usuário ou senha errados, não sessão expirada.
+    if (err instanceof ApiError && err.status === 401) throw new CommandError('usuário ou senha incorretos')
     if (err instanceof ApiError) throw new CommandError(err.message)
     throw err
   }
@@ -45,7 +50,7 @@ export const sessionCommands: CommandDef[] = [
     name: 'login',
     aliases: ['entrar'],
     group: 'Sessão',
-    summary: 'entra com a senha do administrador (digitada num campo mascarado)',
+    summary: 'entra com usuário e senha (a senha é digitada num campo mascarado)',
     details: 'No modo CLI, é o primeiro comando: antes do login só login, ui, cli, help e clear funcionam.',
     examples: ['login'],
     run: login,

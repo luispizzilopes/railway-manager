@@ -7,6 +7,8 @@ use application::inventory::InstanceRef;
 use application::ports::HistoryFilter;
 use application::power::{PlannedOperation, PowerTarget};
 use application::railway::RailwayToken;
+use application::users::{CreateUser, UpdateUser};
+use axum::Extension;
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, Query, State};
@@ -14,14 +16,17 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, NaiveDate, Utc};
 use domain::credential::CredentialKind;
-use domain::ids::{OperationId, PlanId, ProjectId, ServiceId, ServiceInstanceId};
+use domain::ids::{OperationId, PlanId, ProjectId, ServiceId, ServiceInstanceId, UserId};
 use domain::operation::ItemResult;
 use domain::power::{Decision, PowerKind};
+use domain::user::{Role, User, key_of};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::AppState;
-use crate::auth::{clear_cookie, hash_session, new_session_id, session_cookie, session_from};
+use crate::auth::{
+    Principal, clear_cookie, hash_session, new_session_id, session_cookie, session_from,
+};
 use crate::error::{ApiError, ApiResult};
 
 type Body<T> = Result<Json<T>, JsonRejection>;
@@ -40,12 +45,15 @@ fn parse<T: FromStr>(field: &str, raw: &str) -> ApiResult<T> {
 
 #[derive(Deserialize)]
 pub struct Login {
+    username: String,
     password: String,
 }
 
 pub async fn login(State(state): State<AppState>, body: Body<Login>) -> ApiResult<Response> {
     let auth = &state.auth;
-    if let Some(wait) = auth.limiter.blocked_for() {
+    let Json(login) = body?;
+    let key = key_of(&login.username);
+    if let Some(wait) = auth.limiter.blocked_for(&key) {
         let mut response = ApiError::new(
             StatusCode::TOO_MANY_REQUESTS,
             "too_many_attempts",
@@ -57,27 +65,36 @@ pub async fn login(State(state): State<AppState>, body: Body<Login>) -> ApiResul
         }
         return Ok(response);
     }
-    let Json(login) = body?;
-    if !auth.password.verify(&login.password) {
-        auth.limiter.record_failure();
-        tracing::warn!("tentativa de login com senha incorreta");
+    // `Some(None)` = master; `Some(Some(id))` = usuário cadastrado.
+    let user_id = if key == key_of(&auth.master_username) {
+        auth.password.verify(&login.password).then_some(None)
+    } else {
+        state
+            .users
+            .authenticate(&login.username, &login.password)
+            .await?
+            .map(|user| Some(user.id))
+    };
+    let Some(user_id) = user_id else {
+        auth.limiter.record_failure(&key);
+        tracing::warn!(usuario = %key, "tentativa de login recusada");
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "invalid_credentials",
-            "senha incorreta",
+            "usuário ou senha incorretos",
         ));
-    }
-    auth.limiter.reset();
+    };
+    auth.limiter.reset(&key);
     let session = new_session_id();
     let now = state.clock.now();
     let ttl = chrono::Duration::from_std(auth.session_ttl).unwrap_or(chrono::Duration::hours(12));
     state
         .sessions
-        .create(&hash_session(&session), now, now + ttl)
+        .create(&hash_session(&session), user_id, now, now + ttl)
         .await
         .map_err(application::error::AppError::from)?;
     let _ = state.sessions.purge_expired(now).await;
-    tracing::info!("login do administrador");
+    tracing::info!(usuario = %key, "login");
     let mut response = StatusCode::NO_CONTENT.into_response();
     response.headers_mut().insert(
         header::SET_COOKIE,
@@ -102,8 +119,12 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiRes
     Ok(response)
 }
 
-pub async fn session() -> Json<serde_json::Value> {
-    Json(json!({ "authenticated": true }))
+pub async fn session(Extension(principal): Extension<Principal>) -> Json<serde_json::Value> {
+    Json(json!({
+        "authenticated": true,
+        "username": principal.username,
+        "role": principal.role,
+    }))
 }
 
 // ---------- credencial ----------
@@ -485,6 +506,7 @@ pub struct ExecuteInput {
 
 pub async fn execute_operation(
     State(state): State<AppState>,
+    Extension(principal): Extension<Principal>,
     body: Body<ExecuteInput>,
 ) -> ApiResult<Response> {
     let Json(input) = body?;
@@ -496,7 +518,7 @@ pub async fn execute_operation(
             ));
         }
     };
-    let operation_id = state.power.execute(plan_id, "admin").await?;
+    let operation_id = state.power.execute(plan_id, &principal.username).await?;
     Ok((
         StatusCode::ACCEPTED,
         Json(json!({ "operation_id": operation_id })),
@@ -947,4 +969,120 @@ pub async fn cancel_scheduled_action(
     Path(action): Path<String>,
 ) -> ApiResult<Response> {
     Ok(Json(state.scheduled_actions.cancel(id(&action)?).await?).into_response())
+}
+
+// ---------- usuários (somente master) ----------
+
+#[derive(Serialize)]
+struct UserDto {
+    id: UserId,
+    username: String,
+    role: Role,
+    is_active: bool,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<User> for UserDto {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id,
+            username: user.username.to_string(),
+            role: user.role,
+            is_active: user.is_active,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+        }
+    }
+}
+
+fn role_of(raw: &str) -> ApiResult<Role> {
+    raw.parse()
+        .map_err(|e: domain::user::InvalidRole| ApiError::bad_request(e.to_string()))
+}
+
+pub async fn list_users(State(state): State<AppState>) -> ApiResult<Response> {
+    let users: Vec<UserDto> = state
+        .users
+        .list()
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
+    Ok(Json(json!({ "users": users })).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct CreateUserInput {
+    username: String,
+    password: String,
+    role: String,
+}
+
+pub async fn create_user(
+    State(state): State<AppState>,
+    body: Body<CreateUserInput>,
+) -> ApiResult<Response> {
+    let Json(input) = body?;
+    let user = state
+        .users
+        .create(CreateUser {
+            username: input.username,
+            password: input.password,
+            role: role_of(&input.role)?,
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(UserDto::from(user))).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct UpdateUserInput {
+    role: Option<String>,
+    is_active: Option<bool>,
+}
+
+pub async fn update_user(
+    State(state): State<AppState>,
+    Path(user): Path<String>,
+    body: Body<UpdateUserInput>,
+) -> ApiResult<Response> {
+    let Json(input) = body?;
+    let role = input.role.as_deref().map(role_of).transpose()?;
+    let user = state
+        .users
+        .update(
+            id::<UserId>(&user)?,
+            UpdateUser {
+                role,
+                is_active: input.is_active,
+            },
+        )
+        .await?;
+    Ok(Json(UserDto::from(user)).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct PasswordInput {
+    password: String,
+}
+
+pub async fn set_user_password(
+    State(state): State<AppState>,
+    Path(user): Path<String>,
+    body: Body<PasswordInput>,
+) -> ApiResult<Response> {
+    let Json(input) = body?;
+    state
+        .users
+        .set_password(id::<UserId>(&user)?, &input.password)
+        .await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+pub async fn delete_user(
+    State(state): State<AppState>,
+    Path(user): Path<String>,
+) -> ApiResult<Response> {
+    state.users.delete(id::<UserId>(&user)?).await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
 }

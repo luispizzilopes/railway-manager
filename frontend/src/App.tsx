@@ -17,6 +17,7 @@ import { ProjectDetail } from './pages/ProjectDetail'
 import { Projects } from './pages/Projects'
 import { Schedules } from './pages/Schedules'
 import { Settings } from './pages/Settings'
+import { Users } from './pages/Users'
 
 export function App() {
   const queryClient = useQueryClient()
@@ -69,6 +70,7 @@ export function App() {
         <Route path="schedules" element={<Schedules />} />
         <Route path="history" element={<History />} />
         <Route path="console" element={mobile ? <Navigate to="/" replace /> : <ConsolePage />} />
+        <Route path="users" element={<Users />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<p className="muted">Página não encontrada.</p>} />
       </Route>

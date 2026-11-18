@@ -8,6 +8,7 @@ import { ConfirmDialog, Modal } from '../components/Modal'
 import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { OperationResult } from '../components/OperationFlow'
 import { DAY_LABEL, KIND_LABEL, RUN_LABEL, formatDays, formatInZone } from '../format'
+import { useSession } from '../session'
 import { Button } from '../components/ui/Button'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui/Feedback'
 import { Input, Select } from '../components/ui/Field'
@@ -441,6 +442,7 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
 
 /** Ações pendentes criadas pelo console (`stop all --at 18:00`), com cancelamento. */
 export function PendingActions() {
+  const canCancel = useSession().can('operator')
   const actions = useQuery({
     queryKey: ['scheduled-actions', 'pending'],
     queryFn: () => api.scheduledActions('pending'),
@@ -484,12 +486,11 @@ export function PendingActions() {
                   <td className="mono">{formatInZone(a.run_at, actions.data!.default_timezone)}</td>
                   <td>{a.note ?? ''}</td>
                   <td className="num">
-                    <Button variant="ghost" size="sm"
-                      disabled={cancel.isPending}
-                      onClick={() => cancel.mutate(a.id)}
-                    >
-                      Cancelar
-                    </Button>
+                    {canCancel && (
+                      <Button variant="ghost" size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate(a.id)}>
+                        Cancelar
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -518,6 +519,9 @@ export function Schedules() {
     refetchInterval: 60_000,
   })
 
+  const session = useSession()
+  const canOperate = session.can('operator')
+  const canManage = session.can('admin')
   const toggle = useFeedbackMutation({
     mutationFn: (view: ScheduleView) =>
       view.schedule.enabled ? api.pauseSchedule(view.schedule.id) : api.resumeSchedule(view.schedule.id),
@@ -541,7 +545,7 @@ export function Schedules() {
           <h1>Agendas</h1>
           <p className="muted">Liga e desliga projetos ou serviços automaticamente nos horários definidos.</p>
         </div>
-        {tab === 'schedules' && (
+        {tab === 'schedules' && canManage && (
           <Button variant="primary" disabled={projectList.length === 0} onClick={() => setEditing('new')}>
             Nova agenda
           </Button>
@@ -586,12 +590,16 @@ export function Schedules() {
             <EmptyState
               title="Nenhuma agenda"
               action={
-                <Button variant="primary" disabled={projectList.length === 0} onClick={() => setEditing('new')}>
-                  Nova agenda
-                </Button>
+                canManage ? (
+                  <Button variant="primary" disabled={projectList.length === 0} onClick={() => setEditing('new')}>
+                    Nova agenda
+                  </Button>
+                ) : undefined
               }
             >
-              Crie uma agenda para ligar e desligar serviços nos horários de uso.
+              {canManage
+                ? 'Crie uma agenda para ligar e desligar serviços nos horários de uso.'
+                : 'Peça a um administrador para criar agendas.'}
             </EmptyState>
           </div>
         )}
@@ -641,15 +649,21 @@ export function Schedules() {
                       </td>
                       <td className="num">
                         <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
-                          <Button size="sm" onClick={() => toggle.mutate(view)}>
-                            {s.enabled ? 'Pausar' : 'Retomar'}
-                          </Button>
-                          <Button size="sm" onClick={() => setEditing(view)}>
-                            Editar
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setRemoving(view)}>
-                            Excluir
-                          </Button>
+                          {canOperate && (
+                            <Button size="sm" onClick={() => toggle.mutate(view)}>
+                              {s.enabled ? 'Pausar' : 'Retomar'}
+                            </Button>
+                          )}
+                          {canManage && (
+                            <>
+                              <Button size="sm" onClick={() => setEditing(view)}>
+                                Editar
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => setRemoving(view)}>
+                                Excluir
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

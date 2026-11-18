@@ -14,6 +14,7 @@ use domain::operation::{
 };
 use domain::power::{Decision, PowerKind, SkipReason};
 use domain::state::ObservedState;
+use domain::user::{Role, User, Username};
 use infrastructure::sqlite::*;
 use sqlx::SqlitePool;
 
@@ -655,18 +656,168 @@ async fn sessoes_expiram_e_sao_removidas() {
     let sessions = SqliteSessions::new(pool);
     let now = Utc::now();
     sessions
-        .create("h1", now, now + Duration::hours(1))
+        .create("h1", None, now, now + Duration::hours(1))
         .await
         .unwrap();
     sessions
-        .create("h2", now - Duration::hours(2), now - Duration::hours(1))
+        .create(
+            "h2",
+            None,
+            now - Duration::hours(2),
+            now - Duration::hours(1),
+        )
         .await
         .unwrap();
-    assert!(sessions.is_valid("h1", now).await.unwrap());
-    assert!(!sessions.is_valid("h2", now).await.unwrap());
+    assert_eq!(
+        sessions.resolve("h1", now).await.unwrap(),
+        Some(SessionOwner::Master)
+    );
+    assert_eq!(sessions.resolve("h2", now).await.unwrap(), None);
     assert_eq!(sessions.purge_expired(now).await.unwrap(), 1);
     sessions.delete("h1").await.unwrap();
-    assert!(!sessions.is_valid("h1", now).await.unwrap());
+    assert_eq!(sessions.resolve("h1", now).await.unwrap(), None);
+}
+
+fn new_user(name: &str, role: Role) -> User {
+    let now = Utc::now();
+    User {
+        id: UserId::new(),
+        username: Username::parse(name).unwrap(),
+        role,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+    }
+}
+
+#[tokio::test]
+async fn usuarios_nome_unico_sem_diferenciar_caixa() {
+    let users = SqliteUsers::new(memory().await);
+    users
+        .insert(&new_user("Maria", Role::Operator), "hash-1")
+        .await
+        .unwrap();
+    let err = users
+        .insert(&new_user("MARIA", Role::Viewer), "hash-2")
+        .await
+        .unwrap_err();
+    assert!(matches!(err, RepoError::Conflict(_)));
+
+    let found = users.find_credentials("maria").await.unwrap().unwrap();
+    assert_eq!(found.user.username.as_str(), "Maria");
+    assert_eq!(found.password_hash, "hash-1");
+    assert!(users.find_credentials("joao").await.unwrap().is_none());
+    assert_eq!(users.list().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn papel_master_nao_pode_ser_gravado() {
+    let pool = memory().await;
+    let result = sqlx::query(
+        "INSERT INTO users (id, username, username_key, password_hash, role, created_at, updated_at)
+         VALUES ('x', 'root', 'root', 'h', 'master', 't', 't')",
+    )
+    .execute(&pool)
+    .await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn usuario_atualiza_e_remove() {
+    let pool = memory().await;
+    let users = SqliteUsers::new(pool.clone());
+    let user = new_user("ana", Role::Operator);
+    users.insert(&user, "h").await.unwrap();
+    let now = Utc::now();
+    users
+        .update(user.id, Role::Viewer, false, now)
+        .await
+        .unwrap();
+    users.set_password_hash(user.id, "h2", now).await.unwrap();
+    let got = users.get(user.id).await.unwrap().unwrap();
+    assert_eq!(got.role, Role::Viewer);
+    assert!(!got.is_active);
+    assert_eq!(
+        users
+            .find_credentials("ana")
+            .await
+            .unwrap()
+            .unwrap()
+            .password_hash,
+        "h2"
+    );
+    users.delete(user.id).await.unwrap();
+    assert!(users.get(user.id).await.unwrap().is_none());
+    assert_eq!(
+        users.delete(user.id).await.unwrap_err(),
+        RepoError::NotFound
+    );
+}
+
+#[tokio::test]
+async fn sessao_segue_o_estado_do_usuario() {
+    let pool = memory().await;
+    let users = SqliteUsers::new(pool.clone());
+    let sessions = SqliteSessions::new(pool);
+    let user = new_user("ana", Role::Operator);
+    users.insert(&user, "h").await.unwrap();
+    let now = Utc::now();
+    sessions
+        .create("s1", Some(user.id), now, now + Duration::hours(1))
+        .await
+        .unwrap();
+    let operator = SessionOwner::User {
+        username: "ana".into(),
+        role: Role::Operator,
+    };
+    assert_eq!(sessions.resolve("s1", now).await.unwrap(), Some(operator));
+
+    // Rebaixar vale na hora.
+    users
+        .update(user.id, Role::Viewer, true, now)
+        .await
+        .unwrap();
+    assert_eq!(
+        sessions.resolve("s1", now).await.unwrap(),
+        Some(SessionOwner::User {
+            username: "ana".into(),
+            role: Role::Viewer
+        })
+    );
+    // Desativar derruba a sessão.
+    users
+        .update(user.id, Role::Viewer, false, now)
+        .await
+        .unwrap();
+    assert_eq!(sessions.resolve("s1", now).await.unwrap(), None);
+    // Remover apaga as sessões em cascata.
+    users
+        .update(user.id, Role::Viewer, true, now)
+        .await
+        .unwrap();
+    users.delete(user.id).await.unwrap();
+    assert_eq!(sessions.resolve("s1", now).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn nova_senha_encerra_as_sessoes_do_usuario() {
+    let pool = memory().await;
+    let users = SqliteUsers::new(pool.clone());
+    let sessions = SqliteSessions::new(pool);
+    let user = new_user("ana", Role::Admin);
+    users.insert(&user, "h").await.unwrap();
+    let now = Utc::now();
+    sessions
+        .create("s1", Some(user.id), now, now + Duration::hours(1))
+        .await
+        .unwrap();
+    sessions
+        .create("m", None, now, now + Duration::hours(1))
+        .await
+        .unwrap();
+    sessions.delete_for_user(user.id).await.unwrap();
+    assert_eq!(sessions.resolve("s1", now).await.unwrap(), None);
+    assert!(sessions.resolve("m", now).await.unwrap().is_some());
 }
 
 #[tokio::test]

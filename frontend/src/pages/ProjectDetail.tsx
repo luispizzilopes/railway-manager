@@ -14,6 +14,7 @@ import { Table } from '../components/ui/Table'
 import { Tabs } from '../components/ui/Tabs'
 import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { KIND_LABEL, SYNC_LABEL, formatDays, relativeTime } from '../format'
+import { useSession } from '../session'
 import { DEFAULT_FILTERS, type LogFilterState, filtersToParams } from '../logs/filters'
 import { LogsPanel } from '../logs/LogsPanel'
 
@@ -189,6 +190,9 @@ function EditProject({ project, onClose }: { project: Project; onClose: () => vo
 export function ProjectDetail() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const session = useSession()
+  const canOperate = session.can('operator')
+  const canManage = session.can('admin')
   const project = useQuery({ queryKey: ['project', id], queryFn: () => api.project(id) })
   const instances = useQuery({ queryKey: ['instances', id], queryFn: () => api.instances(id) })
   const environments = useQuery({ queryKey: ['environments', id], queryFn: () => api.environments(id) })
@@ -245,13 +249,17 @@ export function ProjectDetail() {
           {p.description && <p className="muted">{p.description}</p>}
         </div>
         <div className="row">
-          <Button onClick={() => sync.mutate()} loading={sync.isPending} disabled={!ready}>
-            {sync.isPending ? 'Sincronizando…' : 'Sincronizar'}
-          </Button>
-          <Button onClick={() => setModal('edit')}>Editar</Button>
-          <Button variant="ghost" onClick={() => setModal('remove')}>
-            Remover do gerenciamento
-          </Button>
+          {canOperate && (
+            <Button onClick={() => sync.mutate()} loading={sync.isPending} disabled={!ready}>
+              {sync.isPending ? 'Sincronizando…' : 'Sincronizar'}
+            </Button>
+          )}
+          {canManage && <Button onClick={() => setModal('edit')}>Editar</Button>}
+          {canManage && (
+            <Button variant="ghost" onClick={() => setModal('remove')}>
+              Remover do gerenciamento
+            </Button>
+          )}
         </div>
       </div>
 
@@ -360,7 +368,7 @@ export function ProjectDetail() {
               ))}
             </Select>
             <span className="spacer" />
-            {(['start', 'stop'] as const).map((kind) => (
+            {canOperate && (['start', 'stop'] as const).map((kind) => (
               <Button
                 key={kind}
                 size="sm"
@@ -377,12 +385,16 @@ export function ProjectDetail() {
                 {kind === 'start' ? 'Iniciar' : 'Desligar'} {envFilter ? 'ambiente' : 'todos'}
               </Button>
             ))}
-            <Button size="sm" onClick={() => setModal('associate')}>
-              Associar por ID
-            </Button>
-            <Button size="sm" variant="primary" onClick={() => setModal('import')} disabled={!ready}>
-              Importar do Railway
-            </Button>
+            {canManage && (
+              <>
+                <Button size="sm" onClick={() => setModal('associate')}>
+                  Associar por ID
+                </Button>
+                <Button size="sm" variant="primary" onClick={() => setModal('import')} disabled={!ready}>
+                  Importar do Railway
+                </Button>
+              </>
+            )}
           </div>
           {views.length === 0 ? (
             <EmptyState title="Nenhum serviço gerenciado">Importe serviços de um ambiente para controlar desligar/iniciar.</EmptyState>
@@ -425,6 +437,7 @@ export function ProjectDetail() {
                         </td>
                         <td className="num">
                           <div className="row" style={{ justifyContent: 'flex-end' }}>
+                            {canOperate && (
                             <Button
                               size="sm"
                               disabled={!ready || v.instance.not_found || card?.busy}
@@ -439,6 +452,7 @@ export function ProjectDetail() {
                             >
                               {off ? 'Iniciar' : 'Desligar'}
                             </Button>
+                            )}
                             <Button
                               size="sm"
                               aria-label={`Logs de ${v.service.name} (${v.environment.name})`}
@@ -451,9 +465,11 @@ export function ProjectDetail() {
                             >
                               Logs
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setRemoveInstance(v)}>
-                              Remover
-                            </Button>
+                            {canManage && (
+                              <Button size="sm" variant="ghost" onClick={() => setRemoveInstance(v)}>
+                                Remover
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

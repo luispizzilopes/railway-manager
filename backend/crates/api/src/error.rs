@@ -37,6 +37,14 @@ impl ApiError {
         )
     }
 
+    pub fn forbidden() -> Self {
+        Self::new(
+            StatusCode::FORBIDDEN,
+            "forbidden",
+            "seu papel não permite esta ação",
+        )
+    }
+
     pub fn not_found(message: impl Into<String>) -> Self {
         Self::new(StatusCode::NOT_FOUND, "not_found", message)
     }

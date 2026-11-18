@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
 import { dashboard } from './test/fixtures'
-import { type Call, mockFetch, renderWithProviders } from './test/utils'
+import { type Call, mockFetch, renderWithProviders, sessionAs } from './test/utils'
 
 describe('login', () => {
   beforeEach(() => window.localStorage.setItem('rm:mode', 'ui'))
@@ -14,7 +14,7 @@ describe('login', () => {
     mockFetch({
       'GET /api/session': () =>
         loggedIn
-          ? { json: { authenticated: true } }
+          ? { json: sessionAs('master') }
           : { status: 401, json: { code: 'unauthorized', message: 'autenticação necessária' } },
       'POST /api/session': () => {
         loggedIn = true
@@ -23,7 +23,8 @@ describe('login', () => {
       'GET /api/dashboard': dashboard([], { integration_ready: false, projects: [] }),
     })
     renderWithProviders(<App />)
-    await userEvent.type(await screen.findByLabelText('Senha'), 'segredo')
+    await userEvent.type(await screen.findByLabelText('Usuário'), 'maria')
+    await userEvent.type(screen.getByLabelText('Senha'), 'segredo')
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Senha')).not.toBeInTheDocument()
@@ -34,7 +35,7 @@ describe('login', () => {
     const calls = mockFetch({
       'GET /api/session': () =>
         loggedIn
-          ? { json: { authenticated: true } }
+          ? { json: sessionAs('master') }
           : { status: 401, json: { code: 'unauthorized', message: 'autenticação necessária' } },
       'DELETE /api/session': () => {
         loggedIn = false
@@ -64,10 +65,11 @@ describe('escolha entre interface gráfica e CLI', () => {
   it('no modo CLI o login é pela linha de comando, e ui troca de modo', async () => {
     let loggedIn = false
     const calls = mockFetch({
-      'GET /api/session': () => (loggedIn ? { json: { authenticated: true } } : loggedOut()),
+      'GET /api/session': () => (loggedIn ? { json: sessionAs('master') } : loggedOut()),
       'POST /api/session': (call: Call) => {
-        loggedIn = (call.body as { password: string }).password === 'segredo'
-        return loggedIn ? { status: 204 } : { status: 401, json: { code: 'invalid_credentials', message: 'senha incorreta' } }
+        const body = call.body as { username: string; password: string }
+        loggedIn = body.username === 'chefe' && body.password === 'segredo'
+        return loggedIn ? { status: 204 } : { status: 401, json: { code: 'invalid_credentials', message: 'usuário ou senha incorretos' } }
       },
       'GET /api/dashboard': dashboard([], { integration_ready: false, projects: [] }),
       'GET /api/schedules': { schedules: [], default_timezone: 'UTC' },
@@ -76,18 +78,22 @@ describe('escolha entre interface gráfica e CLI', () => {
     renderWithProviders(<App />)
     await userEvent.click(await screen.findByRole('button', { name: /Somente linha de comando/ }))
 
-    // Abre já pedindo a senha, num campo mascarado.
-    const first = await screen.findByLabelText(/Senha do administrador/)
+    // Abre já pedindo usuário (visível) e senha (num campo mascarado).
+    const user = await screen.findByLabelText(/Usuário/)
+    expect(user).toHaveAttribute('type', 'text')
+    await userEvent.type(user, 'chefe{Enter}')
+    const first = await screen.findByLabelText(/Senha/)
     expect(first).toHaveAttribute('type', 'password')
     await userEvent.type(first, 'errada{Enter}')
-    expect(await screen.findByText(/senha incorreta/)).toBeInTheDocument()
+    expect(await screen.findByText(/usuário ou senha incorretos/)).toBeInTheDocument()
 
     const command = screen.getByLabelText(/Comando/)
     await userEvent.type(command, 'status{Enter}')
     expect(await screen.findByText(/faça login primeiro/)).toBeInTheDocument()
 
     await userEvent.type(screen.getByLabelText(/Comando/), 'login{Enter}')
-    await userEvent.type(await screen.findByLabelText(/Senha do administrador/), 'segredo{Enter}')
+    await userEvent.type(await screen.findByLabelText(/Usuário/), 'chefe{Enter}')
+    await userEvent.type(await screen.findByLabelText(/Senha/), 'segredo{Enter}')
     expect(await screen.findByText(/autenticado — digite help/)).toBeInTheDocument()
     expect(screen.getByText(/linha de comando · autenticado/)).toBeInTheDocument()
     expect(calls.filter((c) => c.method === 'POST' && c.url === '/api/session')).toHaveLength(2)
@@ -98,7 +104,7 @@ describe('escolha entre interface gráfica e CLI', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Modo CLI' }))
     expect(await screen.findByText(/linha de comando · autenticado/)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/Senha do administrador/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Senha/)).not.toBeInTheDocument()
   })
 
   it('da tela de login dá para passar para a CLI, e da CLI para a interface', async () => {
@@ -106,7 +112,7 @@ describe('escolha entre interface gráfica e CLI', () => {
     mockFetch({ 'GET /api/session': loggedOut })
     renderWithProviders(<App />)
     await userEvent.click(await screen.findByRole('button', { name: /Mudar para linha de comando/ }))
-    expect(await screen.findByLabelText(/Senha do administrador/)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/Usuário/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Interface gráfica' }))
     expect(await screen.findByLabelText('Senha')).toBeInTheDocument()
   })
@@ -129,7 +135,7 @@ describe('celular', () => {
   it('esconde o console e o modo CLI depois do login', async () => {
     const ua = asPhone()
     mockFetch({
-      'GET /api/session': { json: { authenticated: true } },
+      'GET /api/session': sessionAs('master'),
       'GET /api/dashboard': dashboard([], { integration_ready: false, projects: [] }),
     })
     renderWithProviders(<App />, { route: '/console' })

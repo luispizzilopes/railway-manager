@@ -8,6 +8,7 @@ mod projects;
 mod scheduled_actions;
 mod schedules;
 mod sessions;
+mod users;
 
 use std::str::FromStr;
 use std::time::Duration;
@@ -26,6 +27,7 @@ pub use projects::SqliteProjects;
 pub use scheduled_actions::SqliteScheduledActions;
 pub use schedules::{SqliteScheduleRuns, SqliteSchedules};
 pub use sessions::SqliteSessions;
+pub use users::SqliteUsers;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 

@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Field'
 
 export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => void }) {
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -15,7 +16,7 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
     setBusy(true)
     setError(null)
     try {
-      await api.login(password)
+      await api.login(username.trim(), password)
       setPassword('')
       onLogin()
     } catch (err) {
@@ -31,9 +32,24 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
         <div className="login-head">
           <Brand />
           <h1>Entrar</h1>
-          <p className="muted">Entre com a senha de administrador.</p>
+          <p className="muted">Entre com seu usuário e senha.</p>
         </div>
         <div className="stack">
+          <Field label="Usuário">
+            {(p) => (
+              <Input
+                {...p}
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoFocus
+                required
+              />
+            )}
+          </Field>
           <Field label="Senha">
             {(p) => (
               <Input
@@ -42,7 +58,6 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoFocus
                 required
               />
             )}
@@ -52,7 +67,7 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
               {error}
             </div>
           )}
-          <Button variant="primary" type="submit" loading={busy} disabled={!password}>
+          <Button variant="primary" type="submit" loading={busy} disabled={!username.trim() || !password}>
             Entrar
           </Button>
           {onCli && (

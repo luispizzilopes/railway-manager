@@ -288,3 +288,30 @@ async fn tabelas_de_acoes_agendadas_e_cascatas() {
         "as ações ficam (o alvo vazio vira `skipped` na execução)"
     );
 }
+
+#[tokio::test]
+async fn migracao_de_usuarios_invalida_as_sessoes_antigas() {
+    let dir = tempfile::tempdir().unwrap();
+    let pool = pool_at(&dir.path().join("antigo.db")).await;
+    MIGRATOR.run_to(20261118000002, &pool).await.unwrap();
+    sqlx::raw_sql(
+        "INSERT INTO sessions (id_hash, created_at, expires_at)
+         VALUES ('antiga', '2026-11-18T00:00:00.000Z', '2099-01-01T00:00:00.000Z')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    MIGRATOR.run(&pool).await.unwrap();
+
+    assert_eq!(count(&pool, "sessions").await, 0);
+    assert_eq!(count(&pool, "users").await, 0);
+    // A coluna nova aceita sessão do master (usuário nulo).
+    sqlx::raw_sql(
+        "INSERT INTO sessions (id_hash, user_id, created_at, expires_at)
+         VALUES ('nova', NULL, '2026-11-19T00:00:00.000Z', '2099-01-01T00:00:00.000Z')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+}

@@ -10,6 +10,7 @@ import { Field, Input, RadioGroup } from '../components/ui/Field'
 import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { type ThemePreference, useTheme } from '../theme'
 import { formatDateTime } from '../format'
+import { useSession } from '../session'
 
 const STATUS_TEXT: Record<Credential['status'], string> = {
   valid: 'Válido',
@@ -110,6 +111,7 @@ function Appearance() {
 
 export function Settings() {
   const credential = useQuery({ queryKey: ['credential'], queryFn: api.credential })
+  const canManage = useSession().can('admin')
   const [replacing, setReplacing] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const remove = useFeedbackMutation({
@@ -163,9 +165,11 @@ export function Settings() {
                 </div>
               </dl>
               {current.status !== 'valid' && (
-                <div className="alert alert-warn">Cadastre um novo token para reativar a integração.</div>
+                <div className="alert alert-warn">
+                  {canManage ? 'Cadastre um novo token para reativar a integração.' : 'A integração está inativa: avise um administrador.'}
+                </div>
               )}
-              {replacing || current.status !== 'valid' ? (
+              {!canManage ? null : replacing || current.status !== 'valid' ? (
                 <CredentialForm replacing onSaved={() => setReplacing(false)} />
               ) : (
                 <div className="row">
@@ -177,7 +181,12 @@ export function Settings() {
               )}
             </>
           ) : (
-            credential.isSuccess && <CredentialForm replacing={false} />
+            credential.isSuccess &&
+            (canManage ? (
+              <CredentialForm replacing={false} />
+            ) : (
+              <p className="muted">Nenhum token cadastrado. Peça a um administrador para cadastrá-lo.</p>
+            ))
           )}
         </div>
       </div>

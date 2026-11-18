@@ -124,6 +124,8 @@ export interface Ctx {
   clear(): void
   confirm(question: string, options?: ConfirmOptions): Promise<boolean>
   secret(label: string): Promise<string | null>
+  /** Pergunta um texto simples (visível), como o nome de usuário. */
+  ask(label: string): Promise<string | null>
   signal: AbortSignal
   sleep(ms: number): Promise<void>
   now(): Date
@@ -141,8 +143,8 @@ export interface Ctx {
   logout(): Promise<void>
   /** Sessão válida (no modo CLI o console também é a tela de login). */
   authenticated: boolean
-  /** Entra com a senha do administrador. */
-  login(password: string): Promise<void>
+  /** Entra com usuário e senha. */
+  login(username: string, password: string): Promise<void>
   mode: Mode
   setMode(mode: Mode): void
   /** Intervalo do acompanhamento de operações. */

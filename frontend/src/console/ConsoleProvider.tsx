@@ -21,6 +21,8 @@ export interface Prompt {
   question: string
   word?: string
   secret: boolean
+  /** Pergunta de texto livre: sem o sufixo `[s/N]`. */
+  plain?: boolean
   resolve: (answer: string | null) => void
 }
 
@@ -103,12 +105,13 @@ export function ConsoleProvider({
   const clear = useCallback(() => setBlocks([]), [])
 
   const ask = useCallback(
-    (question: string, secret: boolean, word?: string) =>
+    (question: string, secret: boolean, word?: string, plain?: boolean) =>
       new Promise<string | null>((resolve) => {
         const p: Prompt = {
           question,
           word,
           secret,
+          plain,
           resolve: (answer) => {
             promptRef.current = null
             setPrompt(null)
@@ -144,6 +147,11 @@ export function ConsoleProvider({
           const text = answer.trim().toLowerCase()
           return options?.word ? text === options.word.toLowerCase() : ['s', 'sim', 'y', 'yes'].includes(text)
         },
+        async ask(label) {
+          const answer = await ask(label, false, undefined, true)
+          print({ kind: 'input', text: `${label}: ${answer ?? '(cancelado)'}` })
+          return answer?.trim() || null
+        },
         async secret(label) {
           const answer = await ask(label, true)
           print({ kind: 'input', text: `${label}: ${answer ? '••••••••' : '(cancelado)'}` })
@@ -177,8 +185,8 @@ export function ConsoleProvider({
           await onLogout()
         },
         authenticated,
-        login: async (password) => {
-          await api.login(password)
+        login: async (username, password) => {
+          await api.login(username, password)
           await onLogin()
         },
         mode,

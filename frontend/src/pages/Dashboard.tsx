@@ -14,6 +14,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { Table } from '../components/ui/Table'
 import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { KIND_LABEL, STATE_LABEL, STATUS_LABEL, formatTime, relativeTime } from '../format'
+import { useSession } from '../session'
 
 /** Intervalo da atualização automática enquanto a tela está aberta. */
 export const AUTO_REFRESH_MS = 60_000
@@ -132,7 +133,17 @@ function attentionItems(projects: Project[]): Attention[] {
   return items
 }
 
-function AttentionPanel({ items, ready, onStart }: { items: Attention[]; ready: boolean; onStart: (a: Attention) => void }) {
+function AttentionPanel({
+  items,
+  ready,
+  canOperate,
+  onStart,
+}: {
+  items: Attention[]
+  ready: boolean
+  canOperate: boolean
+  onStart: (a: Attention) => void
+}) {
   if (items.length === 0) {
     return (
       <p className="all-clear">
@@ -155,7 +166,7 @@ function AttentionPanel({ items, ready, onStart }: { items: Attention[]; ready: 
             {a.project.display_name ?? a.project.name} · {a.environment} · {a.reason}
           </span>
           <span className="spacer" />
-          {a.card.state === 'failed' && !a.card.not_found && !a.card.busy ? (
+          {canOperate && a.card.state === 'failed' && !a.card.not_found && !a.card.busy ? (
             <Button size="sm" disabled={!ready} onClick={() => onStart(a)}>
               Iniciar
             </Button>
@@ -171,10 +182,13 @@ function AttentionPanel({ items, ready, onStart }: { items: Attention[]; ready: 
 export function InstanceRow({
   card,
   disabled,
+  readOnly = false,
   onAction,
 }: {
   card: InstanceCard
   disabled: boolean
+  /** Papel sem permissão de operar: some o botão de ligar/desligar. */
+  readOnly?: boolean
   onAction: (kind: PowerKind) => void
 }) {
   const off = card.state === 'stopped' || card.state === 'failed'
@@ -196,7 +210,7 @@ export function InstanceRow({
       <td className="actions">
         {card.busy ? (
           <span className="subtle">operação em andamento</span>
-        ) : (
+        ) : readOnly ? null : (
           <Button size="sm" disabled={disabled || card.not_found} onClick={() => onAction(off ? 'start' : 'stop')}>
             {off ? 'Iniciar' : 'Desligar'}
           </Button>
@@ -222,6 +236,7 @@ const STATE_FILTERS: ObservedState[] = ['running', 'sleeping', 'stopped', 'trans
 
 export function Dashboard() {
   const queryClient = useQueryClient()
+  const canOperate = useSession().can('operator')
   const [flow, setFlow] = useState<Flow | null>(null)
   const [selected, setSelected] = useState<string[]>([])
   const [params, setParams] = useSearchParams()
@@ -246,7 +261,7 @@ export function Dashboard() {
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       return Date.now()
     },
-    enabled: ready && !paused,
+    enabled: ready && !paused && canOperate,
     refetchInterval: AUTO_REFRESH_MS,
     refetchOnWindowFocus: false,
   })
@@ -323,7 +338,7 @@ export function Dashboard() {
           </p>
         </div>
         <div className="row">
-          {selected.length > 0 && (
+          {canOperate && selected.length > 0 && (
             <>
               <span className="subtle">{selected.length} projeto(s) selecionado(s)</span>
               {(['start', 'stop'] as const).map((kind) => (
@@ -344,9 +359,11 @@ export function Dashboard() {
               ))}
             </>
           )}
-          <Button variant="primary" onClick={() => refresh.mutate()} loading={refresh.isPending} disabled={!ready}>
-            Atualizar estados
-          </Button>
+          {canOperate && (
+            <Button variant="primary" onClick={() => refresh.mutate()} loading={refresh.isPending} disabled={!ready}>
+              Atualizar estados
+            </Button>
+          )}
         </div>
       </div>
 
@@ -372,6 +389,7 @@ export function Dashboard() {
             <AttentionPanel
               items={attention}
               ready={ready}
+              canOperate={canOperate}
               onStart={({ card, project, environment }) =>
                 setFlow({
                   kind: 'start',
@@ -459,12 +477,14 @@ export function Dashboard() {
       {visible.map(({ project, environments, next_action }) => (
         <section key={project.id} className="card project-card" aria-label={project.display_name ?? project.name}>
           <div className="card-head">
-            <input
-              type="checkbox"
-              aria-label={`Selecionar ${project.display_name ?? project.name}`}
-              checked={selected.includes(project.id)}
-              onChange={() => toggle(project.id)}
-            />
+            {canOperate && (
+              <input
+                type="checkbox"
+                aria-label={`Selecionar ${project.display_name ?? project.name}`}
+                checked={selected.includes(project.id)}
+                onChange={() => toggle(project.id)}
+              />
+            )}
             <h3>
               <Link to={`/projects/${project.id}`}>{project.display_name ?? project.name}</Link>
             </h3>
@@ -477,7 +497,7 @@ export function Dashboard() {
             )}
             <span className="spacer" />
             {environments.length > 0 && <ProjectSummary cards={environments.flatMap((e) => e.instances)} />}
-            {(['start', 'stop'] as const).map((kind) => (
+            {canOperate && (['start', 'stop'] as const).map((kind) => (
               <Button
                 key={kind}
                 size="sm"
@@ -522,6 +542,7 @@ export function Dashboard() {
                       key={card.id}
                       card={card}
                       disabled={!ready}
+                      readOnly={!canOperate}
                       onAction={(kind) =>
                         setFlow({
                           kind,

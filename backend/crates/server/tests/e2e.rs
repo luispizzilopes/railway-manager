@@ -232,6 +232,7 @@ async fn desligar_e_iniciar_projeto_contra_railway_simulado() {
         .await;
 
     let vars: HashMap<&str, String> = [
+        ("RM_ADMIN_USERNAME", "chefe".to_string()),
         ("RM_ADMIN_PASSWORD", "admin".to_string()),
         (
             "RM_MASTER_KEY",
@@ -256,7 +257,9 @@ async fn desligar_e_iniciar_projeto_contra_railway_simulado() {
         .method("POST")
         .uri("/api/session")
         .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(json!({ "password": "admin" }).to_string()))
+        .body(Body::from(
+            json!({ "username": "chefe", "password": "admin" }).to_string(),
+        ))
         .unwrap();
     let response = router.clone().oneshot(login).await.unwrap();
     let cookie = response.headers()[header::SET_COOKIE]

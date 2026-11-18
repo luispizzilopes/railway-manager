@@ -1,11 +1,12 @@
-//! Acesso do administrador: senha (argon2 ou texto claro em dev), sessão por cookie
-//! opaco (só o hash vai ao banco), limite de tentativas e proteção das rotas.
+//! Acesso: master (nome e senha do ambiente, argon2 ou texto claro em dev) e usuários do
+//! banco; sessão por cookie opaco (só o hash vai ao banco), limite de tentativas por
+//! usuário e autorização por papel.
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::collections::{HashMap, VecDeque};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use application::ports::SessionRepository;
+use application::ports::{PasswordHasher, SessionOwner};
 use argon2::Argon2;
 use argon2::password_hash::PasswordVerifier;
 use argon2::password_hash::phc::PasswordHash;
@@ -15,10 +16,12 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use domain::user::Role;
 use sha2::{Digest, Sha256};
 
 use crate::AppState;
 use crate::error::ApiError;
+use crate::permissions;
 
 pub const COOKIE: &str = "rm_session";
 
@@ -50,6 +53,39 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
+/// Hash argon2 de senhas de usuários cadastrados.
+pub struct Argon2Hasher {
+    dummy_hash: String,
+}
+
+impl Argon2Hasher {
+    pub fn new() -> Self {
+        Self {
+            dummy_hash: hash_password("senha-fictícia-para-igualar-o-tempo").unwrap_or_default(),
+        }
+    }
+}
+
+impl Default for Argon2Hasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PasswordHasher for Argon2Hasher {
+    fn hash(&self, password: &str) -> Result<String, String> {
+        hash_password(password)
+    }
+
+    fn verify(&self, password: &str, hash: &str) -> bool {
+        AdminPassword::Hash(hash.to_owned()).verify(password)
+    }
+
+    fn verify_dummy(&self, password: &str) {
+        let _ = self.verify(password, &self.dummy_hash);
+    }
+}
+
 /// Gera o hash PHC para `RM_ADMIN_PASSWORD_HASH`.
 pub fn hash_password(password: &str) -> Result<String, String> {
     use argon2::password_hash::PasswordHasher;
@@ -59,11 +95,16 @@ pub fn hash_password(password: &str) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Janela deslizante de tentativas falhas (há um único administrador).
+/// Máximo de nomes distintos acompanhados; acima disso, nomes novos dividem um só balde
+/// (evita crescer sem limite com nomes aleatórios).
+const MAX_TRACKED_USERS: usize = 1024;
+const SHARED_BUCKET: &str = "*";
+
+/// Janela deslizante de tentativas falhas por nome de usuário.
 pub struct LoginLimiter {
     max_attempts: usize,
     window: Duration,
-    failures: Mutex<VecDeque<Instant>>,
+    failures: Mutex<HashMap<String, VecDeque<Instant>>>,
 }
 
 impl LoginLimiter {
@@ -71,36 +112,65 @@ impl LoginLimiter {
         Self {
             max_attempts: max_attempts.max(1) as usize,
             window,
-            failures: Mutex::new(VecDeque::new()),
+            failures: Mutex::new(HashMap::new()),
         }
     }
 
-    /// `Some(segundos)` enquanto o limite estiver estourado.
-    pub fn blocked_for(&self) -> Option<Duration> {
-        let mut failures = self.failures.lock().unwrap();
-        let now = Instant::now();
-        while failures
+    fn expire(&self, queue: &mut VecDeque<Instant>, now: Instant) {
+        while queue
             .front()
             .is_some_and(|t| now.duration_since(*t) >= self.window)
         {
-            failures.pop_front();
+            queue.pop_front();
         }
-        (failures.len() >= self.max_attempts).then(|| {
+    }
+
+    fn bucket<'a>(map: &HashMap<String, VecDeque<Instant>>, key: &'a str) -> &'a str {
+        if map.contains_key(key) || map.len() < MAX_TRACKED_USERS {
+            key
+        } else {
+            SHARED_BUCKET
+        }
+    }
+
+    /// Tempo restante de bloqueio enquanto o limite do `key` (nome normalizado) estiver estourado.
+    pub fn blocked_for(&self, key: &str) -> Option<Duration> {
+        let mut map = self.failures.lock().unwrap();
+        let now = Instant::now();
+        let key = Self::bucket(&map, key).to_owned();
+        let queue = map.get_mut(&key)?;
+        self.expire(queue, now);
+        if queue.is_empty() {
+            map.remove(&key);
+            return None;
+        }
+        (queue.len() >= self.max_attempts).then(|| {
             self.window
-                .saturating_sub(now.duration_since(*failures.front().unwrap()))
+                .saturating_sub(now.duration_since(*queue.front().unwrap()))
         })
     }
 
-    pub fn record_failure(&self) {
-        self.failures.lock().unwrap().push_back(Instant::now());
+    pub fn record_failure(&self, key: &str) {
+        let mut map = self.failures.lock().unwrap();
+        let now = Instant::now();
+        if map.len() >= MAX_TRACKED_USERS {
+            map.retain(|_, queue| {
+                self.expire(queue, now);
+                !queue.is_empty()
+            });
+        }
+        let key = Self::bucket(&map, key).to_owned();
+        map.entry(key).or_default().push_back(now);
     }
 
-    pub fn reset(&self) {
-        self.failures.lock().unwrap().clear();
+    pub fn reset(&self, key: &str) {
+        self.failures.lock().unwrap().remove(key);
     }
 }
 
 pub struct AuthConfig {
+    /// Nome do master (do ambiente), comparado sem diferenciar maiúsculas.
+    pub master_username: String,
     pub password: AdminPassword,
     pub session_ttl: Duration,
     pub cookie_secure: bool,
@@ -144,33 +214,58 @@ pub fn session_from(headers: &HeaderMap) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
-pub async fn is_authenticated(
-    sessions: &Arc<dyn SessionRepository>,
-    headers: &HeaderMap,
-    now: chrono::DateTime<chrono::Utc>,
-) -> bool {
-    match session_from(headers) {
-        Some(id) => sessions
-            .is_valid(&hash_session(&id), now)
-            .await
-            .unwrap_or(false),
-        None => false,
+/// Quem está autenticado na requisição, colocado nas extensions pelo middleware.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Principal {
+    pub username: String,
+    pub role: Role,
+}
+
+impl Principal {
+    fn from_owner(owner: SessionOwner, master_username: &str) -> Self {
+        match owner {
+            SessionOwner::Master => Self {
+                username: master_username.to_owned(),
+                role: Role::Master,
+            },
+            SessionOwner::User { username, role } => Self { username, role },
+        }
     }
 }
 
-/// Exige sessão em todas as rotas `/api`, exceto login/logout.
+/// Exige sessão em todas as rotas `/api`, exceto login/logout, e aplica o papel mínimo
+/// da rota (`permissions::required_role`): sem sessão `401`, papel insuficiente `403`.
 pub async fn require_session(
     State(state): State<AppState>,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Response {
     let path = request.uri().path();
     // Dentro de `nest("/api")` o caminho chega sem o prefixo.
     let is_session = path == "/session" || path == "/api/session";
     let public = is_session && matches!(*request.method(), Method::POST | Method::DELETE);
-    if !public && !is_authenticated(&state.sessions, request.headers(), state.clock.now()).await {
-        return ApiError::unauthorized().into_response();
+    if public {
+        return next.run(request).await;
     }
+    let owner = match session_from(request.headers()) {
+        Some(id) => state
+            .sessions
+            .resolve(&hash_session(&id), state.clock.now())
+            .await
+            .ok()
+            .flatten(),
+        None => None,
+    };
+    let Some(owner) = owner else {
+        return ApiError::unauthorized().into_response();
+    };
+    let principal = Principal::from_owner(owner, &state.auth.master_username);
+    let required = permissions::required_role(request.method(), path);
+    if !principal.role.allows(required) {
+        tracing::warn!(user = %principal.username, role = %principal.role, %required, "acesso negado por papel");
+        return ApiError::forbidden().into_response();
+    }
+    request.extensions_mut().insert(principal);
     next.run(request).await
 }
 
@@ -214,13 +309,41 @@ mod tests {
     #[test]
     fn limitador_bloqueia_apos_o_maximo() {
         let limiter = LoginLimiter::new(2, Duration::from_secs(60));
-        assert!(limiter.blocked_for().is_none());
-        limiter.record_failure();
-        assert!(limiter.blocked_for().is_none());
-        limiter.record_failure();
-        assert!(limiter.blocked_for().unwrap() <= Duration::from_secs(60));
-        limiter.reset();
-        assert!(limiter.blocked_for().is_none());
+        assert!(limiter.blocked_for("ana").is_none());
+        limiter.record_failure("ana");
+        assert!(limiter.blocked_for("ana").is_none());
+        limiter.record_failure("ana");
+        assert!(limiter.blocked_for("ana").unwrap() <= Duration::from_secs(60));
+        limiter.reset("ana");
+        assert!(limiter.blocked_for("ana").is_none());
+    }
+
+    #[test]
+    fn limite_e_por_usuario() {
+        let limiter = LoginLimiter::new(1, Duration::from_secs(60));
+        limiter.record_failure("ana");
+        assert!(limiter.blocked_for("ana").is_some());
+        assert!(limiter.blocked_for("bia").is_none());
+    }
+
+    #[test]
+    fn nomes_demais_dividem_um_balde() {
+        let limiter = LoginLimiter::new(1, Duration::from_secs(60));
+        for n in 0..MAX_TRACKED_USERS {
+            limiter.record_failure(&format!("u{n}"));
+        }
+        limiter.record_failure("novo");
+        assert!(limiter.failures.lock().unwrap().len() <= MAX_TRACKED_USERS + 1);
+        assert!(limiter.blocked_for("outro-novo").is_some());
+    }
+
+    #[test]
+    fn hasher_argon2_confere_senha() {
+        let hasher = Argon2Hasher::new();
+        let hash = hasher.hash("senha-forte").unwrap();
+        assert!(hasher.verify("senha-forte", &hash));
+        assert!(!hasher.verify("outra", &hash));
+        hasher.verify_dummy("qualquer");
     }
 
     #[test]
@@ -229,6 +352,7 @@ mod tests {
         headers.insert(header::COOKIE, "a=1; rm_session=xyz; b=2".parse().unwrap());
         assert_eq!(session_from(&headers).as_deref(), Some("xyz"));
         let config = AuthConfig {
+            master_username: "chefe".into(),
             password: AdminPassword::Plain("x".into()),
             session_ttl: Duration::from_secs(60),
             cookie_secure: true,

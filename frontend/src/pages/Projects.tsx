@@ -11,6 +11,7 @@ import { Field, Input } from '../components/ui/Field'
 import { Table } from '../components/ui/Table'
 import { useFeedbackMutation } from '../components/useFeedbackMutation'
 import { SYNC_LABEL, relativeTime } from '../format'
+import { useSession } from '../session'
 
 /** Cadastro manual por Railway Project ID. */
 export function RegisterProjectForm({ onDone }: { onDone: () => void }) {
@@ -130,6 +131,7 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
 }
 
 export function Projects() {
+  const canManage = useSession().can('admin')
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const [mode, setMode] = useState<'discover' | 'manual' | null>(null)
   const [filter, setFilter] = useState('')
@@ -144,12 +146,14 @@ export function Projects() {
           <h1>Projetos</h1>
           <p className="muted">Projetos do Railway sob gerenciamento. Nada aqui cria ou exclui projetos no Railway.</p>
         </div>
-        <div className="row">
-          <Button onClick={() => setMode('manual')}>Cadastrar por ID</Button>
-          <Button variant="primary" onClick={() => setMode('discover')}>
-            Importar da conta
-          </Button>
-        </div>
+        {canManage && (
+          <div className="row">
+            <Button onClick={() => setMode('manual')}>Cadastrar por ID</Button>
+            <Button variant="primary" onClick={() => setMode('discover')}>
+              Importar da conta
+            </Button>
+          </div>
+        )}
       </div>
       <ErrorState error={projects.error} onRetry={() => void projects.refetch()} retrying={projects.isFetching} />
       {projects.isPending && (
@@ -162,12 +166,14 @@ export function Projects() {
           <EmptyState
             title="Nenhum projeto ainda"
             action={
-              <Button variant="primary" onClick={() => setMode('discover')}>
-                Importar da conta
-              </Button>
+              canManage ? (
+                <Button variant="primary" onClick={() => setMode('discover')}>
+                  Importar da conta
+                </Button>
+              ) : undefined
             }
           >
-            Importe a partir da conta ou cadastre pelo Railway Project ID.
+            {canManage ? 'Importe a partir da conta ou cadastre pelo Railway Project ID.' : 'Peça a um administrador para cadastrar projetos.'}
           </EmptyState>
         </div>
       )}

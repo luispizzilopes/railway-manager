@@ -10,3 +10,4 @@ pub mod power;
 pub mod schedule;
 pub mod scheduled_action;
 pub mod state;
+pub mod user;

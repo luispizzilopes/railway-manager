@@ -68,15 +68,16 @@ Toda a configuração vem de variáveis de ambiente; a lista completa e comentad
 
 | Variável | Para quê | Padrão |
 |---|---|---|
-| `RM_ADMIN_PASSWORD_HASH` | Hash argon2 da senha de administrador (produção). Gere com `railway-manager hash-password`. | — |
-| `RM_ADMIN_PASSWORD` | Senha em texto claro, só para desenvolvimento. Ignorada se houver hash. | — |
+| `RM_ADMIN_USERNAME` | **Obrigatória.** Nome do usuário master (3 a 32 caracteres: letras, números, `.`, `_`, `-`). | — |
+| `RM_ADMIN_PASSWORD_HASH` | Hash argon2 da senha do usuário master (produção). Gere com `railway-manager hash-password`. | — |
+| `RM_ADMIN_PASSWORD` | Senha do master em texto claro, só para desenvolvimento. Ignorada se houver hash. | — |
 | `RM_MASTER_KEY` | 32 bytes em base64 que cifram o token (`openssl rand -base64 32`). Sem ela o servidor sobe, mas a integração fica inativa. | — |
 | `RM_DATABASE_URL` | Arquivo SQLite. | `sqlite://railway-manager.db` |
 | `RM_BIND_ADDR` | Endereço HTTP. Sem ele, se `PORT` existir (Railway), usa `0.0.0.0:$PORT`. | `0.0.0.0:8080` |
 | `RM_FRONTEND_DIR` | Build do frontend. | `./frontend/dist` |
 | `RM_COOKIE_SECURE` | Marca o cookie de sessão como `Secure` (ative atrás de HTTPS). | `false` |
 | `RM_SESSION_TTL_SECS` | Duração da sessão. | `43200` |
-| `RM_LOGIN_MAX_ATTEMPTS` / `RM_LOGIN_WINDOW_SECS` | Limite de tentativas de login falhas. | `5` / `300` |
+| `RM_LOGIN_MAX_ATTEMPTS` / `RM_LOGIN_WINDOW_SECS` | Limite de tentativas de login falhas, por nome de usuário. | `5` / `300` |
 | `RM_RAILWAY_RPS` | Requisições por segundo ao Railway (todas as chamadas). | `5` |
 | `RM_RAILWAY_CONNECT_TIMEOUT_SECS` / `RM_RAILWAY_REQUEST_TIMEOUT_SECS` | Timeouts das chamadas. | `5` / `20` |
 | `RM_RAILWAY_MAX_RETRIES` | Novas tentativas de **consultas** (mutations nunca são repetidas). | `3` |
@@ -91,7 +92,7 @@ Toda a configuração vem de variáveis de ambiente; a lista completa e comentad
 | `RM_SCHEDULE_CATCHUP_SECS` | Até quanto tempo depois um evento perdido ainda é executado (0 = nunca). | `1800` |
 | `RM_SCHEDULER_TICK_SECS` | Intervalo em que o agendador avalia as agendas. | `30` |
 
-O processo **não inicia** sem senha de administrador e recusa valores inválidos
+O processo **não inicia** sem o nome e a senha do usuário master e recusa valores inválidos
 (chave mestra malformada, números fora de faixa) com uma mensagem indicando a variável.
 
 ## Rodando localmente
@@ -105,13 +106,15 @@ cd ..
 
 # 2. Backend (serve a API e o frontend/dist)
 cd backend
+export RM_ADMIN_USERNAME=admin
 export RM_ADMIN_PASSWORD=troque-esta-senha
 export RM_MASTER_KEY="$(openssl rand -base64 32)"   # guarde este valor!
 export RM_FRONTEND_DIR=../frontend/dist
 cargo run --release --bin railway-manager
 ```
 
-Abra <http://localhost:8080>, entre com a senha e cadastre o token em **Configurações**.
+Abra <http://localhost:8080>, entre como o usuário master (`RM_ADMIN_USERNAME` e a senha) e cadastre o token em
+**Configurações**.
 Guarde a `RM_MASTER_KEY`: com outra chave o token salvo fica indecifrável e precisa ser
 cadastrado de novo (projetos e histórico não se perdem).
 
@@ -132,6 +135,7 @@ export RM_ADMIN_PASSWORD_HASH='$argon2id$v=19$...'
 ```bash
 docker build -f Dockerfile.manager -t railway-manager .
 docker run -d --name railway-manager -p 8080:8080 -v railway-manager-data:/data \
+  -e RM_ADMIN_USERNAME='admin' \
   -e RM_ADMIN_PASSWORD_HASH='$argon2id$v=19$...' \
   -e RM_MASTER_KEY='...' \
   railway-manager
@@ -153,6 +157,31 @@ imagem: `docker run --rm -i railway-manager hash-password`.
 O servidor escuta na `PORT` injetada pelo Railway. Ele pode rodar em qualquer projeto
 (inclusive num projeto só para ele): os projetos gerenciados vêm do token, não de IDs
 fixos. Só existe um processo por banco; não escale para mais de uma réplica.
+
+## Usuários e papéis
+
+O acesso tem dois tipos de usuário:
+
+- **Master**: um só, definido no ambiente (`RM_ADMIN_USERNAME` + senha em
+  `RM_ADMIN_PASSWORD_HASH`). Não existe no banco, tem todas as permissões e é o único que
+  gerencia usuários (menu **Usuários**). Perdeu a senha? Troque a variável e reinicie.
+- **Usuários comuns**: cadastrados pelo master, ficam no SQLite com a senha só como hash
+  argon2 e um papel:
+
+| Papel | Pode |
+|---|---|
+| `viewer` (somente leitura) | Consultar visão geral, projetos, serviços, agendas, histórico e logs. |
+| `operator` | Tudo do `viewer` + ligar/desligar, atualizar estados, sincronizar projetos, pausar/retomar agendas e criar/cancelar ações agendadas. |
+| `admin` | Tudo do `operator` + cadastrar/editar/remover projetos, serviços e agendas e gerenciar o token do Railway. |
+
+As permissões são checadas no backend (`403` quando o papel não basta); a interface só
+esconde os controles. Mudar o papel, desativar, redefinir a senha ou remover um usuário vale
+na requisição seguinte, e as sessões afetadas são encerradas. O histórico mostra quem
+executou cada operação manual.
+
+**Atualizando de uma versão anterior:** defina `RM_ADMIN_USERNAME` (sem ela o processo não
+inicia). A migração encerra as sessões existentes, então todos entram de novo uma vez, e o
+login passa a pedir usuário e senha.
 
 ## Tokens do Railway
 
@@ -201,8 +230,8 @@ Voltar para a versão anterior depois da atualização exige restaurar esse back
 ## Console
 
 Antes do login, o app pergunta se você quer usar a **interface gráfica** ou **somente a
-linha de comando (CLI)**. No modo CLI, até o login é feito pelo console (`login`, com a
-senha num campo mascarado). Dá para trocar a qualquer momento, sem entrar de novo: `ui` e
+linha de comando (CLI)**. No modo CLI, até o login é feito pelo console (`login`, que pede
+o usuário e a senha, esta num campo mascarado). Dá para trocar a qualquer momento, sem entrar de novo: `ui` e
 `cli` no console, ou os botões **Interface gráfica** / **Modo CLI** no topo.
 
 O console (menu **Console**, ou ``Ctrl+` `` em qualquer tela) executa comandos
@@ -266,7 +295,7 @@ os filtros na URL (`/logs?instance=…&severity=error`), então o link reabre a 
   como religar depois; por isso o padrão é `deploymentRemove` (ADR-003).
 - **Reinício no meio de uma operação**: itens em andamento viram `interrupted` e não são
   reexecutados automaticamente; a próxima sincronização mostra o estado real.
-- Um administrador, um token, um processo (SQLite). Com mais de um processo no mesmo banco
+- Um token do Railway, um processo (SQLite); os papéis são globais (não há permissão por projeto). Com mais de um processo no mesmo banco
   os eventos de agenda não se repetem, mas a configuração não é suportada.
 - Agendas com muitos serviços no mesmo minuto concentram chamadas ao Railway nesse
   horário (o rate limit enfileira as chamadas).

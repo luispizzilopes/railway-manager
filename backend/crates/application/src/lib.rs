@@ -14,3 +14,4 @@ pub mod scheduled_actions;
 pub mod schedules;
 #[cfg(any(test, feature = "testkit"))]
 pub mod testkit;
+pub mod users;

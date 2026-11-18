@@ -19,6 +19,11 @@ pub enum ConfigError {
          (gere com `railway-manager hash-password`) ou RM_ADMIN_PASSWORD"
     )]
     MissingAdminPassword,
+    #[error(
+        "nome do usuário master não configurado: defina RM_ADMIN_USERNAME \
+         (3 a 32 caracteres: letras, números, '.', '_' ou '-')"
+    )]
+    MissingAdminUsername,
     #[error("{var} inválida: {reason}")]
     Invalid { var: &'static str, reason: String },
 }
@@ -62,6 +67,8 @@ pub struct OperationsConfig {
 
 #[derive(Debug)]
 pub struct Config {
+    /// Nome do usuário master; o dono da `admin_password`.
+    pub admin_username: String,
     pub admin_password: AdminPassword,
     /// Ausente: o processo sobe sem integração ativa e a credencial fica "indecifrável".
     pub master_key: Option<MasterKey>,
@@ -114,6 +121,14 @@ impl Config {
             (None, None) => return Err(ConfigError::MissingAdminPassword),
         };
 
+        let admin_username = match env.get("RM_ADMIN_USERNAME") {
+            None => return Err(ConfigError::MissingAdminUsername),
+            Some(raw) => domain::user::Username::parse(&raw)
+                .map_err(|e| invalid("RM_ADMIN_USERNAME", e.to_string()))?
+                .as_str()
+                .to_owned(),
+        };
+
         let master_key = env.get("RM_MASTER_KEY").map(parse_master_key).transpose()?;
 
         let operations = OperationsConfig {
@@ -132,6 +147,7 @@ impl Config {
         }
 
         Ok(Self {
+            admin_username,
             admin_password,
             master_key,
             bind_addr: match (env.get("RM_BIND_ADDR"), env.get("PORT")) {
@@ -264,8 +280,35 @@ mod tests {
     }
 
     #[test]
+    fn sem_nome_do_master_falha_citando_a_variavel() {
+        let err = load(&[("RM_ADMIN_PASSWORD", "x")]).unwrap_err();
+        assert_eq!(err, ConfigError::MissingAdminUsername);
+        assert!(err.to_string().contains("RM_ADMIN_USERNAME"));
+        // Valor vazio conta como ausente.
+        let err = load(&[("RM_ADMIN_PASSWORD", "x"), ("RM_ADMIN_USERNAME", "  ")]).unwrap_err();
+        assert_eq!(err, ConfigError::MissingAdminUsername);
+    }
+
+    #[test]
+    fn nome_do_master_invalido_falha() {
+        for bad in ["ab", "com espaço", "joão"] {
+            let err = load(&[("RM_ADMIN_PASSWORD", "x"), ("RM_ADMIN_USERNAME", bad)]).unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    ConfigError::Invalid {
+                        var: "RM_ADMIN_USERNAME",
+                        ..
+                    }
+                ),
+                "{bad}: {err:?}"
+            );
+        }
+    }
+
+    #[test]
     fn senha_vazia_conta_como_ausente() {
-        let err = load(&[("RM_ADMIN_PASSWORD", "  ")]).unwrap_err();
+        let err = load(&[("RM_ADMIN_USERNAME", "chefe"), ("RM_ADMIN_PASSWORD", "  ")]).unwrap_err();
         assert_eq!(err, ConfigError::MissingAdminPassword);
     }
 
@@ -283,7 +326,12 @@ mod tests {
 
     #[test]
     fn master_key_nao_base64_falha() {
-        let err = load(&[("RM_ADMIN_PASSWORD", "x"), ("RM_MASTER_KEY", "%%%")]).unwrap_err();
+        let err = load(&[
+            ("RM_ADMIN_USERNAME", "chefe"),
+            ("RM_ADMIN_PASSWORD", "x"),
+            ("RM_MASTER_KEY", "%%%"),
+        ])
+        .unwrap_err();
         assert!(matches!(
             err,
             ConfigError::Invalid {
@@ -296,19 +344,29 @@ mod tests {
 
     #[test]
     fn master_key_tamanho_errado_falha() {
-        let err = load(&[("RM_ADMIN_PASSWORD", "x"), ("RM_MASTER_KEY", "AAAA")]).unwrap_err();
+        let err = load(&[
+            ("RM_ADMIN_USERNAME", "chefe"),
+            ("RM_ADMIN_PASSWORD", "x"),
+            ("RM_MASTER_KEY", "AAAA"),
+        ])
+        .unwrap_err();
         assert!(err.to_string().contains("32 bytes, tem 3"), "{err}");
     }
 
     #[test]
     fn master_key_ausente_sobe_sem_integracao() {
-        let cfg = load(&[("RM_ADMIN_PASSWORD", "x")]).unwrap();
+        let cfg = load(&[("RM_ADMIN_USERNAME", "chefe"), ("RM_ADMIN_PASSWORD", "x")]).unwrap();
         assert!(cfg.master_key.is_none());
     }
 
     #[test]
     fn defaults_e_master_key_valida() {
-        let cfg = load(&[("RM_ADMIN_PASSWORD", "x"), ("RM_MASTER_KEY", KEY)]).unwrap();
+        let cfg = load(&[
+            ("RM_ADMIN_USERNAME", "chefe"),
+            ("RM_ADMIN_PASSWORD", "x"),
+            ("RM_MASTER_KEY", KEY),
+        ])
+        .unwrap();
         assert_eq!(cfg.master_key.unwrap().expose_secret()[31], 31);
         assert_eq!(cfg.operations.max_concurrency, 3);
         assert_eq!(cfg.railway.rps, 5);
@@ -332,7 +390,12 @@ mod tests {
             ("RM_SCHEDULE_CATCHUP_SECS", "-5"),
             ("RM_SCHEDULER_TICK_SECS", "0"),
         ] {
-            let err = load(&[("RM_ADMIN_PASSWORD", "x"), (var, value)]).unwrap_err();
+            let err = load(&[
+                ("RM_ADMIN_USERNAME", "chefe"),
+                ("RM_ADMIN_PASSWORD", "x"),
+                (var, value),
+            ])
+            .unwrap_err();
             assert!(
                 matches!(&err, ConfigError::Invalid { var: v, .. } if *v == var),
                 "{var}: {err}"
@@ -342,21 +405,35 @@ mod tests {
 
     #[test]
     fn porta_do_railway_quando_nao_ha_bind_explicito() {
-        let cfg = load(&[("RM_ADMIN_PASSWORD", "x"), ("PORT", "3000")]).unwrap();
+        let cfg = load(&[
+            ("RM_ADMIN_USERNAME", "chefe"),
+            ("RM_ADMIN_PASSWORD", "x"),
+            ("PORT", "3000"),
+        ])
+        .unwrap();
         assert_eq!(cfg.bind_addr.to_string(), "0.0.0.0:3000");
         let cfg = load(&[
+            ("RM_ADMIN_USERNAME", "chefe"),
             ("RM_ADMIN_PASSWORD", "x"),
             ("PORT", "3000"),
             ("RM_BIND_ADDR", "127.0.0.1:9"),
         ])
         .unwrap();
         assert_eq!(cfg.bind_addr.to_string(), "127.0.0.1:9");
-        assert!(load(&[("RM_ADMIN_PASSWORD", "x"), ("PORT", "abc")]).is_err());
+        assert!(
+            load(&[
+                ("RM_ADMIN_USERNAME", "chefe"),
+                ("RM_ADMIN_PASSWORD", "x"),
+                ("PORT", "abc")
+            ])
+            .is_err()
+        );
     }
 
     #[test]
     fn poll_interval_maior_que_maximo_falha() {
         let err = load(&[
+            ("RM_ADMIN_USERNAME", "chefe"),
             ("RM_ADMIN_PASSWORD", "x"),
             ("RM_POLL_INTERVAL_SECS", "20"),
             ("RM_POLL_MAX_INTERVAL_SECS", "15"),

@@ -182,6 +182,10 @@ export function consoleHarness(routes: Record<string, unknown>, options: Harness
       const a = (answers.shift() ?? '')?.toLowerCase()
       return o?.word ? a === o.word : a === 's'
     },
+    ask: async (label) => {
+      prompts.push(label)
+      return answers.shift() ?? null
+    },
     secret: async (label) => {
       prompts.push(label)
       return answers.shift() ?? null
@@ -199,7 +203,7 @@ export function consoleHarness(routes: Record<string, unknown>, options: Harness
     json,
     logout: async () => void (loggedOut = true),
     authenticated: true,
-    login: async (password) => api.login(password),
+    login: async (username, password) => api.login(username, password),
     mode: 'ui',
     setMode: () => undefined,
     pollMs: 0,

@@ -4,7 +4,7 @@ pub mod config;
 
 use std::sync::Arc;
 
-use api::{AdminPassword, AppState, AuthConfig, LoginLimiter};
+use api::{AdminPassword, AppState, Argon2Hasher, AuthConfig, LoginLimiter};
 use application::credentials::CredentialService;
 use application::dashboard::DashboardService;
 use application::history::HistoryService;
@@ -16,6 +16,7 @@ use application::projects::ProjectService;
 use application::railway::RailwayGateway;
 use application::scheduled_actions::ScheduledActionService;
 use application::schedules::{ScheduleService, SchedulerConfig, SchedulerService};
+use application::users::UserService;
 use infrastructure::crypto::XChaChaCipher;
 use infrastructure::railway::{RailwayClient, Transport, TransportConfig};
 use infrastructure::sqlite::*;
@@ -144,6 +145,14 @@ pub fn build_state(
             AdminPassword::Plain(plain.expose_secret().to_owned())
         }
     };
+    let sessions = Arc::new(SqliteSessions::new(pool.clone()));
+    let users = Arc::new(UserService::new(
+        Arc::new(SqliteUsers::new(pool)),
+        sessions.clone(),
+        Arc::new(Argon2Hasher::new()),
+        clock.clone(),
+        &config.admin_username,
+    ));
     AppState {
         credentials,
         projects,
@@ -155,9 +164,11 @@ pub fn build_state(
         scheduled_actions,
         logs,
         scheduler,
-        sessions: Arc::new(SqliteSessions::new(pool)),
+        users,
+        sessions,
         clock,
         auth: Arc::new(AuthConfig {
+            master_username: config.admin_username.clone(),
             password,
             session_ttl: config.session_ttl,
             cookie_secure: config.cookie_secure,

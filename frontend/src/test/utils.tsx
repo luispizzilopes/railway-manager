@@ -4,6 +4,8 @@ import type { ReactElement } from 'react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { vi } from 'vitest'
 
+import type { Role } from '../api/types'
+
 export interface Call {
   method: string
   url: string
@@ -12,8 +14,13 @@ export interface Call {
 
 type Handler = (call: Call) => { status?: number; json?: unknown }
 
-/** Substitui `fetch` por rotas `"MÉTODO /caminho"` (sem querystring) e registra as chamadas. */
-export function mockFetch(routes: Record<string, Handler | unknown>) {
+/** Sessão de teste com o papel dado (por padrão os testes entram como master). */
+export const sessionAs = (role: Role, username = 'chefe') => ({ authenticated: true, username, role })
+
+/** Substitui `fetch` por rotas `"MÉTODO /caminho"` (sem querystring) e registra as chamadas.
+ *  Sem rota de sessão própria, responde como master logado. */
+export function mockFetch(userRoutes: Record<string, Handler | unknown>) {
+  const routes: Record<string, Handler | unknown> = { 'GET /api/session': sessionAs('master'), ...userRoutes }
   const calls: Call[] = []
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)

@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod error;
+pub mod permissions;
 mod routes;
 
 use std::path::Path;
@@ -17,14 +18,15 @@ use application::power::PowerService;
 use application::projects::ProjectService;
 use application::scheduled_actions::ScheduledActionService;
 use application::schedules::{ScheduleService, SchedulerService};
+use application::users::UserService;
 use axum::Router;
 use axum::middleware::from_fn;
 use axum::middleware::from_fn_with_state;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, patch, post};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
-pub use auth::{AdminPassword, AuthConfig, LoginLimiter, hash_password};
+pub use auth::{AdminPassword, Argon2Hasher, AuthConfig, LoginLimiter, hash_password};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -38,6 +40,7 @@ pub struct AppState {
     pub scheduled_actions: Arc<ScheduledActionService>,
     pub logs: Arc<LogsService>,
     pub scheduler: Arc<SchedulerService>,
+    pub users: Arc<UserService>,
     pub sessions: Arc<dyn SessionRepository>,
     pub clock: Arc<dyn Clock>,
     pub auth: Arc<AuthConfig>,
@@ -98,6 +101,9 @@ fn api(state: AppState) -> Router<AppState> {
         )
         .route("/dashboard", get(dashboard))
         .route("/dashboard/refresh", post(refresh))
+        .route("/users", get(list_users).post(create_user))
+        .route("/users/{id}", patch(update_user).delete(delete_user))
+        .route("/users/{id}/password", post(set_user_password))
         .fallback(api_not_found)
         .layer(from_fn_with_state(state, auth::require_session))
         .layer(from_fn(auth::require_json))

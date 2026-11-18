@@ -3,6 +3,7 @@
 
 import type {
   ApiErrorBody,
+  AssignableRole,
   Credential,
   CredentialKind,
   Dashboard,
@@ -14,6 +15,7 @@ import type {
   InstanceImportReport,
   DeploymentSummary,
   InstanceView,
+  ManagedUser,
   LogsFilters,
   LogsResponse,
   OperationDetail,
@@ -24,6 +26,7 @@ import type {
   Project,
   ProjectImportReport,
   RefreshReport,
+  Session,
   ScheduleInput,
   ScheduleRun,
   ScheduleView,
@@ -87,9 +90,17 @@ export function logsQuery(filters: LogsFilters): string {
 }
 
 export const api = {
-  session: () => get<{ authenticated: boolean }>('/api/session'),
-  login: (password: string) => post<void>('/api/session', { password }),
+  session: () => get<Session>('/api/session'),
+  login: (username: string, password: string) => post<void>('/api/session', { username, password }),
   logout: () => request<void>('DELETE', '/api/session'),
+
+  users: () => get<{ users: ManagedUser[] }>('/api/users'),
+  createUser: (input: { username: string; password: string; role: AssignableRole }) =>
+    post<ManagedUser>('/api/users', input),
+  updateUser: (id: Uuid, input: { role?: AssignableRole; is_active?: boolean }) =>
+    request<ManagedUser>('PATCH', `/api/users/${id}`, input),
+  setUserPassword: (id: Uuid, password: string) => post<void>(`/api/users/${id}/password`, { password }),
+  removeUser: (id: Uuid) => request<void>('DELETE', `/api/users/${id}`),
 
   credential: () => get<{ credential: Credential | null }>('/api/credential'),
   saveCredential: (input: { kind: CredentialKind; token: string; workspace_id?: string }) =>

@@ -23,8 +23,20 @@ fn sem_senha_encerra_com_mensagem() {
 }
 
 #[test]
+fn sem_nome_do_master_encerra_com_mensagem() {
+    let out = run(&[("RM_ADMIN_PASSWORD", "x")]);
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("RM_ADMIN_USERNAME"), "{stderr}");
+}
+
+#[test]
 fn master_key_invalida_encerra_com_mensagem() {
-    let out = run(&[("RM_ADMIN_PASSWORD", "x"), ("RM_MASTER_KEY", "curta")]);
+    let out = run(&[
+        ("RM_ADMIN_USERNAME", "chefe"),
+        ("RM_ADMIN_PASSWORD", "x"),
+        ("RM_MASTER_KEY", "curta"),
+    ]);
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("RM_MASTER_KEY"), "{stderr}");

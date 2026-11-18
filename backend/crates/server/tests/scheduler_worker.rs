@@ -19,6 +19,7 @@ const TOKEN: &str = "tok-worker-0123456789";
 #[tokio::test]
 async fn worker_processa_evento_no_horario() {
     let vars: HashMap<&str, &str> = [
+        ("RM_ADMIN_USERNAME", "chefe"),
         ("RM_ADMIN_PASSWORD", "x"),
         (
             "RM_MASTER_KEY",

@@ -17,6 +17,7 @@ import {
   Stack,
   Sun,
   TerminalWindow,
+  UsersThree,
   X,
 } from '@phosphor-icons/react'
 
@@ -27,6 +28,7 @@ const ICONS = {
   history: ClockCounterClockwise,
   logs: Article,
   settings: SlidersHorizontal,
+  users: UsersThree,
   console: TerminalWindow,
   logout: SignOut,
   search: MagnifyingGlass,

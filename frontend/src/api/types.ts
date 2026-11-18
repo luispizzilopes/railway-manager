@@ -452,3 +452,21 @@ export interface LogsFilters {
   q?: string
   limit?: number
 }
+
+export type Role = 'viewer' | 'operator' | 'admin' | 'master'
+export type AssignableRole = Exclude<Role, 'master'>
+
+export interface Session {
+  authenticated: boolean
+  username: string
+  role: Role
+}
+
+export interface ManagedUser {
+  id: Uuid
+  username: string
+  role: AssignableRole
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}

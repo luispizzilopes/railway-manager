@@ -8,7 +8,7 @@ use domain::deployment::DeploymentStatus;
 use domain::ids::{
     CredentialId, EnvironmentId, OperationId, PlanId, ProjectId, RailwayDeploymentId,
     RailwayEnvironmentId, RailwayProjectId, RailwayServiceId, ScheduleId, ScheduledActionId,
-    ServiceId, ServiceInstanceId,
+    ServiceId, ServiceInstanceId, UserId,
 };
 use domain::operation::{
     ItemResult, Operation, OperationItem, OperationScope, OperationStatus, OperationTrigger, Plan,
@@ -17,6 +17,7 @@ use domain::power::PowerKind;
 use domain::schedule::{Schedule, ScheduleRun};
 use domain::scheduled_action::{ScheduledAction, ScheduledActionStatus};
 use domain::state::ObservedState;
+use domain::user::{Role, User};
 use serde::Serialize;
 
 use crate::railway::RailwayToken;
@@ -259,17 +260,71 @@ pub trait OperationRepository: Send + Sync {
     async fn active_instance_ids(&self) -> RepoResult<Vec<ServiceInstanceId>>;
 }
 
+/// Dono de uma sessão válida, resolvido a cada requisição.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SessionOwner {
+    /// Usuário definido no ambiente.
+    Master,
+    /// Usuário cadastrado e ativo, com o papel atual.
+    User { username: String, role: Role },
+}
+
 #[async_trait]
 pub trait SessionRepository: Send + Sync {
+    /// `user_id` nulo cria a sessão do master.
     async fn create(
         &self,
         id_hash: &str,
+        user_id: Option<UserId>,
         created_at: DateTime<Utc>,
         expires_at: DateTime<Utc>,
     ) -> RepoResult<()>;
-    async fn is_valid(&self, id_hash: &str, now: DateTime<Utc>) -> RepoResult<bool>;
+    /// Dono da sessão, ou `None` se expirada, inexistente ou de usuário inativo.
+    async fn resolve(&self, id_hash: &str, now: DateTime<Utc>) -> RepoResult<Option<SessionOwner>>;
     async fn delete(&self, id_hash: &str) -> RepoResult<()>;
+    /// Encerra todas as sessões de um usuário (desativação, nova senha).
+    async fn delete_for_user(&self, user_id: UserId) -> RepoResult<()>;
     async fn purge_expired(&self, now: DateTime<Utc>) -> RepoResult<u64>;
+}
+
+/// Hash de senhas de usuários (argon2 na implementação real).
+pub trait PasswordHasher: Send + Sync {
+    fn hash(&self, password: &str) -> Result<String, String>;
+    fn verify(&self, password: &str, hash: &str) -> bool;
+    /// Gasta o mesmo trabalho de `verify` quando o usuário não existe, para não
+    /// revelar pelo tempo de resposta quais nomes estão cadastrados.
+    fn verify_dummy(&self, password: &str);
+}
+
+/// Usuário com o hash da senha, só para autenticação.
+#[derive(Debug, Clone)]
+pub struct UserCredentials {
+    pub user: User,
+    pub password_hash: String,
+}
+
+#[async_trait]
+pub trait UserRepository: Send + Sync {
+    /// `Conflict` quando o nome (sem diferenciar maiúsculas) já existe.
+    async fn insert(&self, user: &User, password_hash: &str) -> RepoResult<()>;
+    async fn list(&self) -> RepoResult<Vec<User>>;
+    async fn get(&self, id: UserId) -> RepoResult<Option<User>>;
+    async fn find_credentials(&self, username_key: &str) -> RepoResult<Option<UserCredentials>>;
+    /// `NotFound` quando o usuário não existe.
+    async fn update(
+        &self,
+        id: UserId,
+        role: Role,
+        is_active: bool,
+        now: DateTime<Utc>,
+    ) -> RepoResult<()>;
+    async fn set_password_hash(
+        &self,
+        id: UserId,
+        password_hash: &str,
+        now: DateTime<Utc>,
+    ) -> RepoResult<()>;
+    async fn delete(&self, id: UserId) -> RepoResult<()>;
 }
 
 #[async_trait]

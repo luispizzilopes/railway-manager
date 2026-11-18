@@ -192,7 +192,7 @@ export function Console({
         <label htmlFor="console-input" className="con-prompt-label">
           {prompt ? (
             <>
-              {prompt.question} {prompt.secret ? '' : prompt.word ? `[${prompt.word}]` : '[s/N]'}
+              {prompt.question} {prompt.secret || prompt.plain ? '' : prompt.word ? `[${prompt.word}]` : '[s/N]'}
             </>
           ) : search ? (
             `busca (${search.term || '…'})${search.from < 0 ? ' sem resultado' : ''} ›`

@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 
 const TOKEN: &str = "tok-http-0123456789abcdef";
+const MASTER: &str = "chefe";
 const PASSWORD: &str = "senha-do-admin";
 
 struct App {
@@ -34,6 +35,7 @@ struct Reply {
 
 async fn app_with(extra: &[(&str, &str)]) -> App {
     let mut vars: HashMap<String, String> = [
+        ("RM_ADMIN_USERNAME", MASTER),
         ("RM_ADMIN_PASSWORD", PASSWORD),
         (
             "RM_MASTER_KEY",
@@ -127,13 +129,38 @@ impl App {
     }
 
     async fn login(&self) {
+        self.login_as(MASTER, PASSWORD).await;
+    }
+
+    async fn login_as(&self, username: &str, password: &str) {
         let reply = self
-            .post("/api/session", json!({ "password": PASSWORD }))
+            .post(
+                "/api/session",
+                json!({ "username": username, "password": password }),
+            )
             .await;
-        assert_eq!(reply.status, StatusCode::NO_CONTENT);
+        assert_eq!(reply.status, StatusCode::NO_CONTENT, "{}", reply.text);
         let cookie = reply.headers[header::SET_COOKIE].to_str().unwrap();
         let pair = cookie.split(';').next().unwrap().to_owned();
         *self.cookie.lock().unwrap() = Some(pair);
+    }
+
+    /// Master cria o usuário e fica logado como ele.
+    async fn create_user(&self, username: &str, role: &str) -> String {
+        self.login().await;
+        let reply = self
+            .post(
+                "/api/users",
+                json!({ "username": username, "password": "senha-forte-1", "role": role }),
+            )
+            .await;
+        assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.text);
+        reply.json["id"].as_str().unwrap().to_owned()
+    }
+
+    async fn user_session(&self, username: &str, role: &str) {
+        self.create_user(username, role).await;
+        self.login_as(username, "senha-forte-1").await;
     }
 
     async fn with_credential(&self) {
@@ -219,13 +246,19 @@ async fn rotas_protegidas_exigem_sessao() {
 async fn login_logout_e_cookie_seguro() {
     let app = app_with(&[("RM_COOKIE_SECURE", "true")]).await;
     let wrong = app
-        .post("/api/session", json!({ "password": "errada" }))
+        .post(
+            "/api/session",
+            json!({ "username": MASTER, "password": "errada" }),
+        )
         .await;
     assert_eq!(wrong.status, StatusCode::UNAUTHORIZED);
-    assert_eq!(wrong.json["message"], "senha incorreta");
+    assert_eq!(wrong.json["message"], "usuário ou senha incorretos");
 
     let ok = app
-        .post("/api/session", json!({ "password": PASSWORD }))
+        .post(
+            "/api/session",
+            json!({ "username": MASTER, "password": PASSWORD }),
+        )
         .await;
     let cookie = ok.headers[header::SET_COOKIE].to_str().unwrap().to_owned();
     for part in ["rm_session=", "HttpOnly", "SameSite=Strict", "Secure"] {
@@ -253,14 +286,20 @@ async fn excesso_de_tentativas_responde_429() {
     let app = app().await;
     for _ in 0..3 {
         assert_eq!(
-            app.post("/api/session", json!({ "password": "x" }))
-                .await
-                .status,
+            app.post(
+                "/api/session",
+                json!({ "username": MASTER, "password": "x" })
+            )
+            .await
+            .status,
             StatusCode::UNAUTHORIZED
         );
     }
     let blocked = app
-        .post("/api/session", json!({ "password": PASSWORD }))
+        .post(
+            "/api/session",
+            json!({ "username": MASTER, "password": PASSWORD }),
+        )
         .await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
     assert!(blocked.headers.contains_key(header::RETRY_AFTER));
@@ -1332,4 +1371,369 @@ async fn logs_nunca_expoem_o_token_nem_gravam_conteudo() {
     let reply = app.get(&format!("/api/instances/{instance}/logs")).await;
     assert_eq!(reply.status, StatusCode::OK);
     app.assert_token_never_leaked();
+}
+
+// ---------- usuários e papéis ----------
+
+const UUID: &str = "00000000-0000-4000-8000-000000000999";
+
+#[tokio::test]
+async fn login_de_usuario_comum_informa_nome_e_papel() {
+    let app = app().await;
+    app.user_session("Maria", "operator").await;
+    let session = app.get("/api/session").await;
+    assert_eq!(session.status, StatusCode::OK);
+    assert_eq!(session.json["username"], "Maria");
+    assert_eq!(session.json["role"], "operator");
+
+    app.login().await;
+    let session = app.get("/api/session").await;
+    assert_eq!(session.json["username"], MASTER);
+    assert_eq!(session.json["role"], "master");
+}
+
+#[tokio::test]
+async fn usuario_nome_nao_diferencia_caixa_e_master_usa_senha_do_ambiente() {
+    let app = app().await;
+    app.create_user("Maria", "viewer").await;
+    app.login_as("MARIA", "senha-forte-1").await;
+    // A senha de um usuário não vale para o master e vice-versa.
+    let reply = app
+        .post(
+            "/api/session",
+            json!({ "username": MASTER, "password": "senha-forte-1" }),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+    let reply = app
+        .post(
+            "/api/session",
+            json!({ "username": "maria", "password": PASSWORD }),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn falhas_de_login_sao_indistinguiveis() {
+    let app = app().await;
+    let id = app.create_user("maria", "viewer").await;
+    app.call(
+        "PATCH",
+        &format!("/api/users/{id}"),
+        Some(json!({ "is_active": false })),
+    )
+    .await;
+    app.create_user("ana", "viewer").await;
+    let mut replies = vec![];
+    for (user, password) in [
+        ("inexistente", "senha-forte-1"),
+        ("maria", "senha-forte-1"),
+        ("ana", "errada-errada"),
+    ] {
+        let reply = app
+            .post(
+                "/api/session",
+                json!({ "username": user, "password": password }),
+            )
+            .await;
+        assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{user}");
+        replies.push(reply.json);
+    }
+    assert!(replies.windows(2).all(|w| w[0] == w[1]), "{replies:?}");
+}
+
+#[tokio::test]
+async fn limite_de_tentativas_e_por_usuario() {
+    let app = app().await;
+    app.create_user("maria", "viewer").await;
+    for _ in 0..3 {
+        app.post(
+            "/api/session",
+            json!({ "username": "maria", "password": "errada-errada" }),
+        )
+        .await;
+    }
+    let blocked = app
+        .post(
+            "/api/session",
+            json!({ "username": "maria", "password": "senha-forte-1" }),
+        )
+        .await;
+    assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS);
+    // Outro nome, inclusive o master, não é afetado.
+    app.login().await;
+}
+
+#[tokio::test]
+async fn matriz_de_permissoes_vale_para_todas_as_rotas() {
+    let app = app().await;
+    let roles = ["viewer", "operator", "admin"];
+    for name in roles {
+        app.create_user(name, name).await;
+    }
+    let order = |role: &str| match role {
+        "viewer" => 0,
+        "operator" => 1,
+        "admin" => 2,
+        _ => 3,
+    };
+    for (method, pattern, required) in api::permissions::ROUTES {
+        let path = format!("/api{}", pattern.replace("{id}", UUID));
+        for role in roles.iter().copied().chain(["master"]) {
+            if role == "master" {
+                app.login().await;
+            } else {
+                app.login_as(role, "senha-forte-1").await;
+            }
+            let reply = app.call(method, &path, Some(json!({}))).await;
+            let denied = order(role) < order(required.as_str());
+            assert_eq!(
+                reply.status == StatusCode::FORBIDDEN,
+                denied,
+                "{role} {method} {path} (mínimo {required}): {}",
+                reply.status
+            );
+            assert_ne!(reply.status, StatusCode::UNAUTHORIZED, "{method} {path}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn rota_sem_nivel_declarado_so_serve_o_master() {
+    let app = app().await;
+    app.user_session("ana", "admin").await;
+    assert_eq!(
+        app.get("/api/nao-existe").await.status,
+        StatusCode::FORBIDDEN
+    );
+    app.login().await;
+    assert_eq!(
+        app.get("/api/nao-existe").await.status,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn viewer_nao_cria_operacao_e_operator_nao_mexe_no_token() {
+    let app = app().await;
+    app.with_credential().await;
+    app.user_session("vera", "viewer").await;
+    let denied = app
+        .post("/api/operations", json!({ "plan_id": UUID }))
+        .await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN);
+    assert_eq!(denied.json["code"], "forbidden");
+    assert_eq!(app.get("/api/history").await.json["total"], 0);
+
+    app.user_session("otto", "operator").await;
+    let denied = app
+        .call(
+            "PUT",
+            "/api/credential",
+            Some(json!({ "kind": "account", "token": TOKEN })),
+        )
+        .await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN);
+
+    app.user_session("ada", "admin").await;
+    let created = app
+        .post(
+            "/api/projects",
+            json!({ "railway_project_id": rid::<String>(1) }),
+        )
+        .await;
+    assert_ne!(created.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn gestao_de_usuarios_crud_validacoes_e_sem_hash() {
+    let app = app().await;
+    app.login().await;
+    let created = app
+        .post(
+            "/api/users",
+            json!({ "username": "Maria", "password": "senha-forte-1", "role": "operator" }),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED);
+    let id = created.json["id"].as_str().unwrap().to_owned();
+
+    for (body, status) in [
+        (
+            json!({ "username": "MARIA", "password": "senha-forte-1", "role": "viewer" }),
+            StatusCode::CONFLICT,
+        ),
+        (
+            json!({ "username": MASTER, "password": "senha-forte-1", "role": "viewer" }),
+            StatusCode::CONFLICT,
+        ),
+        (
+            json!({ "username": "novo", "password": "curta", "role": "viewer" }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({ "username": "novo", "password": "senha-forte-1", "role": "master" }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({ "username": "novo", "password": "senha-forte-1", "role": "dono" }),
+            StatusCode::BAD_REQUEST,
+        ),
+    ] {
+        assert_eq!(
+            app.post("/api/users", body.clone()).await.status,
+            status,
+            "{body}"
+        );
+    }
+
+    let list = app.get("/api/users").await;
+    assert_eq!(list.json["users"].as_array().unwrap().len(), 1);
+    assert_eq!(list.json["users"][0]["role"], "operator");
+    for text in [&list.text, &created.text] {
+        assert!(
+            !text.contains("argon2") && !text.contains("senha-forte-1"),
+            "{text}"
+        );
+        assert!(!text.contains("password"), "{text}");
+    }
+
+    let edited = app
+        .call(
+            "PATCH",
+            &format!("/api/users/{id}"),
+            Some(json!({ "role": "admin" })),
+        )
+        .await;
+    assert_eq!(edited.json["role"], "admin");
+    let reset = app
+        .post(
+            &format!("/api/users/{id}/password"),
+            json!({ "password": "outra-senha-9" }),
+        )
+        .await;
+    assert_eq!(reset.status, StatusCode::NO_CONTENT);
+    app.login_as("maria", "outra-senha-9").await;
+    app.login().await;
+    let removed = app.call("DELETE", &format!("/api/users/{id}"), None).await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        app.call("DELETE", &format!("/api/users/{id}"), None)
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(app.get("/api/users").await.json["users"], json!([]));
+}
+
+#[tokio::test]
+async fn admin_nao_gerencia_usuarios() {
+    let app = app().await;
+    app.user_session("ada", "admin").await;
+    assert_eq!(app.get("/api/users").await.status, StatusCode::FORBIDDEN);
+    let reply = app
+        .post(
+            "/api/users",
+            json!({ "username": "x-y-z", "password": "senha-forte-1", "role": "viewer" }),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn mudancas_de_usuario_valem_na_proxima_requisicao() {
+    let app = app().await;
+    let id = app.create_user("otto", "operator").await;
+    let master_cookie = app.cookie.lock().unwrap().clone();
+    app.login_as("otto", "senha-forte-1").await;
+    let otto_cookie = app.cookie.lock().unwrap().clone();
+    let plan = json!({ "kind": "stop", "target": { "type": "project", "project_id": UUID } });
+    let before = app.post("/api/operations/plan", plan.clone()).await;
+    assert_ne!(before.status, StatusCode::FORBIDDEN);
+
+    // Rebaixar vale de imediato, na mesma sessão.
+    *app.cookie.lock().unwrap() = master_cookie.clone();
+    app.call(
+        "PATCH",
+        &format!("/api/users/{id}"),
+        Some(json!({ "role": "viewer" })),
+    )
+    .await;
+    *app.cookie.lock().unwrap() = otto_cookie.clone();
+    let after = app.post("/api/operations/plan", plan).await;
+    assert_eq!(after.status, StatusCode::FORBIDDEN);
+    assert_eq!(app.get("/api/session").await.json["role"], "viewer");
+
+    // Desativar derruba a sessão e impede novo login.
+    *app.cookie.lock().unwrap() = master_cookie;
+    app.call(
+        "PATCH",
+        &format!("/api/users/{id}"),
+        Some(json!({ "is_active": false })),
+    )
+    .await;
+    *app.cookie.lock().unwrap() = otto_cookie;
+    assert_eq!(
+        app.get("/api/session").await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    let reply = app
+        .post(
+            "/api/session",
+            json!({ "username": "otto", "password": "senha-forte-1" }),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn nova_senha_derruba_sessoes_do_usuario() {
+    let app = app().await;
+    let id = app.create_user("otto", "viewer").await;
+    let master_cookie = app.cookie.lock().unwrap().clone();
+    app.login_as("otto", "senha-forte-1").await;
+    let otto_cookie = app.cookie.lock().unwrap().clone();
+    *app.cookie.lock().unwrap() = master_cookie;
+    app.post(
+        &format!("/api/users/{id}/password"),
+        json!({ "password": "outra-senha-9" }),
+    )
+    .await;
+    *app.cookie.lock().unwrap() = otto_cookie;
+    assert_eq!(
+        app.get("/api/session").await.status,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[tokio::test]
+async fn historico_registra_quem_executou_e_preserva_apos_remocao() {
+    let app = app().await;
+    app.with_credential().await;
+    let project = app.seed().await;
+    let id = app.create_user("maria", "operator").await;
+    app.login_as("maria", "senha-forte-1").await;
+    let plan = app
+        .post(
+            "/api/operations/plan",
+            json!({ "kind": "stop", "target": { "type": "project", "project_id": project } }),
+        )
+        .await;
+    let op = app
+        .post(
+            "/api/operations",
+            json!({ "plan_id": plan.json["plan_id"] }),
+        )
+        .await;
+    assert_eq!(op.status, StatusCode::ACCEPTED, "{}", op.text);
+    app.wait_operation(op.json["operation_id"].as_str().unwrap())
+        .await;
+
+    app.login().await;
+    let history = app.get("/api/history").await;
+    assert_eq!(history.json["items"][0]["requested_by"], "maria");
+    app.call("DELETE", &format!("/api/users/{id}"), None).await;
+    let history = app.get("/api/history").await;
+    assert_eq!(history.json["items"][0]["requested_by"], "maria");
 }

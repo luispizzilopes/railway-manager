@@ -9,9 +9,10 @@ import { Button } from '../components/ui/Button'
 import { Console } from '../console/Console'
 import { ConsoleProvider, useConsole } from '../console/ConsoleProvider'
 import type { Mode } from '../mode'
+import { ROLE_LABEL, useSession } from '../session'
 import { useTheme } from '../theme'
 
-type NavItem = { to: string; label: string; icon: IconName; end?: boolean }
+type NavItem = { to: string; label: string; icon: IconName; end?: boolean; master?: boolean }
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Visão geral', icon: 'overview', end: true },
@@ -20,6 +21,7 @@ const NAV: NavItem[] = [
   { to: '/history', label: 'Histórico', icon: 'history' },
   { to: '/logs', label: 'Logs', icon: 'logs' },
   { to: '/console', label: 'Console', icon: 'console' },
+  { to: '/users', label: 'Usuários', icon: 'users', master: true },
   { to: '/settings', label: 'Configurações', icon: 'settings' },
 ]
 
@@ -96,7 +98,8 @@ export function Layout({
 }) {
   const { pathname } = useLocation()
   const [palette, setPalette] = useState(false)
-  const nav = mobile ? NAV.filter((item) => item.to !== '/console') : NAV
+  const session = useSession()
+  const nav = NAV.filter((item) => (!mobile || item.to !== '/console') && (!item.master || session.can('master')))
 
   // Ctrl+K abre a paleta (na página do console ele leva o foco à linha de comando).
   useEffect(() => {
@@ -125,6 +128,11 @@ export function Layout({
             ))}
           </nav>
           <div className="side-foot">
+            {session.username && session.role && (
+              <p className="subtle" data-testid="whoami">
+                {session.username} · {ROLE_LABEL[session.role]}
+              </p>
+            )}
             <ThemeRow />
             <Button variant="ghost" onClick={onLogout}>
               <Icon name="logout" />
