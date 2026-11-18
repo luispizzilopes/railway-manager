@@ -187,14 +187,16 @@ export function LogViewer({ lines, loading, error, notice, truncated, noDeployme
         <Field label="Buscar nos logs exibidos" className="log-search">
           {(p) => <Input {...p} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Texto" />}
         </Field>
-        <Checkbox label="Quebrar linhas" checked={wrap} onChange={(e) => setWrap(e.target.checked)} />
-        {toolbar}
-        <Button size="sm" onClick={() => void copy()} disabled={lines.length === 0}>
-          Copiar
-        </Button>
-        <Button size="sm" onClick={download} disabled={lines.length === 0}>
-          Baixar
-        </Button>
+        <div className="log-actions">
+          <Checkbox label="Quebrar linhas" checked={wrap} onChange={(e) => setWrap(e.target.checked)} />
+          {toolbar}
+          <Button size="sm" onClick={() => void copy()} disabled={lines.length === 0}>
+            Copiar
+          </Button>
+          <Button size="sm" onClick={download} disabled={lines.length === 0}>
+            Baixar
+          </Button>
+        </div>
       </div>
       <p className="log-meta subtle" aria-live="polite">
         {lines.length} {lines.length === 1 ? 'linha' : 'linhas'}
