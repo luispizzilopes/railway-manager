@@ -128,11 +128,6 @@ export function Layout({
             ))}
           </nav>
           <div className="side-foot">
-            {session.username && session.role && (
-              <p className="subtle" data-testid="whoami">
-                {session.username} · {ROLE_LABEL[session.role]}
-              </p>
-            )}
             <ThemeRow />
             <Button variant="ghost" onClick={onLogout}>
               <Icon name="logout" />
@@ -151,6 +146,11 @@ export function Layout({
                   <Icon name="console" />
                   Modo CLI
                 </Button>
+              )}
+              {session.username && session.role && (
+                <span className="subtle" data-testid="whoami">
+                  {session.username} · {ROLE_LABEL[session.role]}
+                </span>
               )}
               {mobile && (
                 <Button variant="ghost" size="sm" onClick={onLogout}>
