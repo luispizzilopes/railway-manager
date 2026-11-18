@@ -50,19 +50,19 @@ function countStates(cards: InstanceCard[]): Segment[] {
 function Summary({ data }: { data: DashboardData }) {
   const i = data.indicators
   const segments: Segment[] = [
-    { state: 'running', count: i.running },
+    { state: 'running', count: i.running - i.sleeping },
     { state: 'sleeping', count: i.sleeping },
     { state: 'stopped', count: i.stopped },
     { state: 'failed', count: i.failed },
     { state: 'unknown', count: i.other },
   ]
-  const pct = i.instances > 0 ? Math.round(((i.running + i.sleeping) / i.instances) * 100) : null
+  const pct = i.instances > 0 ? Math.round((i.running / i.instances) * 100) : null
   const headline =
     i.instances === 0
       ? 'Nenhum serviço monitorado'
       : i.failed > 0
         ? `${i.failed} ${i.failed === 1 ? 'serviço com falha' : 'serviços com falha'}`
-        : `${i.running + i.sleeping} de ${i.instances} serviços em operação`
+        : `${i.running} de ${i.instances} serviços em operação`
   const stats = [
     { label: 'Projetos', value: i.projects },
     { label: 'Serviços monitorados', value: i.instances },
