@@ -93,25 +93,6 @@ export function LogsPanel({ instanceId, filters, onChange, fileName, actions, ti
         <Field label="Até" hint={filters.end ? 'Com limite final, não acompanha ao vivo.' : undefined}>
           {(p) => <Input {...p} type="datetime-local" value={filters.end} onChange={(e) => set({ end: e.target.value })} />}
         </Field>
-        <Field label="Filtrar texto" hint="Enter aplica no Railway">
-          {(p) => (
-            <Input
-              {...p}
-              type="search"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onBlur={commitText}
-              onKeyDown={(e) => {
-                // O formulário tem vários campos e nenhum botão de envio: o Enter é tratado aqui.
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  commitText()
-                }
-              }}
-              placeholder="Mensagem contém…"
-            />
-          )}
-        </Field>
         <Field label="Linhas">
           {(p) => (
             <Select {...p} value={filters.limit} onChange={(e) => set({ limit: Number(e.target.value) })}>
@@ -134,6 +115,25 @@ export function LogsPanel({ instanceId, filters, onChange, fileName, actions, ti
             />
           ))}
         </fieldset>
+        <Field label="Filtrar texto" hint="Enter aplica no Railway" className="log-filter-text">
+          {(p) => (
+            <Input
+              {...p}
+              type="search"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onBlur={commitText}
+              onKeyDown={(e) => {
+                // O formulário tem vários campos e nenhum botão de envio: o Enter é tratado aqui.
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitText()
+                }
+              }}
+              placeholder="Mensagem contém…"
+            />
+          )}
+        </Field>
       </form>
 
       {logs.deployment && logs.deployment.id && !logs.deployment.isCurrent && (
