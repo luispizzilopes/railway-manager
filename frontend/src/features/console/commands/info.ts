@@ -2,11 +2,11 @@
 
 import type { HistoryFilters, ScheduledAction, ScheduledActionStatus } from '@/shared/api/types'
 import { KIND_LABEL, RESULT_LABEL, STATUS_LABEL } from '@/shared/lib/format'
-import { flag, int, str } from '../parse'
-import { findProject, flatten, resolveSelectors } from '../selectors'
-import { describeWhen } from '../time'
-import type { Cell, CommandDef, Ctx, Invocation } from '../types'
-import { CommandError } from '../types'
+import { flag, int, str } from '@/features/console/engine/parse'
+import { findProject, flatten, resolveSelectors } from '@/features/console/state/selectors'
+import { describeWhen } from '@/features/console/lib/time'
+import type { Cell, CommandDef, Ctx, Invocation } from '@/features/console/state/types'
+import { CommandError } from '@/features/console/state/types'
 import { YES, confirmOrCancel, note, pick, short, show, succeeded, watch, when } from './shared'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

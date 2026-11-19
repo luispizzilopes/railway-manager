@@ -5,7 +5,7 @@ Identidade visual própria e sóbria: superfícies planas com linha fina, uma co
 ## Marca e ícones
 
 - **Marca**: só o nome em texto (`shared/components/Brand.tsx`); não há logo nem favicon.
-- **Ícones** (`shared/components/Icon.tsx`): Phosphor (`@phosphor-icons/react`, peso regular). Para um novo ícone, importe o glifo e registre-o em `ICONS`; os ícones de estado do `StatusBadge` são desenhos próprios, com formas distintas.
+- **Ícones** (`shared/components/Icon/Icon.tsx`): Phosphor (`@phosphor-icons/react`, peso regular). Para um novo ícone, importe o glifo e registre-o em `ICONS`; os ícones de estado do `StatusBadge` são desenhos próprios, com formas distintas.
 
 ## Estrutura
 
@@ -14,10 +14,10 @@ frontend/src/styles/
   index.css     ordem das camadas e dos imports (a ordem define a cascata: não reordene)
   tokens.css    tokens semânticos dos temas claro e escuro (valores em OKLCH)
   base.css      reset, tipografia, painéis (.card) e utilitários
-frontend/src/app/layout.css, mobile.css          layout da aplicação e regras de celular
-frontend/src/features/<tela>/*.css               CSS de cada tela (dashboard, projects, auth, history, console, logs)
-frontend/src/shared/components/*.css             CSS de componentes compartilhados (paleta de comandos, andamento de operação)
-frontend/src/shared/ui/                          componentes base, cada um com o próprio CSS em `@layer components`
+frontend/src/app/layout/layout.css, mobile.css   layout da aplicação e regras de celular
+frontend/src/features/<tela>/styles/*.css        CSS de cada tela (dashboard, projects, auth, history, console, logs)
+frontend/src/shared/components/<Nome>/*.css      CSS de componentes compartilhados (paleta de comandos, andamento de operação)
+frontend/src/shared/ui/<Nome>/                     componentes base, cada um com o próprio CSS em `@layer components`
 ```
 
 ## Regras

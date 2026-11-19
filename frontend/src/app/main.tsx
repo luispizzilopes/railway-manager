@@ -4,15 +4,15 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 
 import { App } from './App'
-import { ApiError } from '../shared/api/client'
+import { ApiError } from '@/shared/api/client'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/500.css'
 import '@fontsource/ibm-plex-sans/400.css'
 import '@fontsource/ibm-plex-sans/500.css'
 import '@fontsource/ibm-plex-sans/600.css'
-import { ToastProvider } from '../shared/ui/Toast'
-import '../styles/index.css'
-import { applyTheme } from '../shared/lib/theme'
+import { ToastProvider } from '@/shared/ui/Toast/Toast'
+import '@/styles/index.css'
+import { applyTheme } from '@/shared/lib/theme'
 
 const queryClient = new QueryClient({
   defaultOptions: {

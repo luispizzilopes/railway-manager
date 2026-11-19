@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { vi } from 'vitest'
 
-import type { Role } from '../shared/api/types'
+import type { Role } from '@/shared/api/types'
 
 export interface Call {
   method: string

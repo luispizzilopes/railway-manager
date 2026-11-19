@@ -1,9 +1,9 @@
 // login, ui e cli: entrar pela linha de comando e alternar entre os modos.
 
 import { ApiError } from '@/shared/api/client'
-import type { Mode } from '@/features/auth/mode'
-import type { CommandDef, Ctx } from '../types'
-import { CommandError } from '../types'
+import type { Mode } from '@/features/auth/lib/mode'
+import type { CommandDef, Ctx } from '@/features/console/state/types'
+import { CommandError } from '@/features/console/state/types'
 import { note } from './shared'
 
 /** Comandos disponíveis antes do login, no modo CLI. */

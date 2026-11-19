@@ -1,6 +1,6 @@
 // Registro único de comandos: parser, execução, autocompletar, help e docs/console.md.
 
-import type { CommandDef } from '../types'
+import type { CommandDef } from '@/features/console/state/types'
 import { infoCommands } from './info'
 import { manageCommands } from './manage'
 import { miscCommands } from './misc'

@@ -2,10 +2,10 @@
 
 import type { CredentialKind, DiscoveredEnvironment, ProjectImportReport, InstanceImportReport } from '@/shared/api/types'
 import { SYNC_LABEL } from '@/shared/lib/format'
-import { flag, str } from '../parse'
-import { findProject, instanceName, parseSelector, resolveSelectors } from '../selectors'
-import type { CommandDef, Ctx, Invocation } from '../types'
-import { CommandError } from '../types'
+import { flag, str } from '@/features/console/engine/parse'
+import { findProject, instanceName, parseSelector, resolveSelectors } from '@/features/console/state/selectors'
+import type { CommandDef, Ctx, Invocation } from '@/features/console/state/types'
+import { CommandError } from '@/features/console/state/types'
 import { YES, confirmOrCancel, note, show, when } from './shared'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

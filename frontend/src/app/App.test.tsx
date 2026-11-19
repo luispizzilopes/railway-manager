@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
-import { dashboard } from '../test/fixtures'
-import { type Call, mockFetch, renderWithProviders, sessionAs } from '../test/utils'
+import { dashboard } from '@/test/fixtures'
+import { type Call, mockFetch, renderWithProviders, sessionAs } from '@/test/utils'
 
 describe('login', () => {
   beforeEach(() => window.localStorage.setItem('rm:mode', 'ui'))

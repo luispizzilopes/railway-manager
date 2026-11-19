@@ -4,12 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { STATE_LABEL } from '../lib/format'
-import type { ObservedState } from '../api/types'
-import { Modal } from '../components/Modal'
-import { useFeedbackMutation } from '../components/useFeedbackMutation'
+import { STATE_LABEL } from '@/shared/lib/format'
+import type { ObservedState } from '@/shared/api/types'
+import { Modal } from '@/shared/components/Modal/Modal'
+import { useFeedbackMutation } from '@/shared/hooks/useFeedbackMutation'
 import { Button, Field, Input, StatusBadge, Tabs, ToastProvider, useToast } from './index'
-import { TOAST_MS } from './Toast'
+import { TOAST_MS } from '@/shared/ui/Toast/Toast'
 
 describe('Button', () => {
   it('em carregamento fica desabilitado e não envia duas vezes', async () => {

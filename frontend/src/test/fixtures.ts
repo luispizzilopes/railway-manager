@@ -1,4 +1,4 @@
-import type { Dashboard, InstanceCard, Plan, Project } from '../shared/api/types'
+import type { Dashboard, InstanceCard, Plan, Project } from '@/shared/api/types'
 
 export const PROJECT: Project = {
   id: 'p-1',

@@ -3,11 +3,11 @@
 import { ApiError } from '@/shared/api/client'
 import type { ActionTarget, Plan, PowerKind } from '@/shared/api/types'
 import { KIND_LABEL } from '@/shared/lib/format'
-import { flag, list, str } from '../parse'
-import { type ResolvedInstance, instanceName, parseSelector, resolveSelectors } from '../selectors'
-import { describeWhen, parseWhen } from '../time'
-import type { Block, CommandDef, Ctx, Invocation, OptionDef } from '../types'
-import { CommandError } from '../types'
+import { flag, list, str } from '@/features/console/engine/parse'
+import { type ResolvedInstance, instanceName, parseSelector, resolveSelectors } from '@/features/console/state/selectors'
+import { describeWhen, parseWhen } from '@/features/console/lib/time'
+import type { Block, CommandDef, Ctx, Invocation, OptionDef } from '@/features/console/state/types'
+import { CommandError } from '@/features/console/state/types'
 import { VERB, YES, note, short, show, succeeded, watch } from './shared'
 
 const TARGET_OPTIONS: OptionDef[] = [

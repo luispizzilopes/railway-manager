@@ -1,10 +1,10 @@
 // help, clear, open, logout, alias, unalias.
 
-import { findCommand } from '../parse'
-import { findProject } from '../selectors'
-import { helpBlocks } from '../help'
-import type { CommandDef, Ctx, Invocation } from '../types'
-import { CommandError } from '../types'
+import { findCommand } from '@/features/console/engine/parse'
+import { findProject } from '@/features/console/state/selectors'
+import { helpBlocks } from '@/features/console/lib/help'
+import type { CommandDef, Ctx, Invocation } from '@/features/console/state/types'
+import { CommandError } from '@/features/console/state/types'
 import { note, show } from './shared'
 
 export const PAGES: Record<string, string> = {

@@ -2,9 +2,9 @@
 
 import type { OperationDetail, PowerKind } from '@/shared/api/types'
 import { formatDateTime } from '@/shared/lib/format'
-import { flag } from '../parse'
-import type { Block, Ctx, Invocation, OptionDef, Tone } from '../types'
-import { Aborted, CommandError } from '../types'
+import { flag } from '@/features/console/engine/parse'
+import type { Block, Ctx, Invocation, OptionDef, Tone } from '@/features/console/state/types'
+import { Aborted, CommandError } from '@/features/console/state/types'
 
 export const YES: OptionDef = { name: 'yes', short: 'y', help: 'não pede confirmação' }
 

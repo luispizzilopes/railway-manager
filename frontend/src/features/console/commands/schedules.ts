@@ -3,11 +3,11 @@
 import { ApiError } from '@/shared/api/client'
 import type { Dashboard, ScheduleInput, ScheduleTarget, ScheduleView } from '@/shared/api/types'
 import { KIND_LABEL, RUN_LABEL, formatDays, formatInZone } from '@/shared/lib/format'
-import { flag, int, list, str } from '../parse'
-import { findProject, parseSelector } from '../selectors'
-import { validTimeZone } from '../time'
-import type { CommandDef, Ctx, Invocation } from '../types'
-import { CommandError } from '../types'
+import { flag, int, list, str } from '@/features/console/engine/parse'
+import { findProject, parseSelector } from '@/features/console/state/selectors'
+import { validTimeZone } from '@/features/console/lib/time'
+import type { CommandDef, Ctx, Invocation } from '@/features/console/state/types'
+import { CommandError } from '@/features/console/state/types'
 import { YES, confirmOrCancel, note, pick, show, when } from './shared'
 
 const DAY_NAMES: Record<string, number> = {

@@ -1,6 +1,6 @@
 // Rótulos e formatação para a interface (pt-BR).
 
-import type { ItemResult, ObservedState, OperationStatus, PowerKind, RunStatus, SyncStatus } from '../api/types'
+import type { ItemResult, ObservedState, OperationStatus, PowerKind, RunStatus, SyncStatus } from '@/shared/api/types'
 
 export const STATE_LABEL: Record<ObservedState, string> = {
   running: 'Ativo',
