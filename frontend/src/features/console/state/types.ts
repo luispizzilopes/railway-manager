@@ -151,6 +151,16 @@ export interface Ctx {
   pollMs: number
 }
 
+/** Definição de comando sem os textos: eles vêm do catálogo (`console:cmd.<caminho>`), por `defineCommands`. */
+export type ArgSource = Omit<ArgDef, 'help'>
+export type OptionSource = Omit<OptionDef, 'help' | 'default'>
+
+export interface CommandSource extends Omit<CommandDef, 'summary' | 'details' | 'args' | 'options' | 'subcommands'> {
+  args?: ArgSource[]
+  options?: OptionSource[]
+  subcommands?: CommandSource[]
+}
+
 /** Erro de uso exibido sem pilha. */
 export class CommandError extends Error {
   readonly details?: unknown
@@ -163,6 +173,6 @@ export class CommandError extends Error {
 
 export class Aborted extends Error {
   constructor() {
-    super('interrompido')
+    super('aborted')
   }
 }

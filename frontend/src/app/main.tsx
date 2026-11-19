@@ -13,6 +13,7 @@ import '@fontsource/ibm-plex-sans/600.css'
 import { ToastProvider } from '@/shared/ui/Toast/Toast'
 import '@/styles/index.css'
 import { applyTheme } from '@/shared/lib/theme'
+import { initI18n } from '@/shared/i18n'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +26,7 @@ const queryClient = new QueryClient({
 })
 
 applyTheme()
+initI18n()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

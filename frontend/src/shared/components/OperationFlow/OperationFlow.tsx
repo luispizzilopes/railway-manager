@@ -4,21 +4,17 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { ApiError, api } from '@/shared/api/client'
 import type { OperationItem, Plan, PlanEntry, PowerKind, PowerTarget } from '@/shared/api/types'
+import { currentLanguage } from '@/shared/i18n'
 import { KIND_LABEL, RESULT_LABEL, STATUS_LABEL, formatDuration } from '@/shared/lib/format'
 import { Modal } from '@/shared/components/Modal/Modal'
 import { StateChip } from '@/shared/components/StateChip/StateChip'
 import { Button } from '@/shared/ui/Button/Button'
 import { ErrorState, Skeleton } from '@/shared/ui/Feedback/Feedback'
 import { Table } from '@/shared/ui/Table/Table'
-
-const ACTION_LABEL: Record<PlanEntry['action'], string> = {
-  will_stop: 'Será desligada',
-  will_start: 'Será iniciada',
-  will_skip: 'Ignorada',
-}
 
 function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
   const map = new Map<string, T[]>()
@@ -27,29 +23,33 @@ function groupBy<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 }
 
 function PlanView({ plan }: { plan: Plan }) {
+  const { t } = useTranslation()
+  const actionLabel = (action: PlanEntry['action']) => t(`flow.${action}`)
   const actionable = plan.entries.filter((e) => e.action !== 'will_skip')
   const skipped = plan.entries.length - actionable.length
   return (
     <>
       <p>
-        <strong>{actionable.length}</strong> {actionable.length === 1 ? 'serviço será afetado' : 'serviços serão afetados'}
-        {skipped > 0 && <>, {skipped} ignorada{skipped > 1 ? 's' : ''}</>}.{' '}
+        <strong>{actionable.length}</strong> {t('flow.affected', { count: actionable.length })}
+        {skipped > 0 && <>, {t('flow.skipped', { count: skipped })}</>}.{' '}
         <span className="subtle">
-          {plan.estimate.mutations} chamada(s) de {plan.kind === 'stop' ? 'desligamento' : 'início'} ao Railway; o plano
-          expira às {new Date(plan.expires_at).toLocaleTimeString('pt-BR')}.
+          {t(plan.kind === 'stop' ? 'flow.calls_stop' : 'flow.calls_start', {
+            count: plan.estimate.mutations,
+            time: new Date(plan.expires_at).toLocaleTimeString(currentLanguage()),
+          })}
         </span>
       </p>
       {groupBy(plan.entries, (e) => e.project_name).map(([project, entries]) => (
         <div key={project}>
           <div className="group-title">{project}</div>
           <div className="card">
-            <Table label={`Plano: ${project}`}>
+            <Table label={t('flow.plan', { project })}>
               <thead>
                 <tr>
-                  <th>Serviço</th>
-                  <th>Ambiente</th>
-                  <th>Estado atual</th>
-                  <th>Ação prevista</th>
+                  <th>{t('flow.service')}</th>
+                  <th>{t('flow.environment')}</th>
+                  <th>{t('flow.currentState')}</th>
+                  <th>{t('flow.plannedAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -63,12 +63,12 @@ function PlanView({ plan }: { plan: Plan }) {
                     <td>
                       {e.action === 'will_skip' ? (
                         <span className={e.fails ? 'result result-failed' : 'muted'}>
-                          {e.fails ? 'Falhará' : ACTION_LABEL[e.action]}: {e.reason}
+                          {e.fails ? t('flow.willFail') : actionLabel(e.action)}: {e.reason}
                         </span>
                       ) : (
                         <strong>
-                          {ACTION_LABEL[e.action]}
-                          {e.action === 'will_stop' && e.deployments > 1 && ` (${e.deployments} deployments)`}
+                          {actionLabel(e.action)}
+                          {e.action === 'will_stop' && e.deployments > 1 && ` ${t('flow.deployments', { count: e.deployments })}`}
                         </strong>
                       )}
                     </td>
@@ -85,12 +85,13 @@ function PlanView({ plan }: { plan: Plan }) {
 
 /** Andamento por serviço, em linha do tempo: cada item mostra resultado, estado final e duração. */
 export function Progress({ items }: { items: OperationItem[] }) {
+  const { t } = useTranslation()
   return (
     <>
       {groupBy(items, (i) => i.label.project_name).map(([project, rows]) => (
         <div key={project}>
           <div className="group-title">{project}</div>
-          <ol className="timeline" aria-label={`Andamento: ${project}`}>
+          <ol className="timeline" aria-label={t('flow.progress', { project })}>
             {rows.map((i) => (
               <li key={i.id} className={`timeline-item timeline-${i.result}`} data-testid="progress-item">
                 <div className="timeline-head">
@@ -125,6 +126,7 @@ export function OperationFlow({
   confirm?: boolean
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [plan, setPlan] = useState<Plan | null>(null)
   const [operationId, setOperationId] = useState<string | null>(null)
@@ -177,9 +179,7 @@ export function OperationFlow({
   if (!operationId) {
     footer = (
       <>
-        <Button onClick={onClose}>
-          Cancelar
-        </Button>
+        <Button onClick={onClose}>{t('ui.cancel')}</Button>
         {plan && confirm && (
           <Button
             variant={kind === 'stop' ? 'danger' : 'primary'}
@@ -187,16 +187,14 @@ export function OperationFlow({
             loading={busy}
             disabled={actionable === 0}
           >
-            Confirmar: {KIND_LABEL[kind].toLowerCase()} {actionable}
+            {t('flow.confirm', { kind: KIND_LABEL[kind].toLowerCase(), count: actionable })}
           </Button>
         )}
       </>
     )
   } else {
     footer = (
-      <Button onClick={onClose}>
-        {done ? 'Fechar' : 'Fechar (continua em segundo plano)'}
-      </Button>
+      <Button onClick={onClose}>{done ? t('ui.close') : t('flow.closeBackground')}</Button>
     )
   }
 
@@ -204,16 +202,16 @@ export function OperationFlow({
   return (
     <Modal title={title} onClose={onClose} footer={footer}>
       <ErrorState error={error} />
-      {!plan && !error && <Skeleton lines={3} label="Lendo o estado atual no Railway…" />}
+      {!plan && !error && <Skeleton lines={3} label={t('flow.reading')} />}
       {plan && !operationId && <PlanView plan={plan} />}
       {plan && !operationId && actionable === 0 && (
-        <div className="alert alert-info">Nada a fazer: todos os serviços foram ignorados.</div>
+        <div className="alert alert-info">{t('flow.nothingToDo')}</div>
       )}
       {operationId && (
         <>
           <div className="row">
-            <strong>{op ? STATUS_LABEL[op.status] : 'Iniciando…'}</strong>
-            {op && !done && <span className="subtle">atualiza a cada poucos segundos</span>}
+            <strong>{op ? STATUS_LABEL[op.status] : t('flow.starting')}</strong>
+            {op && !done && <span className="subtle">{t('flow.refreshing')}</span>}
           </div>
           {progress.data && <Progress items={progress.data.items} />}
         </>
@@ -224,6 +222,7 @@ export function OperationFlow({
 
 /** Resultado de uma operação já criada (ex.: disparada por uma agenda). */
 export function OperationResult({ operationId, onClose }: { operationId: string; onClose: () => void }) {
+  const { t } = useTranslation()
   const detail = useQuery({
     queryKey: ['operation', operationId],
     queryFn: () => api.operation(operationId),
@@ -232,13 +231,9 @@ export function OperationResult({ operationId, onClose }: { operationId: string;
   const op = detail.data?.operation
   return (
     <Modal
-      title={op ? `${KIND_LABEL[op.kind]} — ${STATUS_LABEL[op.status]}` : 'Operação'}
+      title={op ? `${KIND_LABEL[op.kind]} — ${STATUS_LABEL[op.status]}` : t('flow.operation')}
       onClose={onClose}
-      footer={
-        <Button onClick={onClose}>
-          Fechar
-        </Button>
-      }
+      footer={<Button onClick={onClose}>{t('ui.close')}</Button>}
     >
       <ErrorState error={detail.error} onRetry={() => void detail.refetch()} />
       {detail.data && <Progress items={detail.data.items} />}

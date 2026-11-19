@@ -1,0 +1,920 @@
+{
+  "cmd": {
+    "stop": {
+      "summary": "desliga instâncias (interrompe os deployments ativos)",
+      "details": "Gera um plano no servidor, mostra o que será feito e pede confirmação antes de desligar. Com o seletor all, a confirmação exige digitar \"tudo\". Com --at/--in, cria uma ação agendada em vez de executar agora (alvo all é dinâmico; projetos inteiros incluem instâncias novas; o resto fica fixo).",
+      "options": {
+        "tz": {
+          "default": "fuso padrão das agendas"
+        }
+      }
+    },
+    "start": {
+      "summary": "liga instâncias (reaproveita o último deployment)",
+      "details": "Gera um plano no servidor, mostra o que será feito e pede confirmação antes de iniciar. Com o seletor all, a confirmação exige digitar \"tudo\". Com --at/--in, cria uma ação agendada em vez de executar agora (alvo all é dinâmico; projetos inteiros incluem instâncias novas; o resto fica fixo).",
+      "options": {
+        "tz": {
+          "default": "fuso padrão das agendas"
+        }
+      }
+    },
+    "restart": {
+      "summary": "reinicia instâncias: desliga e, ao terminar, liga as que desligaram",
+      "details": "Duas operações no histórico (desligar, depois iniciar). Instâncias que não estavam ligadas não são ligadas. Se o console for fechado entre as etapas, as instâncias ficam desligadas e, ao reabrir, o console mostra o comando para ligá-las.",
+      "options": {
+        "at": {
+          "help": "não suportado: o reinício não pode ser agendado"
+        },
+        "in": {
+          "help": "não suportado: o reinício não pode ser agendado"
+        }
+      }
+    },
+    "status": {
+      "summary": "visão geral: indicadores, alertas e estado de cada instância",
+      "options": {
+        "env": {
+          "help": "só um ambiente"
+        },
+        "state": {
+          "help": "só instâncias neste estado"
+        }
+      },
+      "args": {
+        "seletor": "filtra as instâncias (padrão: todas)"
+      }
+    },
+    "refresh": {
+      "summary": "lê de novo o estado de todas as instâncias no Railway"
+    },
+    "ops": {
+      "summary": "operações recentes",
+      "options": {
+        "limit": {
+          "default": "10"
+        }
+      }
+    },
+    "op": {
+      "summary": "mostra e acompanha uma operação até o fim",
+      "options": {
+        "no-wait": {
+          "help": "mostra o estado atual sem acompanhar"
+        }
+      }
+    },
+    "history": {
+      "summary": "histórico de itens de operações, com os filtros da tela",
+      "options": {
+        "env": {
+          "help": "ambiente"
+        },
+        "page": {
+          "default": "1"
+        },
+        "limit": {
+          "help": "itens por página",
+          "default": "20"
+        }
+      }
+    },
+    "at": {
+      "summary": "ações agendadas pontuais (criadas com start/stop --at/--in)"
+    },
+    "at/list": {
+      "summary": "lista ações agendadas (padrão: pendentes)"
+    },
+    "at/show": {
+      "summary": "mostra uma ação e a operação que ela gerou",
+      "args": {
+        "id": "ID ou prefixo"
+      }
+    },
+    "at/cancel": {
+      "summary": "cancela ações pendentes",
+      "options": {
+        "all": {
+          "help": "cancela todas as pendentes"
+        }
+      },
+      "args": {
+        "id": "IDs ou prefixos"
+      }
+    },
+    "schedule": {
+      "summary": "agendas recorrentes de ligar/desligar"
+    },
+    "schedule/list": {
+      "summary": "lista agendas com a próxima execução",
+      "args": {
+        "projeto": "só deste projeto"
+      }
+    },
+    "schedule/show": {
+      "summary": "detalhes, próximas 5 e últimas execuções"
+    },
+    "schedule/create": {
+      "summary": "cria uma agenda para um projeto (ou ambiente, ou instâncias)",
+      "options": {
+        "tz": {
+          "help": "fuso IANA",
+          "default": "fuso padrão das agendas"
+        }
+      }
+    },
+    "schedule/edit": {
+      "summary": "altera uma agenda (só os campos informados; --window substitui todas)",
+      "options": {
+        "tz": {
+          "help": "fuso IANA",
+          "default": "fuso padrão das agendas"
+        },
+        "env": {
+          "help": "alvo: projeto inteiro restrito a um ambiente"
+        }
+      }
+    },
+    "schedule/pause": {
+      "summary": "pausa (eventos durante a pausa não são recuperados)"
+    },
+    "schedule/resume": {
+      "summary": "retoma a partir do próximo evento"
+    },
+    "schedule/rm": {
+      "summary": "exclui a agenda"
+    },
+    "schedule/runs": {
+      "summary": "execuções da agenda, mais recentes primeiro",
+      "options": {
+        "page": {
+          "help": "página (20 por página)",
+          "default": "1"
+        }
+      }
+    },
+    "project": {
+      "summary": "projetos gerenciados"
+    },
+    "project/list": {
+      "summary": "lista os projetos gerenciados"
+    },
+    "project/discover": {
+      "summary": "lista os projetos acessíveis pelo token no Railway"
+    },
+    "project/import": {
+      "summary": "importa projetos do Railway (nome ou ID) ou todos os não gerenciados",
+      "options": {
+        "all": {
+          "help": "importa todos os projetos acessíveis ainda não gerenciados"
+        }
+      },
+      "args": {
+        "projeto": "nome ou ID Railway"
+      }
+    },
+    "project/add": {
+      "summary": "cadastra um projeto pelo ID Railway",
+      "options": {
+        "name": {
+          "help": "nome de exibição"
+        }
+      }
+    },
+    "project/show": {
+      "summary": "detalhes, instâncias e agendas de um projeto"
+    },
+    "project/edit": {
+      "summary": "altera nome de exibição e descrição (vazio limpa)",
+      "options": {
+        "name": {
+          "help": "nome de exibição (\"\" volta ao nome do Railway)"
+        }
+      }
+    },
+    "project/sync": {
+      "summary": "sincroniza nome, ambientes e estados com o Railway",
+      "options": {
+        "all": {
+          "help": "sincroniza todos"
+        }
+      }
+    },
+    "project/rm": {
+      "summary": "remove o projeto do gerenciamento (nada muda no Railway)"
+    },
+    "instance": {
+      "summary": "instâncias gerenciadas (serviço × ambiente)"
+    },
+    "instance/list": {
+      "summary": "lista instâncias gerenciadas com IDs",
+      "options": {
+        "env": {
+          "help": "só um ambiente"
+        },
+        "state": {
+          "help": "só neste estado"
+        }
+      },
+      "args": {
+        "seletor": "padrão: all"
+      }
+    },
+    "instance/discover": {
+      "summary": "lista as instâncias do projeto no Railway e se já são gerenciadas"
+    },
+    "instance/import": {
+      "summary": "importa instâncias do Railway",
+      "options": {
+        "all": {
+          "help": "importa todas as não gerenciadas (exceto ambientes efêmeros)"
+        },
+        "env": {
+          "help": "só deste ambiente"
+        }
+      }
+    },
+    "instance/add": {
+      "summary": "associa uma instância específica",
+      "args": {
+        "serviço@ambiente": "nomes ou IDs Railway"
+      }
+    },
+    "instance/rm": {
+      "summary": "remove instâncias do gerenciamento (nada muda no Railway)",
+      "options": {
+        "env": {
+          "help": "só um ambiente"
+        }
+      },
+      "args": {
+        "seletor": "instâncias a remover"
+      }
+    },
+    "service": {
+      "summary": "serviços gerenciados"
+    },
+    "service/rm": {
+      "summary": "remove o serviço e todas as suas instâncias do gerenciamento"
+    },
+    "credential": {
+      "summary": "token do Railway"
+    },
+    "credential/show": {
+      "summary": "mostra o token cadastrado (mascarado)"
+    },
+    "credential/set": {
+      "summary": "cadastra ou substitui o token (digitado num campo mascarado)",
+      "details": "O token nunca é aceito como argumento e nunca vai para o histórico de comandos."
+    },
+    "credential/rm": {
+      "summary": "remove o token"
+    },
+    "help": {
+      "summary": "lista os comandos ou mostra a ajuda de um comando"
+    },
+    "clear": {
+      "summary": "limpa a saída (Ctrl+L)"
+    },
+    "open": {
+      "summary": "abre uma tela da interface ou a página de um projeto (no modo CLI, passa para a interface gráfica)"
+    },
+    "alias": {
+      "summary": "cria ou lista apelidos (guardados neste navegador)"
+    },
+    "unalias": {
+      "summary": "remove um apelido"
+    },
+    "logout": {
+      "summary": "encerra a sessão"
+    },
+    "login": {
+      "summary": "entra com usuário e senha (a senha é digitada num campo mascarado)",
+      "details": "No modo CLI, é o primeiro comando: antes do login só login, ui, cli, help, clear e language funcionam."
+    },
+    "ui": {
+      "summary": "passa para a interface gráfica (a sessão continua a mesma)"
+    },
+    "cli": {
+      "summary": "passa para o modo só linha de comando (a sessão continua a mesma)"
+    },
+    "language": {
+      "summary": "mostra ou troca o idioma da interface (guardado neste navegador)",
+      "args": {
+        "idioma": "pt-BR ou en; sem argumento, mostra o idioma atual"
+      }
+    }
+  },
+  "opt": {
+    "env": {
+      "help": "restringe todos os seletores a um ambiente"
+    },
+    "except": {
+      "help": "remove instâncias do alvo"
+    },
+    "state": {
+      "help": "filtra pelo estado observado (running, stopped, …)"
+    },
+    "dry-run": {
+      "help": "só mostra o plano; nada é executado"
+    },
+    "yes": {
+      "help": "não pede confirmação"
+    },
+    "no-wait": {
+      "help": "não acompanha a operação; mostra só o identificador"
+    },
+    "at": {
+      "help": "agenda para um instante: HH:MM, AAAA-MM-DD HH:MM, DD/MM HH:MM, \"amanhã HH:MM\""
+    },
+    "in": {
+      "help": "agenda para daqui a uma duração: 30m, 2h, 1h30m"
+    },
+    "tz": {
+      "help": "fuso IANA de --at"
+    },
+    "note": {
+      "help": "observação da ação agendada"
+    },
+    "limit": {
+      "help": "quantas mostrar"
+    },
+    "project": {
+      "help": "projeto (nome ou ID)"
+    },
+    "service": {
+      "help": "serviço (nome ou ID Railway)"
+    },
+    "kind": {
+      "help": "start ou stop"
+    },
+    "result": {
+      "help": "pending, running, verifying, succeeded, failed, skipped, timed_out, interrupted"
+    },
+    "trigger": {
+      "help": "manual, schedule, scheduled_action"
+    },
+    "from": {
+      "help": "a partir de (AAAA-MM-DD ou RFC 3339)"
+    },
+    "to": {
+      "help": "até (AAAA-MM-DD ou RFC 3339, inclusive)"
+    },
+    "page": {
+      "help": "página"
+    },
+    "all": {
+      "help": "inclui executadas, canceladas, perdidas…"
+    },
+    "status": {
+      "help": "pending, processing, executed, late, skipped, missed, failed, cancelled"
+    },
+    "name": {
+      "help": "nome da agenda"
+    },
+    "days": {
+      "help": "seg-sex, seg,qua,sex, todos, fds, uteis"
+    },
+    "window": {
+      "help": "janela ligada (início liga, fim desliga); fim < início atravessa a meia-noite"
+    },
+    "instances": {
+      "help": "serviço@ambiente separados por vírgula (em vez do projeto inteiro)"
+    },
+    "whole": {
+      "help": "alvo: projeto inteiro, todos os ambientes"
+    },
+    "description": {
+      "help": "descrição (\"\" limpa)"
+    },
+    "workspace": {
+      "help": "ID do workspace (obrigatório para tokens de workspace)"
+    }
+  },
+  "arg": {
+    "seletor": "all, projeto, projeto@ambiente, projeto/serviço, projeto/serviço@ambiente; aceita * e IDs",
+    "id": "ID completo ou prefixo (de ops)",
+    "projeto": "nome ou ID",
+    "agenda": "nome ou ID (prefixo)",
+    "projeto[@ambiente]": "alvo da agenda",
+    "id-railway": "Railway Project ID",
+    "serviço@ambiente": "aceita * e IDs Railway",
+    "projeto/serviço": "ex.: loja/worker",
+    "tipo": "account ou workspace",
+    "comando": "ex.: stop, project import",
+    "destino": "overview, visao, inicio, projects, projetos, schedules, agendas, history, historico, settings, config, console ou nome do projeto",
+    "definição": "nome=expansão; sem argumentos, lista",
+    "nome": "apelido a remover"
+  },
+  "group": {
+    "Energia": "Energia",
+    "Consulta": "Consulta",
+    "Operações": "Operações",
+    "Agendamento": "Agendamento",
+    "Cadastro": "Cadastro",
+    "Configuração": "Configuração",
+    "Console": "Console",
+    "Sessão": "Sessão"
+  },
+  "globalOpt": {
+    "json": "mostra a resposta da API em JSON, sem formatação",
+    "help": "mostra a ajuda do comando"
+  },
+  "m": {
+    "common": {
+      "cancelled": "cancelado",
+      "simulation": "simulação: nada foi executado"
+    },
+    "pick": {
+      "kind": {
+        "operation": {
+          "one": "operação",
+          "many": "operações"
+        },
+        "scheduledAction": {
+          "one": "ação agendada",
+          "many": "ações agendadas"
+        },
+        "schedule": {
+          "one": "agenda",
+          "many": "agendas"
+        }
+      },
+      "ambiguous": "'{{text}}' corresponde a vários {{kinds}}: {{list}}",
+      "none": "nenhum {{kind}} '{{text}}'{{known}}",
+      "known": " — existentes: {{list}}"
+    },
+    "verb": {
+      "start": "iniciar",
+      "stop": "desligar"
+    },
+    "watch": {
+      "interrupted": "acompanhamento interrompido; a operação continua no servidor — retome com: op {{id}}"
+    },
+    "session": {
+      "already": "você já está autenticado",
+      "username": "Usuário",
+      "password": "Senha",
+      "badCredentials": "usuário ou senha incorretos",
+      "ok": "autenticado — digite help para ver os comandos",
+      "alreadyUi": "você já está na interface gráfica",
+      "alreadyCli": "você já está no modo linha de comando",
+      "loginFirst": "faça login primeiro: digite login"
+    },
+    "misc": {
+      "aliasTitle": {
+        "alias": "Apelido",
+        "expansion": "Expansão"
+      },
+      "noAliases": "nenhum apelido — crie com: alias fimdodia=\"stop all -y\"",
+      "aliasUsage": "use alias <nome>=<expansão> (ex.: alias fimdodia=\"stop all --except infra -y\")",
+      "aliasInvalid": "nome de apelido inválido: '{{name}}' (letras, números, _ e -)",
+      "aliasIsCommand": "'{{name}}' já é um comando: apelidos não substituem comandos",
+      "aliasEmpty": "a expansão do apelido está vazia",
+      "aliasSet": "apelido {{name}} → {{expansion}}",
+      "noAlias": "nenhum apelido '{{name}}'",
+      "aliasRemoved": "apelido {{name}} removido",
+      "loggedOut": "sessão encerrada"
+    },
+    "info": {
+      "summary": "{{projects}} projeto(s) · {{instances}} instância(s): {{running}} ativas, {{sleeping}} dormindo, {{stopped}} desligadas, {{failed}} com falha, {{other}} outras",
+      "notConfigured": "integração não configurada: use credential set",
+      "noInstances": "nenhuma instância gerenciada — importe com: project import --all; instance import <projeto> --all",
+      "col": {
+        "project": "Projeto",
+        "service": "Serviço",
+        "environment": "Ambiente",
+        "state": "Estado",
+        "nextAction": "Próxima ação",
+        "id": "ID"
+      },
+      "busy": " (em operação)",
+      "refreshed": "estados atualizados: {{refreshed}} lidos, {{notFound}} não encontrados, {{failed}} falhas",
+      "ops": {
+        "col": {
+          "id": "ID",
+          "kind": "Tipo",
+          "trigger": "Origem",
+          "status": "Situação",
+          "items": "Itens",
+          "projects": "Projetos",
+          "created": "Criada"
+        },
+        "items": "{{ok}} ok · {{failed}} falhas · {{skipped}} ignorados",
+        "active": " · {{count}} ativos",
+        "none": "nenhuma operação recente"
+      },
+      "invalidOption": "--{{name}} inválido: '{{value}}' — use {{allowed}}",
+      "noService": "nenhum serviço '{{text}}' nos projetos gerenciados",
+      "serviceAmbiguous": "'{{text}}' existe em vários projetos: informe também --project",
+      "history": {
+        "title": "Histórico — página {{page}} de {{pages}} ({{total}} itens)",
+        "col": {
+          "when": "Quando",
+          "kind": "Tipo",
+          "project": "Projeto",
+          "service": "Serviço",
+          "environment": "Ambiente",
+          "result": "Resultado",
+          "trigger": "Origem",
+          "message": "Mensagem"
+        },
+        "schedule": "agenda {{name}}",
+        "action": "ação agendada ({{label}})"
+      },
+      "actionStatus": {
+        "pending": "pendente",
+        "processing": "executando",
+        "executed": "executada",
+        "late": "executada com atraso",
+        "skipped": "ignorada",
+        "missed": "perdida",
+        "failed": "falhou",
+        "cancelled": "cancelada"
+      },
+      "action": {
+        "col": {
+          "id": "ID",
+          "action": "Ação",
+          "when": "Quando",
+          "target": "Alvo",
+          "status": "Situação",
+          "operation": "Operação",
+          "note": "Observação"
+        }
+      },
+      "at": {
+        "title": "Ações agendadas{{status}} — fuso {{tz}}",
+        "none": {
+          "pending": "nenhuma ação pendente — crie com: stop <seletor> --at 18:00",
+          "any": "nenhuma ação"
+        },
+        "idsOrAll": "use IDs ou --all, não os dois",
+        "nonePending": "nenhuma ação pendente",
+        "confirmCancel": "Cancelar {{count}} ação(ões) pendente(s)?",
+        "needId": "informe o ID da ação (veja at list) ou --all",
+        "cancelled": "ação {{id}} cancelada ({{kind}} · {{label}})",
+        "failed": "ação {{id}}: {{reason}}"
+      }
+    },
+    "time": {
+      "durationInvalid": "duração inválida: '{{text}}' — use por exemplo 30m, 2h ou 1h30m",
+      "durationZero": "duração deve ser maior que zero: '{{text}}'",
+      "timeInvalid": "horário inválido: '{{text}}' — use HH:MM",
+      "zoneInvalid": "fuso inválido: '{{tz}}' (use um nome IANA, ex.: America/Sao_Paulo)",
+      "atOrIn": "use --at ou --in, não os dois",
+      "needAtOrIn": "informe --at ou --in",
+      "dateInvalid": "data inválida: '{{text}}' — use AAAA-MM-DD, DD/MM, hoje ou amanhã",
+      "instantInvalid": "instante inválido: '{{text}}'",
+      "dateOnlyInvalid": "data inválida: '{{text}}'",
+      "today": "hoje",
+      "tomorrow": "amanhã",
+      "in": "em {{span}}",
+      "ago": "há {{span}}"
+    },
+    "power": {
+      "planExpired": "o plano expirou antes da confirmação — repita o comando para gerar um novo plano",
+      "confirmAll": "{{question}} Isto afeta TODOS os projetos: digite \"{{word}}\" para confirmar.",
+      "allWord": "tudo",
+      "dynamicAll": "todos os projetos{{env}} (dinâmico: inclui projetos importados depois)",
+      "dynamicProjects": "projetos {{names}}{{env}} (inclui instâncias importadas depois)",
+      "fixed": "{{count}} instância(s) fixas",
+      "stateWithAt": "a opção --state não pode ser usada com --at/--in: o estado só é conhecido na hora",
+      "scheduledTitle": "Ação agendada",
+      "scheduledCols": {
+        "action": "Ação",
+        "when": "Quando",
+        "tz": "Fuso",
+        "target": "Alvo",
+        "instances": "Instâncias hoje"
+      },
+      "notScheduled": "simulação: nada foi agendado",
+      "confirmSchedule": "Agendar {{verb}} para {{when}}?",
+      "scheduled": "ação agendada {{id}} criada: {{kind}} · {{label}} · {{when}}\ncancele com: at cancel {{id}}",
+      "onlyWithAt": "--{{name}} só vale junto com --at ou --in",
+      "nothingToRun": "nada a executar: todas as instâncias foram ignoradas",
+      "confirmRun": "{{verb}} {{count}} instância(s)?",
+      "opCreated": "operação {{id}} criada — acompanhe com: op {{short}}",
+      "restartNoSchedule": "restart não pode ser agendado: agende stop e start separadamente",
+      "step1": "etapa 1/2 — desligar",
+      "step2": "etapa 2/2 — ligar",
+      "wasOff": "não estava ligada",
+      "nothingToRestart": "nada a reiniciar: nenhuma instância do alvo está ligada",
+      "confirmRestart": "Reiniciar {{count}} instância(s)? Elas ficarão fora do ar até a etapa de ligar terminar.",
+      "restartInterrupted": "reinício interrompido: as instâncias desligadas continuam desligadas — para ligá-las: {{command}}",
+      "outcome": {
+        "restarted": "reiniciada",
+        "stopFailed": "falhou ao desligar",
+        "startFailed": "falhou ao ligar",
+        "skipped": "ignorada"
+      },
+      "noResult": "sem resultado",
+      "restartSummary": "Resumo do reinício",
+      "restartCols": {
+        "instance": "Instância",
+        "result": "Resultado",
+        "reason": "Motivo"
+      },
+      "restartNotice": "reinício interrompido (iniciado em {{when}}): {{names}} podem ter ficado desligadas. O comando para ligá-las está pronto abaixo — pressione Enter."
+    },
+    "sched": {
+      "dayInvalid": "dia inválido: '{{part}}' — use seg, ter, qua, qui, sex, sab, dom (ex.: seg-sex, seg,qua,sex, todos, fds)",
+      "needDay": "informe ao menos um dia",
+      "windowInvalid": "janela inválida: '{{text}}' — use HH:MM-HH:MM (ex.: 07:00-12:00)",
+      "instancesCount": "{{count}} instância(s)",
+      "wholeProject": "projeto inteiro",
+      "wholeProjectEnv": "projeto inteiro · {{env}}",
+      "noNext": "sem próximas execuções",
+      "pausedShort": "pausada{{reason}}",
+      "nextTitle": "Próximas execuções ({{tz}})",
+      "nextCols": {
+        "when": "Quando",
+        "action": "Ação"
+      },
+      "listCols": {
+        "id": "ID",
+        "schedule": "Agenda",
+        "project": "Projeto",
+        "target": "Alvo",
+        "days": "Dias",
+        "windows": "Janelas",
+        "next": "Próxima",
+        "status": "Situação"
+      },
+      "active": "ativa",
+      "pausedWith": "pausada{{reason}}",
+      "none": "nenhuma agenda — crie com: schedule create <projeto> --name … --days seg-sex --window 07:00-19:00",
+      "showRows": {
+        "field": "Campo",
+        "value": "Valor",
+        "project": "Projeto",
+        "target": "Alvo",
+        "days": "Dias",
+        "windows": "Janelas",
+        "tz": "Fuso",
+        "status": "Situação",
+        "id": "ID"
+      },
+      "lastRuns": "Últimas execuções",
+      "noRuns": "nenhuma execução ainda",
+      "runCols": {
+        "scheduled": "Previsto",
+        "action": "Ação",
+        "status": "Situação",
+        "operation": "Operação",
+        "message": "Mensagem"
+      },
+      "noInstance": "nenhuma instância '{{spec}}' em {{project}} — existentes: {{list}}",
+      "noEnvironment": "nenhum ambiente '{{name}}' em {{project}} — existentes: {{list}}",
+      "zoneInvalid": "fuso inválido: '{{tz}}' (use um nome IANA, ex.: America/Sao_Paulo)",
+      "conflict": "{{message}} — janelas em conflito: {{list}}",
+      "saved": "agenda \"{{name}}\" {{verb}} ({{id}})",
+      "created": "criada",
+      "updated": "atualizada",
+      "targetNeeded": "use projeto ou projeto@ambiente como alvo (para serviços, use --instances)",
+      "needName": "informe --name",
+      "needDays": "informe --days (ex.: seg-sex)",
+      "needWindow": "informe ao menos uma --window (ex.: 07:00-19:00)",
+      "envOrInstances": "use projeto@ambiente ou --instances, não os dois",
+      "oneMode": "use só um de --instances, --env ou --whole",
+      "pausedDone": "agenda \"{{name}}\" pausada",
+      "resumedDone": "agenda \"{{name}}\" retomada",
+      "confirmDelete": "Excluir a agenda \"{{name}}\"? As operações já criadas por ela ficam no histórico.",
+      "deleted": "agenda \"{{name}}\" excluída",
+      "runsTitle": "Execuções de \"{{name}}\" — página {{page}} ({{total}} no total)"
+    },
+    "manage": {
+      "importReport": "{{imported}} {{what}} importado(s), {{already}} já gerenciado(s), {{failed}} falha(s)",
+      "what": {
+        "project": "projeto(s)",
+        "instance": "instância(s)"
+      },
+      "listCols": {
+        "project": "Projeto",
+        "railwayName": "Nome no Railway",
+        "sync": "Sincronização",
+        "last": "Última",
+        "id": "ID",
+        "railwayId": "ID Railway"
+      },
+      "noProjects": "nenhum projeto gerenciado — veja project discover e project import --all",
+      "personal": "pessoal",
+      "discoverCols": {
+        "workspace": "Workspace",
+        "project": "Projeto",
+        "managed": "Gerenciado",
+        "railwayId": "ID Railway"
+      },
+      "yes": "sim",
+      "no": "não",
+      "namesOrAll": "use nomes/IDs ou --all, não os dois",
+      "allManaged": "todos os projetos acessíveis já são gerenciados",
+      "needProjects": "informe projetos (nome ou ID Railway) ou --all",
+      "multiWorkspace": "'{{text}}' existe em mais de um workspace: use o ID Railway",
+      "noRailwayProject": "nenhum projeto '{{text}}' no Railway — veja project discover",
+      "projectAdded": "projeto {{name}} cadastrado ({{id}})",
+      "showRows": {
+        "field": "Campo",
+        "value": "Valor",
+        "railwayName": "Nome no Railway",
+        "description": "Descrição",
+        "sync": "Sincronização",
+        "id": "ID",
+        "railwayId": "ID Railway",
+        "schedules": "Agendas",
+        "nextAction": "Próxima ação"
+      },
+      "instances": "Instâncias",
+      "instCols": {
+        "service": "Serviço",
+        "environment": "Ambiente",
+        "state": "Estado",
+        "id": "ID"
+      },
+      "needNameOrDesc": "informe --name e/ou --description",
+      "projectUpdated": "projeto {{name}} atualizado",
+      "needProjectsOrAll": "informe projetos ou --all",
+      "synced": "{{name}}: {{status}} — {{refreshed}} lidas, {{notFound}} não encontradas, {{failed}} falhas",
+      "removeWarn": "remover {{name}} do gerenciamento apaga localmente {{instances}} instância(s) e {{schedules}} agenda(s); nada é alterado no Railway e o histórico é preservado",
+      "confirmRemoveProject": "Remover o projeto {{name}}?",
+      "projectRemoved": "projeto {{name}} removido do gerenciamento",
+      "instListCols": {
+        "instance": "Instância",
+        "state": "Estado",
+        "id": "ID"
+      },
+      "discInstCols": {
+        "environment": "Ambiente",
+        "service": "Serviço",
+        "managed": "Gerenciada",
+        "state": "Estado"
+      },
+      "ephemeral": " (efêmero)",
+      "noInstanceOnRailway": "nenhuma instância '{{text}}' no Railway para {{project}} — veja instance discover {{project}}",
+      "specOrAll": "use serviço@ambiente ou --all, não os dois",
+      "needSpec": "informe serviço@ambiente (ex.: api@production) ou --all",
+      "nothingToImport": "nada a importar: as instâncias já são gerenciadas",
+      "ambiguousInstance": "'{{spec}}' corresponde a {{count}} instâncias: seja específico (serviço@ambiente)",
+      "associated": "instância {{instance}} associada a {{project}}",
+      "confirmRemoveInstances": "Remover {{count}} instância(s) do gerenciamento (nada muda no Railway)?",
+      "instancesRemoved": "{{count}} instância(s) removida(s) do gerenciamento",
+      "serviceSyntax": "use projeto/serviço (ex.: loja/worker)",
+      "noService": "nenhum serviço '{{service}}' gerenciado em {{project}}",
+      "serviceWarn": "remove {{service}} e suas {{count}} instância(s) gerenciada(s) ({{envs}})",
+      "confirmRemoveService": "Remover o serviço {{project}}/{{service}} do gerenciamento?",
+      "serviceRemoved": "serviço {{service}} removido do gerenciamento",
+      "noToken": "nenhum token cadastrado — use credential set <account|workspace>",
+      "credCols": {
+        "kind": "Tipo",
+        "account": "Conta",
+        "suffix": "Final",
+        "status": "Situação",
+        "validated": "Validado",
+        "workspace": "Workspace"
+      },
+      "kindInvalid": "tipo inválido: use 'account' ou 'workspace'",
+      "needWorkspace": "tokens de workspace exigem --workspace <id>",
+      "tokenPrompt": "Token do Railway ({{kind}})",
+      "tokenSaved": "token validado e salvo: {{label}} (…{{suffix}})",
+      "confirmRemoveToken": "Remover o token do Railway? Operações e agendas deixarão de funcionar.",
+      "tokenRemoved": "token removido"
+    },
+    "sel": {
+      "empty": "seletor vazio",
+      "emptyEnv": "ambiente vazio no seletor '{{raw}}'",
+      "emptyProject": "projeto vazio no seletor '{{raw}}'",
+      "emptyService": "serviço vazio no seletor '{{raw}}'",
+      "allNoService": "'all' não aceita serviço: use '*/{{service}}'",
+      "noMatch": "nenhum {{kind}} '{{text}}'{{scope}}{{hint}}",
+      "kind": {
+        "project": "projeto",
+        "service": "serviço",
+        "environment": "ambiente"
+      },
+      "similar": " — semelhantes: {{list}}",
+      "noneRegistered": " — nenhum cadastrado",
+      "inProject": " em {{name}}",
+      "forSelector": " para '{{raw}}'",
+      "inTarget": " no alvo",
+      "noInstance": "nenhuma instância gerenciada para '{{raw}}'",
+      "needOne": "informe ao menos um seletor (ex.: all, loja, loja/api@production)",
+      "invalidState": "estado inválido: '{{state}}' — use {{list}}",
+      "nothingLeft": "nenhuma instância restou no alvo depois dos filtros",
+      "severalProjects": "'{{text}}' corresponde a vários projetos: {{list}}"
+    },
+    "parse": {
+      "emptyLine": "linha vazia",
+      "unknownCommand": "comando desconhecido: {{token}}{{hint}}",
+      "didYouMean": " — você quis dizer {{name}}?",
+      "usageSub": "uso: {{path}} <{{subs}}> — veja help {{path}}",
+      "unknownSub": "subcomando desconhecido: {{path}} {{token}}{{hint}}",
+      "unknownOption": "opção desconhecida para {{path}}: {{token}}{{hint}}",
+      "needsValue": "a opção --{{name}} exige um valor ({{value}})",
+      "noValue": "a opção --{{name}} não aceita valor",
+      "twice": "a opção --{{name}} foi informada mais de uma vez",
+      "missingArg": "argumento obrigatório ausente: <{{name}}> — uso: {{usage}}",
+      "tooMany": "argumentos demais para {{path}}: {{args}}",
+      "positiveInt": "--{{name}} deve ser um inteiro positivo: '{{raw}}'"
+    },
+    "engine": {
+      "sessionExpired": "sessão expirada: entre novamente",
+      "interrupted": "interrompido",
+      "network": "falha de rede: {{message}}",
+      "secretInLine": "não informe o token na linha de comando: use `credential set <account|workspace>` e digite-o no campo mascarado",
+      "syntax": "erro de sintaxe: {{message}}",
+      "notRunnable": "'{{path}}' não executa nada sozinho — veja help {{path}}"
+    },
+    "lexer": {
+      "quote": "aspas {{quote}} sem fechamento"
+    },
+    "help": {
+      "intro": "Comandos do Railway Manager. Use `help <comando>` (ou `<comando> --help`) para ver opções e exemplos.",
+      "cols": {
+        "command": "Comando",
+        "also": "Também",
+        "description": "Descrição",
+        "subcommand": "Subcomando",
+        "argument": "Argumento",
+        "option": "Opção",
+        "default": "Padrão"
+      },
+      "footer": "Seletores: all · projeto · projeto@ambiente · projeto/serviço · projeto/serviço@ambiente · curinga * (ex.: */worker).\nAtalhos: Ctrl+` ou Ctrl+K abre/fecha · ↑/↓ histórico · Ctrl+R busca · Tab completa · Ctrl+C interrompe · Ctrl+L limpa.",
+      "usage": "uso: {{usage}}",
+      "usageSub": "uso: {{path}} <{{subs}}> …",
+      "also": "também: {{list}}",
+      "subcommands": "Subcomandos",
+      "arguments": "Argumentos",
+      "options": "Opções",
+      "optional": " (opcional)",
+      "repeatable": " (repetível)",
+      "examples": "Exemplos:",
+      "noHelp": "sem ajuda para '{{path}}': comando desconhecido — veja help",
+      "needCommand": "informe um comando"
+    },
+    "ui": {
+      "log": "Saída do console",
+      "welcome": "Console do Railway Manager. Digite <1>help</1> para ver os comandos — por exemplo <2>stop all --dry-run</2> ou <2>start loja@production</2>.",
+      "yesNo": "[s/N]",
+      "search": "busca ({{term}}){{noResult}} ›",
+      "noResult": " sem resultado",
+      "command": "Comando",
+      "running": "executando… (Ctrl+C interrompe)",
+      "placeholder": "digite um comando — help",
+      "cliLabel": "linha de comando · {{status}}",
+      "authenticated": "autenticado",
+      "notAuthenticated": "não autenticado",
+      "graphical": "Interface gráfica",
+      "cliWelcomeIn": "Railway Manager — linha de comando. Digite help para ver os comandos e ui para usar a interface gráfica.",
+      "cliWelcomeOut": "Railway Manager — linha de comando. Digite login para entrar e ui para usar a interface gráfica.",
+      "pageIntro": "Tudo o que a interface faz, em uma linha. Digite <1>help</1> para ver os comandos; abra este console em qualquer tela com Ctrl+` (Ctrl+K abre a paleta de comandos).",
+      "consoleTitle": "Console",
+      "interrupt": "Interromper"
+    },
+    "out": {
+      "copyTitle": "{{id}} — clique para copiar",
+      "copied": "copiado",
+      "act": {
+        "will_stop": "desligar",
+        "will_start": "iniciar",
+        "will_skip": "ignorar"
+      },
+      "toStop": "{{count}} a desligar",
+      "toStart": "{{count}} a iniciar",
+      "skipped": "{{count}} ignorada(s)",
+      "nothing": "nada",
+      "planTitle": "Plano — {{kind}}: {{total}}",
+      "planCols": {
+        "project": "Projeto",
+        "service": "Serviço",
+        "environment": "Ambiente",
+        "current": "Estado atual",
+        "action": "Ação prevista"
+      },
+      "willFail": "falhará",
+      "willSkip": "ignorar",
+      "planFooter": "{{count}} chamada(s) ao Railway · plano válido até {{time}}",
+      "starting": "iniciando…",
+      "operation": "Operação",
+      "following": " (acompanhando… Ctrl+C para soltar)",
+      "detached": " (continua no servidor)",
+      "progCols": {
+        "project": "Projeto",
+        "service": "Serviço",
+        "environment": "Ambiente",
+        "result": "Resultado",
+        "final": "Estado final",
+        "duration": "Duração"
+      },
+      "error": "erro{{status}}: {{message}}"
+    },
+    "prov": {
+      "cancelled": "(cancelado)",
+      "yesWords": "s,sim,y,yes",
+      "outside": "useConsole fora do ConsoleProvider"
+    },
+    "lang": {
+      "current": "idioma atual: {{language}} (disponíveis: {{list}})",
+      "set": "idioma alterado para {{language}}",
+      "invalid": "idioma inválido: '{{value}}' — use {{list}}"
+    }
+  }
+}

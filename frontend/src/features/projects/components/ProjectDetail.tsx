@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { api, isUuid } from '@/shared/api/client'
@@ -12,6 +13,7 @@ import { EmptyState, ErrorState, Skeleton } from '@/shared/ui/Feedback/Feedback'
 import { Field, Input, Select } from '@/shared/ui/Field/Field'
 import { Table } from '@/shared/ui/Table/Table'
 import { Tabs } from '@/shared/ui/Tabs/Tabs'
+import { errorMessage } from '@/shared/i18n/errors'
 import { useFeedbackMutation } from '@/shared/hooks/useFeedbackMutation'
 import { KIND_LABEL, SYNC_LABEL, formatDays, relativeTime } from '@/shared/lib/format'
 import { useSession } from '@/features/auth/lib/session'
@@ -22,6 +24,7 @@ type Flow = { kind: PowerKind; target: PowerTarget; title: string; confirm: bool
 
 /** Associação manual: Service ID + Environment ID, validados no Railway. */
 export function AssociateForm({ projectId, onDone }: { projectId: string; onDone: () => void }) {
+  const { t } = useTranslation('projects')
   const [service, setService] = useState('')
   const [environment, setEnvironment] = useState('')
   const [touched, setTouched] = useState(false)
@@ -30,7 +33,7 @@ export function AssociateForm({ projectId, onDone }: { projectId: string; onDone
   const associate = useFeedbackMutation({
     mutationFn: () =>
       api.associateInstance(projectId, { service_id: service.trim(), environment_id: environment.trim() }),
-    success: 'Serviço associado.',
+    success: t('associate.done'),
     invalidate: [[]],
     onSuccess: () => onDone(),
   })
@@ -43,19 +46,19 @@ export function AssociateForm({ projectId, onDone }: { projectId: string; onDone
   }
 
   return (
-    <form className="stack" onSubmit={submit} aria-label="Associar serviço">
+    <form className="stack" onSubmit={submit} aria-label={t('associate.label')}>
       <div className="form-grid">
-        <Field label="Railway Service ID" error={touched && serviceInvalid ? 'UUID inválido.' : undefined}>
+        <Field label={t('associate.serviceId')} error={touched && serviceInvalid ? t('associate.invalid') : undefined}>
           {(p) => <Input {...p} className="mono" value={service} onChange={(e) => setService(e.target.value)} />}
         </Field>
-        <Field label="Railway Environment ID" error={touched && environmentInvalid ? 'UUID inválido.' : undefined}>
+        <Field label={t('associate.environmentId')} error={touched && environmentInvalid ? t('associate.invalid') : undefined}>
           {(p) => <Input {...p} className="mono" value={environment} onChange={(e) => setEnvironment(e.target.value)} />}
         </Field>
       </div>
       <ErrorState error={associate.error} />
       <div className="row">
         <Button variant="primary" type="submit" loading={associate.isPending}>
-          Associar
+          {t('associate.submit')}
         </Button>
       </div>
     </form>
@@ -63,6 +66,7 @@ export function AssociateForm({ projectId, onDone }: { projectId: string; onDone
 }
 
 function ImportInstances({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const { t } = useTranslation('projects')
   const discovery = useQuery({
     queryKey: ['discover-instances', projectId],
     queryFn: () => api.discoverInstances(projectId),
@@ -79,7 +83,7 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
           return { environment_id, service_id }
         }),
       ),
-    success: (r) => `${r.imported.length} serviço(s) importado(s).`,
+    success: (r) => t('import.imported', { count: r.imported.length }),
     invalidate: [[]],
     onSuccess: (r) => {
       setReport(r)
@@ -94,7 +98,7 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
     <div key={env.environment.id}>
       <div className="group-title">{env.environment.name}</div>
       {env.instances.length === 0 ? (
-        <p className="subtle">Nenhum serviço neste ambiente.</p>
+        <p className="subtle">{t('import.none')}</p>
       ) : (
         <ul className="check-list">
           {env.instances.map((i) => {
@@ -111,7 +115,7 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
                   <span>{i.service_name}</span>
                 </label>
                 <StateChip state={i.state} />
-                {i.managed && <span className="subtle">já gerenciado</span>}
+                {i.managed && <span className="subtle">{t('import.managed')}</span>}
               </li>
             )
           })}
@@ -122,13 +126,13 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
 
   return (
     <Modal
-      title="Importar serviços do Railway"
+      title={t('import.title')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Fechar</Button>
+          <Button onClick={onClose}>{t('ui.close', { ns: 'common' })}</Button>
           <Button variant="primary" disabled={selected.length === 0} loading={importMany.isPending} onClick={() => importMany.mutate()}>
-            Importar {selected.length || ''}
+            {t('discover.import', { count: selected.length || '' })}
           </Button>
         </>
       }
@@ -136,16 +140,16 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
       <ErrorState error={discovery.error ?? importMany.error} onRetry={discovery.error ? () => void discovery.refetch() : undefined} />
       {report && (
         <div className="alert alert-success" role="status">
-          {report.imported.length} importada(s)
-          {report.already_managed.length > 0 && `, ${report.already_managed.length} já gerenciada(s)`}
-          {report.failed.length > 0 && `, ${report.failed.length} com falha`}.
+          {t('import.reportImported', { count: report.imported.length })}
+          {report.already_managed.length > 0 && t('import.reportAlready', { count: report.already_managed.length })}
+          {report.failed.length > 0 && t('import.reportFailed', { count: report.failed.length })}.
         </div>
       )}
-      {discovery.isPending && <Skeleton lines={4} label="Consultando o Railway…" />}
+      {discovery.isPending && <Skeleton lines={4} label={t('discover.querying')} />}
       {regular.map(renderEnv)}
       {ephemeral.length > 0 && (
         <details>
-          <summary className="section-title">Ambientes efêmeros (PR) — {ephemeral.length}</summary>
+          <summary className="section-title">{t('import.ephemeral', { count: ephemeral.length })}</summary>
           {ephemeral.map(renderEnv)}
         </details>
       )}
@@ -154,32 +158,33 @@ function ImportInstances({ projectId, onClose }: { projectId: string; onClose: (
 }
 
 function EditProject({ project, onClose }: { project: Project; onClose: () => void }) {
+  const { t } = useTranslation('projects')
   const [name, setName] = useState(project.display_name ?? '')
   const [description, setDescription] = useState(project.description ?? '')
   const save = useFeedbackMutation({
     mutationFn: () => api.editProject(project.id, { display_name: name || null, description: description || null }),
-    success: 'Projeto atualizado.',
+    success: t('edit.done'),
     invalidate: [[]],
     onSuccess: () => onClose(),
   })
   return (
     <Modal
-      title="Editar projeto"
+      title={t('edit.title')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Cancelar</Button>
+          <Button onClick={onClose}>{t('ui.cancel', { ns: 'common' })}</Button>
           <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending}>
-            Salvar
+            {t('edit.save')}
           </Button>
         </>
       }
     >
-      <p className="subtle">Altera apenas os dados locais. O Railway Project ID não é editável.</p>
-      <Field label="Nome de exibição">
+      <p className="subtle">{t('edit.hint')}</p>
+      <Field label={t('edit.name')}>
         {(p) => <Input {...p} value={name} placeholder={project.name} onChange={(e) => setName(e.target.value)} />}
       </Field>
-      <Field label="Descrição">
+      <Field label={t('edit.description')}>
         {(p) => <Input {...p} value={description} onChange={(e) => setDescription(e.target.value)} />}
       </Field>
       <ErrorState error={save.error} />
@@ -188,6 +193,7 @@ function EditProject({ project, onClose }: { project: Project; onClose: () => vo
 }
 
 export function ProjectDetail() {
+  const { t } = useTranslation('projects')
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const session = useSession()
@@ -205,16 +211,16 @@ export function ProjectDetail() {
   const [envFilter, setEnvFilter] = useState('')
   const [tab, setTab] = useState('services')
 
-  const sync = useFeedbackMutation({ mutationFn: () => api.syncProject(id), success: 'Projeto sincronizado.', invalidate: [[]] })
+  const sync = useFeedbackMutation({ mutationFn: () => api.syncProject(id), success: t('detail.synced'), invalidate: [[]] })
   const remove = useFeedbackMutation({
     mutationFn: () => api.removeProject(id),
-    success: 'Projeto removido do gerenciamento.',
+    success: t('detail.unmanaged'),
     invalidate: [[]],
     onSuccess: () => navigate('/projects'),
   })
   const unlink = useFeedbackMutation({
     mutationFn: (instance: string) => api.removeInstance(instance),
-    success: 'Serviço removido.',
+    success: t('detail.serviceRemoved'),
     invalidate: [[]],
     onSuccess: () => setRemoveInstance(null),
   })
@@ -233,14 +239,14 @@ export function ProjectDetail() {
   const name = p?.display_name ?? p?.name ?? ''
 
   if (project.error) return <ErrorState error={project.error} onRetry={() => void project.refetch()} />
-  if (!p) return <Skeleton lines={4} label="Carregando projeto…" />
+  if (!p) return <Skeleton lines={4} label={t('detail.loading')} />
 
   return (
     <>
       <div className="page-head">
         <div>
           <p className="crumb">
-            <Link to="/projects">Projetos</Link> /
+            <Link to="/projects">{t('detail.crumb')}</Link> /
           </p>
           <h1>{name}</h1>
           <p className="muted">
@@ -251,13 +257,13 @@ export function ProjectDetail() {
         <div className="row">
           {canOperate && (
             <Button onClick={() => sync.mutate()} loading={sync.isPending} disabled={!ready}>
-              {sync.isPending ? 'Sincronizando…' : 'Sincronizar'}
+              {sync.isPending ? t('detail.syncing') : t('detail.sync')}
             </Button>
           )}
-          {canManage && <Button onClick={() => setModal('edit')}>Editar</Button>}
+          {canManage && <Button onClick={() => setModal('edit')}>{t('detail.edit')}</Button>}
           {canManage && (
             <Button variant="ghost" onClick={() => setModal('remove')}>
-              Remover do gerenciamento
+              {t('detail.unmanage')}
             </Button>
           )}
         </div>
@@ -266,17 +272,17 @@ export function ProjectDetail() {
       <div className="stack">
         <ErrorState error={instances.error} onRetry={() => void instances.refetch()} />
         {p.sync_status === 'not_found' && (
-          <div className="alert alert-danger">O Railway informa que este projeto não existe mais. Os dados locais foram mantidos.</div>
+          <div className="alert alert-danger">{t('detail.gone')}</div>
         )}
 
         <Tabs
-          label="Seções do projeto"
+          label={t('detail.sections')}
           value={tab}
           onChange={setTab}
           items={[
-            { id: 'services', label: 'Serviços', count: views.length },
-            { id: 'environments', label: 'Ambientes', count: environments.data?.environments.length },
-            { id: 'schedules', label: 'Agendas', count: schedules.data?.schedules.length },
+            { id: 'services', label: t('detail.tabServices'), count: views.length },
+            { id: 'environments', label: t('detail.tabEnvironments'), count: environments.data?.environments.length },
+            { id: 'schedules', label: t('detail.tabSchedules'), count: schedules.data?.schedules.length },
           ]}
         />
 
@@ -285,21 +291,21 @@ export function ProjectDetail() {
             {!environments.data ? (
               <Skeleton lines={3} />
             ) : environments.data.environments.length === 0 ? (
-              <EmptyState title="Nenhum ambiente">Sincronize o projeto para carregar os ambientes.</EmptyState>
+              <EmptyState title={t('detail.noEnvironments')}>{t('detail.noEnvironmentsBody')}</EmptyState>
             ) : (
-              <Table label="Ambientes">
+              <Table label={t('detail.envTable')}>
                 <thead>
                   <tr>
-                    <th>Ambiente</th>
-                    <th>Tipo</th>
-                    <th className="num">Serviços gerenciados</th>
+                    <th>{t('detail.environment')}</th>
+                    <th>{t('detail.type')}</th>
+                    <th className="num">{t('detail.managedServices')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {environments.data.environments.map((e) => (
                     <tr key={e.id}>
                       <td className="mono">{e.name}</td>
-                      <td>{e.is_ephemeral ? 'Efêmero (PR)' : 'Permanente'}</td>
+                      <td>{e.is_ephemeral ? t('detail.ephemeralPr') : t('detail.permanent')}</td>
                       <td className="num">{views.filter((v) => v.environment.id === e.id).length}</td>
                     </tr>
                   ))}
@@ -316,22 +322,22 @@ export function ProjectDetail() {
               <Skeleton lines={3} />
             ) : schedules.data && schedules.data.schedules.length === 0 ? (
               <EmptyState
-                title="Nenhuma agenda neste projeto"
+                title={t('detail.noSchedules')}
                 action={
                   <Link to="/schedules" className="btn">
-                    Ir para Agendas
+                    {t('detail.goSchedules')}
                   </Link>
                 }
               >
-                Agendas ligam e desligam os serviços automaticamente em horários definidos.
+                {t('detail.noSchedulesBody')}
               </EmptyState>
             ) : (
-              <Table label="Agendas do projeto">
+              <Table label={t('detail.schedulesTable')}>
                 <thead>
                   <tr>
-                    <th>Agenda</th>
-                    <th>Dias</th>
-                    <th>Situação</th>
+                    <th>{t('detail.schedule')}</th>
+                    <th>{t('detail.days')}</th>
+                    <th>{t('detail.status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -341,7 +347,7 @@ export function ProjectDetail() {
                         <Link to="/schedules">{sc.name}</Link>
                       </td>
                       <td>{formatDays(sc.days)}</td>
-                      <td>{sc.paused_reason ? 'Pausada' : sc.enabled ? 'Ativa' : 'Desativada'}</td>
+                      <td>{sc.paused_reason ? t('detail.paused') : sc.enabled ? t('detail.active') : t('detail.disabled')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -353,14 +359,14 @@ export function ProjectDetail() {
         {tab === 'services' && (
         <div className="card">
           <div className="card-head">
-            <h3>Serviços</h3>
+            <h3>{t('detail.services')}</h3>
             <Select
               style={{ width: 'auto' }}
-              aria-label="Filtrar por ambiente"
+              aria-label={t('detail.filterEnv')}
               value={envFilter}
               onChange={(e) => setEnvFilter(e.target.value)}
             >
-              <option value="">Todos os ambientes</option>
+              <option value="">{t('detail.allEnvs')}</option>
               {environments.data?.environments.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name}
@@ -377,35 +383,35 @@ export function ProjectDetail() {
                   setFlow({
                     kind,
                     target: { type: 'project', project_id: id, environment_id: envFilter || null },
-                    title: `${KIND_LABEL[kind]} ${envFilter ? 'ambiente' : 'todos'} — ${name}`,
+                    title: t(envFilter ? 'detail.titleEnv' : 'detail.titleAll', { kind: KIND_LABEL[kind], name }),
                     confirm: true,
                   })
                 }
               >
-                {kind === 'start' ? 'Iniciar' : 'Desligar'} {envFilter ? 'ambiente' : 'todos'}
+                {t(kind === 'start' ? (envFilter ? 'detail.startEnv' : 'detail.startAll') : envFilter ? 'detail.stopEnv' : 'detail.stopAll')}
               </Button>
             ))}
             {canManage && (
               <>
                 <Button size="sm" onClick={() => setModal('associate')}>
-                  Associar por ID
+                  {t('detail.associateById')}
                 </Button>
                 <Button size="sm" variant="primary" onClick={() => setModal('import')} disabled={!ready}>
-                  Importar do Railway
+                  {t('detail.importFromRailway')}
                 </Button>
               </>
             )}
           </div>
           {views.length === 0 ? (
-            <EmptyState title="Nenhum serviço gerenciado">Importe serviços de um ambiente para controlar desligar/iniciar.</EmptyState>
+            <EmptyState title={t('detail.noServices')}>{t('detail.noServicesBody')}</EmptyState>
           ) : (
-            <Table label="Serviços">
+            <Table label={t('detail.servicesTable')}>
                 <thead>
                   <tr>
-                    <th>Serviço</th>
-                    <th>Ambiente</th>
-                    <th>Estado</th>
-                    <th>Leitura</th>
+                    <th>{t('detail.service')}</th>
+                    <th>{t('detail.environment')}</th>
+                    <th>{t('detail.state')}</th>
+                    <th>{t('detail.reading')}</th>
                     <th />
                   </tr>
                 </thead>
@@ -426,7 +432,7 @@ export function ProjectDetail() {
                         </td>
                         <td>
                           {v.instance.not_found ? (
-                            <span className="freshness freshness-unavailable">Não encontrado no Railway</span>
+                            <span className="freshness freshness-unavailable">{t('detail.notFound')}</span>
                           ) : (
                             <FreshnessNote
                               freshness={freshness}
@@ -445,17 +451,17 @@ export function ProjectDetail() {
                                 setFlow({
                                   kind: off ? 'start' : 'stop',
                                   target: { type: 'instance', instance_id: v.instance.id },
-                                  title: `${off ? 'Iniciar' : 'Desligar'} ${v.service.name} (${v.environment.name})`,
+                                  title: t('detail.actionTitle', { kind: off ? t('detail.start') : t('detail.stop'), service: v.service.name, environment: v.environment.name }),
                                   confirm: false,
                                 })
                               }
                             >
-                              {off ? 'Iniciar' : 'Desligar'}
+                              {off ? t('detail.start') : t('detail.stop')}
                             </Button>
                             )}
                             <Button
                               size="sm"
-                              aria-label={`Logs de ${v.service.name} (${v.environment.name})`}
+                              aria-label={t('detail.logsOf', { service: v.service.name, environment: v.environment.name })}
                               aria-pressed={logsFor?.instance.id === v.instance.id}
                               disabled={v.instance.not_found}
                               onClick={() => {
@@ -463,11 +469,11 @@ export function ProjectDetail() {
                                 setLogsFor(logsFor?.instance.id === v.instance.id ? null : v)
                               }}
                             >
-                              Logs
+                              {t('detail.logs')}
                             </Button>
                             {canManage && (
                               <Button size="sm" variant="ghost" onClick={() => setRemoveInstance(v)}>
-                                Remover
+                                {t('detail.remove')}
                               </Button>
                             )}
                           </div>
@@ -486,17 +492,17 @@ export function ProjectDetail() {
               filters={logFilters}
               onChange={setLogFilters}
               fileName={`${name}-${logsFor.service.name}-${logsFor.environment.name}`}
-              title={`Logs de ${logsFor.service.name} (${logsFor.environment.name})`}
+              title={t('detail.logsOf', { service: logsFor.service.name, environment: logsFor.environment.name })}
               actions={
                 <>
                   <Link
                     className="btn btn-sm"
                     to={`/logs?${filtersToParams(logFilters, new URLSearchParams({ instance: logsFor.instance.id })).toString()}`}
                   >
-                    Abrir em tela cheia
+                    {t('detail.fullScreen')}
                   </Link>
                   <Button size="sm" variant="ghost" onClick={() => setLogsFor(null)}>
-                    Fechar
+                    {t('detail.close')}
                   </Button>
                 </>
               }
@@ -508,43 +514,47 @@ export function ProjectDetail() {
 
       {modal === 'import' && <ImportInstances projectId={id} onClose={() => setModal(null)} />}
       {modal === 'associate' && (
-        <Modal title="Associar serviço" onClose={() => setModal(null)}>
+        <Modal title={t('detail.associateTitle')} onClose={() => setModal(null)}>
           <AssociateForm projectId={id} onDone={() => setModal(null)} />
         </Modal>
       )}
       {modal === 'edit' && <EditProject project={p} onClose={() => setModal(null)} />}
       {modal === 'remove' && (
         <ConfirmDialog
-          title="Remover do gerenciamento"
+          title={t('detail.removeTitle')}
           message={
             <>
               <p>
-                <strong>{name}</strong> sai da lista local com seus ambientes e serviços.
+                <Trans t={t} i18nKey="detail.removeBody" values={{ name }} components={{ 1: <strong /> }} />
               </p>
-              <p className="muted">Nada é alterado no Railway. O histórico de operações é mantido.</p>
+              <p className="muted">{t('detail.removeNote')}</p>
             </>
           }
-          confirmLabel="Remover"
+          confirmLabel={t('detail.confirmRemove')}
           danger
           busy={remove.isPending}
-          error={remove.error?.message}
+          error={remove.error ? errorMessage(remove.error) : undefined}
           onConfirm={() => remove.mutate()}
           onClose={() => setModal(null)}
         />
       )}
       {removeInstance && (
         <ConfirmDialog
-          title="Remover serviço"
+          title={t('detail.removeServiceTitle')}
           message={
             <p>
-              Desvincular <strong>{removeInstance.service.name}</strong> em <strong>{removeInstance.environment.name}</strong>?
-              O serviço continua rodando no Railway.
+              <Trans
+                t={t}
+                i18nKey="detail.unlink"
+                values={{ service: removeInstance.service.name, environment: removeInstance.environment.name }}
+                components={{ 1: <strong /> }}
+              />
             </p>
           }
-          confirmLabel="Remover"
+          confirmLabel={t('detail.confirmRemove')}
           danger
           busy={unlink.isPending}
-          error={unlink.error?.message}
+          error={unlink.error ? errorMessage(unlink.error) : undefined}
           onConfirm={() => unlink.mutate(removeInstance.instance.id)}
           onClose={() => setRemoveInstance(null)}
         />

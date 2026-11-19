@@ -1,15 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { api } from '@/shared/api/client'
 import { Button } from '@/shared/ui/Button/Button'
 import { Checkbox, Field, Input, Select } from '@/shared/ui/Field/Field'
 import { formatDateTime, shortId } from '@/shared/lib/format'
 import { type LogFilterState, LIMITS, SEVERITIES, toApiFilters } from '@/features/logs/lib/filters'
-import { LogViewer, SEVERITY_LABEL } from './LogViewer'
+import { LogViewer, severityLabel } from './LogViewer'
 import { useLogs } from '@/features/logs/hooks/useLogs'
 
-const TYPE_LABEL = { runtime: 'Execução (runtime)', build: 'Build' } as const
+const LOG_TYPES = ['runtime', 'build'] as const
 
 export interface LogsPanelProps {
   instanceId: string
@@ -24,6 +25,7 @@ export interface LogsPanelProps {
 
 /** Filtros, deploy, acompanhamento ao vivo e lista de logs de uma instância. */
 export function LogsPanel({ instanceId, filters, onChange, fileName, actions, title }: LogsPanelProps) {
+  const { t } = useTranslation('logs')
   const deployments = useQuery({
     queryKey: ['instance-deployments', instanceId],
     queryFn: () => api.instanceDeployments(instanceId),
@@ -49,51 +51,51 @@ export function LogsPanel({ instanceId, filters, onChange, fileName, actions, ti
 
   const noDeployment = logs.deployment !== null && logs.deployment.id === null
   return (
-    <section className="log-panel" aria-label="Logs">
+    <section className="log-panel" aria-label={t('title')}>
       <div className="log-panel-head">
-        <h2>{title ?? 'Logs'}</h2>
+        <h2>{title ?? t('title')}</h2>
         <div className="row">{actions}</div>
       </div>
 
       <form
         className="log-filters"
-        aria-label="Filtros de logs"
+        aria-label={t('panel.filters')}
         onSubmit={(e) => {
           e.preventDefault()
           commitText()
         }}
       >
-        <Field label="Tipo">
+        <Field label={t('panel.type')}>
           {(p) => (
             <Select {...p} value={filters.type} onChange={(e) => set({ type: e.target.value as LogFilterState['type'], deployment: '' })}>
-              {(Object.keys(TYPE_LABEL) as (keyof typeof TYPE_LABEL)[]).map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABEL[t]}
+              {LOG_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {t(`panel.${type}`)}
                 </option>
               ))}
             </Select>
           )}
         </Field>
-        <Field label="Deploy">
+        <Field label={t('panel.deploy')}>
           {(p) => (
             <Select {...p} value={filters.deployment} onChange={(e) => set({ deployment: e.target.value })}>
-              <option value="">Atual (mais recente)</option>
+              <option value="">{t('panel.current')}</option>
               {list.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.status} · {d.created_at ? formatDateTime(d.created_at) : 'sem data'} · {shortId(d.id)}
-                  {d.is_current ? ' (atual)' : ''}
+                  {d.status} · {d.created_at ? formatDateTime(d.created_at) : t('panel.noDate')} · {shortId(d.id)}
+                  {d.is_current ? t('panel.currentTag') : ''}
                 </option>
               ))}
             </Select>
           )}
         </Field>
-        <Field label="De">
+        <Field label={t('panel.from')}>
           {(p) => <Input {...p} type="datetime-local" value={filters.start} onChange={(e) => set({ start: e.target.value })} />}
         </Field>
-        <Field label="Até" hint={filters.end ? 'Com limite final, não acompanha ao vivo.' : undefined}>
+        <Field label={t('panel.to')} hint={filters.end ? t('panel.toHint') : undefined}>
           {(p) => <Input {...p} type="datetime-local" value={filters.end} onChange={(e) => set({ end: e.target.value })} />}
         </Field>
-        <Field label="Linhas">
+        <Field label={t('panel.lines')}>
           {(p) => (
             <Select {...p} value={filters.limit} onChange={(e) => set({ limit: Number(e.target.value) })}>
               {LIMITS.map((n) => (
@@ -105,17 +107,17 @@ export function LogsPanel({ instanceId, filters, onChange, fileName, actions, ti
           )}
         </Field>
         <fieldset className="log-severities">
-          <legend>Severidade</legend>
+          <legend>{t('panel.severity')}</legend>
           {SEVERITIES.map((level) => (
             <Checkbox
               key={level}
-              label={SEVERITY_LABEL[level]}
+              label={severityLabel(level)}
               checked={filters.severity.includes(level)}
               onChange={(e) => toggleSeverity(level, e.target.checked)}
             />
           ))}
         </fieldset>
-        <Field label="Filtrar texto" hint="Enter aplica no Railway" className="log-filter-text">
+        <Field label={t('panel.filterText')} hint={t('panel.filterTextHint')} className="log-filter-text">
           {(p) => (
             <Input
               {...p}
@@ -130,7 +132,7 @@ export function LogsPanel({ instanceId, filters, onChange, fileName, actions, ti
                   commitText()
                 }
               }}
-              placeholder="Mensagem contém…"
+              placeholder={t('panel.filterPlaceholder')}
             />
           )}
         </Field>
@@ -139,7 +141,7 @@ export function LogsPanel({ instanceId, filters, onChange, fileName, actions, ti
       {logs.deployment && logs.deployment.id && !logs.deployment.isCurrent && (
         <div className="alert alert-info" role="status">
           <span className="alert-text">
-            Você está vendo um deploy anterior ({logs.deployment.status ?? 'sem status'}), não o atual. Não é acompanhado ao vivo.
+            {t('panel.oldDeploy', { status: logs.deployment.status ?? t('panel.noStatus') })}
           </span>
         </div>
       )}
@@ -157,23 +159,23 @@ export function LogsPanel({ instanceId, filters, onChange, fileName, actions, ti
           <>
             {live && (
               <Button size="sm" onClick={() => logs.setPaused(!logs.paused)} aria-pressed={logs.paused}>
-                {logs.paused ? 'Retomar' : 'Pausar'}
+                {logs.paused ? t('panel.resume') : t('panel.pause')}
               </Button>
             )}
             <Button size="sm" onClick={logs.reload} loading={logs.loading}>
-              Atualizar
+              {t('panel.refresh')}
             </Button>
           </>
         }
       />
       {live && !logs.paused && !noDeployment && (
         <p className="subtle" role="status">
-          Acompanhando ao vivo.
+          {t('panel.live')}
         </p>
       )}
       {live && logs.paused && (
         <p className="subtle" role="status">
-          Acompanhamento pausado.
+          {t('panel.paused')}
         </p>
       )}
     </section>

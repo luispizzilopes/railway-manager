@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 
 import { api, isUuid } from '@/shared/api/client'
@@ -15,13 +16,14 @@ import { useSession } from '@/features/auth/lib/session'
 
 /** Cadastro manual por Railway Project ID. */
 export function RegisterProjectForm({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation('projects')
   const [id, setId] = useState('')
   const [name, setName] = useState('')
   const [touched, setTouched] = useState(false)
   const invalid = id.trim() !== '' && !isUuid(id)
   const create = useFeedbackMutation({
     mutationFn: () => api.createProject(id.trim(), name.trim() || undefined),
-    success: 'Projeto cadastrado.',
+    success: t('register.done'),
     invalidate: [[]],
     onSuccess: () => onDone(),
   })
@@ -34,10 +36,10 @@ export function RegisterProjectForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form className="stack" onSubmit={submit} aria-label="Cadastrar projeto">
+    <form className="stack" onSubmit={submit} aria-label={t('register.label')}>
       <Field
-        label="Railway Project ID"
-        error={touched && (invalid || !id.trim()) ? 'Informe o ID do projeto (UUID), como aparece nas configurações do projeto.' : undefined}
+        label={t('register.id')}
+        error={touched && (invalid || !id.trim()) ? t('register.idError') : undefined}
       >
         {(p) => (
           <Input
@@ -50,13 +52,13 @@ export function RegisterProjectForm({ onDone }: { onDone: () => void }) {
           />
         )}
       </Field>
-      <Field label="Nome de exibição (opcional)" hint="O nome e a descrição vêm do Railway; este nome só muda aqui.">
+      <Field label={t('register.name')} hint={t('register.nameHint')}>
         {(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />}
       </Field>
       <ErrorState error={create.error} />
       <div className="row">
         <Button variant="primary" type="submit" loading={create.isPending}>
-          {create.isPending ? 'Validando no Railway…' : 'Cadastrar'}
+          {create.isPending ? t('register.validating') : t('register.submit')}
         </Button>
       </div>
     </form>
@@ -64,12 +66,13 @@ export function RegisterProjectForm({ onDone }: { onDone: () => void }) {
 }
 
 function DiscoverProjects({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation('projects')
   const discovery = useQuery({ queryKey: ['discover-projects'], queryFn: api.discoverProjects })
   const [selected, setSelected] = useState<string[]>([])
   const [report, setReport] = useState<ProjectImportReport | null>(null)
   const importMany = useFeedbackMutation({
     mutationFn: () => api.importProjects(selected),
-    success: (r) => `${r.imported.length} projeto(s) importado(s).`,
+    success: (r) => t('discover.imported', { count: r.imported.length }),
     invalidate: [[]],
     onSuccess: (r) => {
       setReport(r)
@@ -80,13 +83,13 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Importar projetos do Railway"
+      title={t('discover.title')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Fechar</Button>
+          <Button onClick={onClose}>{t('ui.close', { ns: 'common' })}</Button>
           <Button variant="primary" disabled={selected.length === 0} loading={importMany.isPending} onClick={() => importMany.mutate()}>
-            Importar {selected.length || ''}
+            {t('discover.import', { count: selected.length || '' })}
           </Button>
         </>
       }
@@ -94,17 +97,17 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
       <ErrorState error={discovery.error} onRetry={() => void discovery.refetch()} />
       {report && (
         <div className="alert alert-success" role="status">
-          {report.imported.length} importado(s)
-          {report.already_managed.length > 0 && `, ${report.already_managed.length} já gerenciado(s)`}
-          {report.failed.length > 0 && `, ${report.failed.length} com falha: ${report.failed.map((f) => f.reason).join('; ')}`}.
+          {t('discover.reportImported', { count: report.imported.length })}
+          {report.already_managed.length > 0 && t('discover.reportAlready', { count: report.already_managed.length })}
+          {report.failed.length > 0 && t('discover.reportFailed', { count: report.failed.length, reasons: report.failed.map((f) => f.reason).join('; ') })}.
         </div>
       )}
-      {discovery.isPending && <Skeleton lines={4} label="Consultando o Railway…" />}
+      {discovery.isPending && <Skeleton lines={4} label={t('discover.querying')} />}
       {discovery.data?.workspaces.map((group) => (
         <div key={group.workspace?.id ?? 'sem-workspace'}>
-          <div className="group-title">{group.workspace?.name ?? 'Sem workspace'}</div>
+          <div className="group-title">{group.workspace?.name ?? t('discover.noWorkspace')}</div>
           {group.projects.length === 0 ? (
-            <p className="subtle">Nenhum projeto neste workspace.</p>
+            <p className="subtle">{t('discover.noProjects')}</p>
           ) : (
             <ul className="check-list">
               {group.projects.map(({ project, managed }) => (
@@ -119,7 +122,7 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
                     <span>{project.name}</span>
                     <span className="subtle mono">{project.id.slice(0, 8)}</span>
                   </label>
-                  {managed && <span className="subtle">já gerenciado</span>}
+                  {managed && <span className="subtle">{t('discover.managed')}</span>}
                 </li>
               ))}
             </ul>
@@ -131,6 +134,7 @@ function DiscoverProjects({ onClose }: { onClose: () => void }) {
 }
 
 export function Projects() {
+  const { t } = useTranslation('projects')
   const canManage = useSession().can('admin')
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const [mode, setMode] = useState<'discover' | 'manual' | null>(null)
@@ -143,14 +147,14 @@ export function Projects() {
     <>
       <div className="page-head">
         <div>
-          <h1>Projetos</h1>
-          <p className="muted">Projetos do Railway sob gerenciamento. Nada aqui cria ou exclui projetos no Railway.</p>
+          <h1>{t('list.title')}</h1>
+          <p className="muted">{t('list.subtitle')}</p>
         </div>
         {canManage && (
           <div className="row">
-            <Button onClick={() => setMode('manual')}>Cadastrar por ID</Button>
+            <Button onClick={() => setMode('manual')}>{t('list.registerById')}</Button>
             <Button variant="primary" onClick={() => setMode('discover')}>
-              Importar da conta
+              {t('list.importAccount')}
             </Button>
           </div>
         )}
@@ -158,47 +162,47 @@ export function Projects() {
       <ErrorState error={projects.error} onRetry={() => void projects.refetch()} retrying={projects.isFetching} />
       {projects.isPending && (
         <div className="card">
-          <Skeleton lines={4} label="Carregando projetos…" />
+          <Skeleton lines={4} label={t('list.loading')} />
         </div>
       )}
       {projects.data && all.length === 0 && (
         <div className="card">
           <EmptyState
-            title="Nenhum projeto ainda"
+            title={t('list.emptyTitle')}
             action={
               canManage ? (
                 <Button variant="primary" onClick={() => setMode('discover')}>
-                  Importar da conta
+                  {t('list.importAccount')}
                 </Button>
               ) : undefined
             }
           >
-            {canManage ? 'Importe a partir da conta ou cadastre pelo Railway Project ID.' : 'Peça a um administrador para cadastrar projetos.'}
+            {canManage ? t('list.emptyAdmin') : t('list.emptyViewer')}
           </EmptyState>
         </div>
       )}
       {all.length > 0 && (
         <div className="toolbar" role="search" style={{ marginBottom: 'var(--space-3)' }}>
-          <Input type="search" aria-label="Buscar projeto" placeholder="Buscar projeto…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <Input type="search" aria-label={t('list.search')} placeholder={t('list.searchPlaceholder')} value={filter} onChange={(e) => setFilter(e.target.value)} />
           <span className="toolbar-count" aria-live="polite">
-            {shown.length} {shown.length === 1 ? 'projeto' : 'projetos'}
+            {t('list.count', { count: shown.length })}
           </span>
         </div>
       )}
       {all.length > 0 && (
         <div className="card">
           {shown.length === 0 ? (
-            <EmptyState title="Nenhum projeto encontrado" action={<Button onClick={() => setFilter('')}>Limpar busca</Button>}>
-              Nenhum projeto corresponde à busca.
+            <EmptyState title={t('list.noneTitle')} action={<Button onClick={() => setFilter('')}>{t('list.clearSearch')}</Button>}>
+              {t('list.noneBody')}
             </EmptyState>
           ) : (
-            <Table label="Projetos">
+            <Table label={t('list.table')}>
               <thead>
                 <tr>
-                  <th>Projeto</th>
-                  <th>Railway Project ID</th>
-                  <th>Sincronização</th>
-                  <th>Cadastrado</th>
+                  <th>{t('list.project')}</th>
+                  <th>{t('list.railwayId')}</th>
+                  <th>{t('list.sync')}</th>
+                  <th>{t('list.registered')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,7 +227,7 @@ export function Projects() {
       )}
       {mode === 'discover' && <DiscoverProjects onClose={() => setMode(null)} />}
       {mode === 'manual' && (
-        <Modal title="Cadastrar projeto" onClose={() => setMode(null)}>
+        <Modal title={t('register.label')} onClose={() => setMode(null)}>
           <RegisterProjectForm onDone={() => setMode(null)} />
         </Modal>
       )}

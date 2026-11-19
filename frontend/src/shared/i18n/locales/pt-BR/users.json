@@ -1,0 +1,47 @@
+{
+  "hint": {
+    "viewer": "Só consulta: visão geral, projetos, agendas, histórico e logs.",
+    "operator": "Também liga e desliga serviços, atualiza estados e pausa/retoma agendas.",
+    "admin": "Também gerencia projetos, serviços, agendas e o token do Railway."
+  },
+  "create": {
+    "label": "Novo usuário",
+    "username": "Usuário",
+    "usernameHint": "De 3 a 32 caracteres: letras, números, '.', '_' ou '-'.",
+    "password": "Senha",
+    "passwordHint": "Ao menos 8 caracteres.",
+    "role": "Papel",
+    "submit": "Criar usuário",
+    "done": "Usuário criado."
+  },
+  "password": {
+    "label": "Nova senha de {{user}}",
+    "field": "Nova senha",
+    "submit": "Redefinir senha",
+    "done": "Senha redefinida; as sessões do usuário foram encerradas.",
+    "title": "Redefinir senha de {{user}}"
+  },
+  "denied": "Somente o usuário master gerencia usuários.",
+  "title": "Usuários",
+  "subtitle": "Quem pode entrar e o que cada pessoa pode fazer.",
+  "new": "Novo usuário",
+  "loading": "Carregando usuários…",
+  "emptyTitle": "Nenhum usuário cadastrado",
+  "emptyBody": "Crie usuários para dar acesso à equipe com o papel certo.",
+  "table": "Usuários",
+  "user": "Usuário",
+  "role": "Papel",
+  "status": "Situação",
+  "created": "Criado",
+  "roleOf": "Papel de {{user}}",
+  "active": "Ativo",
+  "inactive": "Inativo",
+  "deactivate": "Desativar",
+  "activate": "Ativar",
+  "resetPassword": "Redefinir senha",
+  "remove": "Remover",
+  "updated": "Usuário atualizado.",
+  "removed": "Usuário removido.",
+  "removeTitle": "Remover usuário",
+  "removeMessage": "Remover <1>{{user}}</1>? As sessões abertas são encerradas e o histórico de operações continua com o nome."
+}

@@ -1,5 +1,7 @@
 // `--at` / `--in` / `--tz` → instante UTC, e descrição relativa ("hoje 18:00 — em 3h12m").
 
+import { currentLanguage } from '@/shared/i18n'
+import { ct } from '@/features/console/lib/i18n'
 import { CommandError } from '@/features/console/state/types'
 
 const MINUTE = 60_000
@@ -82,11 +84,11 @@ export function zonedToUtc(d: LocalDate, hour: number, minute: number, timeZone:
 export function parseDuration(text: string): number {
   const m = /^(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)(?:m|min)?)?$/i.exec(text.trim())
   if (!m || text.trim() === '' || (m[3] !== undefined && !m[1] && !m[2] && !/m/i.test(text))) {
-    throw new CommandError(`duração inválida: '${text}' — use por exemplo 30m, 2h ou 1h30m`)
+    throw new CommandError(ct('m.time.durationInvalid', { text }))
   }
   const [, d, h, min] = m
   const ms = ((Number(d ?? 0) * 24 + Number(h ?? 0)) * 60 + Number(min ?? 0)) * MINUTE
-  if (ms <= 0) throw new CommandError(`duração deve ser maior que zero: '${text}'`)
+  if (ms <= 0) throw new CommandError(ct('m.time.durationZero', { text }))
   return ms
 }
 
@@ -94,7 +96,7 @@ function time(text: string): { hour: number; minute: number } {
   const m = /^(\d{1,2})(?::(\d{2})|h(\d{2})?)$/i.exec(text.trim())
   const hour = m ? Number(m[1]) : NaN
   const minute = m ? Number(m[2] ?? m[3] ?? 0) : NaN
-  if (!m || hour > 23 || minute > 59) throw new CommandError(`horário inválido: '${text}' — use HH:MM`)
+  if (!m || hour > 23 || minute > 59) throw new CommandError(ct('m.time.timeInvalid', { text }))
   return { hour, minute }
 }
 
@@ -121,10 +123,10 @@ export function parseWhen(
   defaultTimeZone: string,
 ): When {
   const timeZone = input.tz?.trim() || defaultTimeZone
-  if (!validTimeZone(timeZone)) throw new CommandError(`fuso inválido: '${timeZone}' (use um nome IANA, ex.: America/Sao_Paulo)`)
-  if (input.at && input.in) throw new CommandError('use --at ou --in, não os dois')
+  if (!validTimeZone(timeZone)) throw new CommandError(ct('m.time.zoneInvalid', { tz: timeZone }))
+  if (input.at && input.in) throw new CommandError(ct('m.time.atOrIn'))
   if (input.in) return { at: new Date(now.getTime() + parseDuration(input.in)), timeZone }
-  if (!input.at) throw new CommandError('informe --at ou --in')
+  if (!input.at) throw new CommandError(ct('m.time.needAtOrIn'))
 
   const text = input.at.trim().replace('T', ' ')
   const today = localDate(now.getTime(), timeZone)
@@ -137,15 +139,15 @@ export function parseWhen(
   } else if (pieces.length === 2) {
     day = date(pieces[0], today)
     clock = pieces[1]
-    if (!day) throw new CommandError(`data inválida: '${pieces[0]}' — use AAAA-MM-DD, DD/MM, hoje ou amanhã`)
+    if (!day) throw new CommandError(ct('m.time.dateInvalid', { text: pieces[0] }))
   } else {
-    throw new CommandError(`instante inválido: '${input.at}'`)
+    throw new CommandError(ct('m.time.instantInvalid', { text: input.at }))
   }
   const { hour, minute } = time(clock)
   if (day) {
     const check = new Date(Date.UTC(day.year, day.month - 1, day.day))
     if (check.getUTCMonth() + 1 !== day.month || check.getUTCDate() !== day.day) {
-      throw new CommandError(`data inválida: '${pieces[0]}'`)
+      throw new CommandError(ct('m.time.dateOnlyInvalid', { text: pieces[0] }))
     }
     return { at: zonedToUtc(day, hour, minute, timeZone), timeZone }
   }
@@ -171,14 +173,15 @@ export function describeWhen(at: Date, timeZone: string, now: Date): string {
   const target = localDate(at.getTime(), timeZone)
   const today = localDate(now.getTime(), timeZone)
   const same = (a: LocalDate, b: LocalDate) => a.year === b.year && a.month === b.month && a.day === b.day
-  const hm = new Intl.DateTimeFormat('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' }).format(at)
+  const locale = currentLanguage()
+  const hm = new Intl.DateTimeFormat(locale, { timeZone, hour: '2-digit', minute: '2-digit' }).format(at)
   let day: string
-  if (same(target, today)) day = 'hoje'
-  else if (same(target, addDays(today, 1))) day = 'amanhã'
+  if (same(target, today)) day = ct('m.time.today')
+  else if (same(target, addDays(today, 1))) day = ct('m.time.tomorrow')
   else {
-    day = new Intl.DateTimeFormat('pt-BR', { timeZone, weekday: 'short', day: '2-digit', month: '2-digit' }).format(at)
+    day = new Intl.DateTimeFormat(locale, { timeZone, weekday: 'short', day: '2-digit', month: '2-digit' }).format(at)
   }
   const delta = at.getTime() - now.getTime()
-  const rel = delta >= 0 ? `em ${formatSpan(delta)}` : `há ${formatSpan(-delta)}`
+  const rel = delta >= 0 ? ct('m.time.in', { span: formatSpan(delta) }) : ct('m.time.ago', { span: formatSpan(-delta) })
   return `${day} ${hm} — ${rel}`
 }

@@ -66,3 +66,14 @@
   border-color: var(--accent);
 }
 
+
+.login-lang {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: auto;
+}
+
+.login {
+  position: relative;
+}

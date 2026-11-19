@@ -1,0 +1,157 @@
+{
+  "language": {
+    "label": "Idioma",
+    "pt-BR": "Português",
+    "en": "English"
+  },
+  "state": {
+    "running": "Ativo",
+    "stopped": "Desligado",
+    "sleeping": "Dormindo",
+    "transitioning": "Em transição",
+    "failed": "Com falha",
+    "awaiting_approval": "Aguardando aprovação",
+    "unknown": "Desconhecido"
+  },
+  "result": {
+    "pending": "Pendente",
+    "running": "Executando",
+    "verifying": "Verificando",
+    "succeeded": "Concluído",
+    "failed": "Falhou",
+    "skipped": "Ignorado",
+    "timed_out": "Sem confirmação",
+    "interrupted": "Interrompido"
+  },
+  "opStatus": {
+    "pending": "Pendente",
+    "running": "Em andamento",
+    "succeeded": "Concluída",
+    "partially_failed": "Parcialmente falha",
+    "failed": "Falhou"
+  },
+  "kind": {
+    "start": "Iniciar",
+    "stop": "Desligar"
+  },
+  "sync": {
+    "never": "Nunca sincronizado",
+    "ok": "Sincronizado",
+    "failed": "Falha na sincronização",
+    "not_found": "Não encontrado no Railway"
+  },
+  "run": {
+    "pending": "Em execução",
+    "executed": "Executado",
+    "late": "Executado com atraso",
+    "skipped": "Nada a fazer",
+    "missed": "Perdido",
+    "failed": "Falhou"
+  },
+  "day": {
+    "short": [
+      "Seg",
+      "Ter",
+      "Qua",
+      "Qui",
+      "Sex",
+      "Sáb",
+      "Dom"
+    ],
+    "everyDay": "Todos os dias"
+  },
+  "time": {
+    "never": "nunca",
+    "now": "agora",
+    "secondsAgo": "há {{count}}s",
+    "minutesAgo": "há {{count}} min",
+    "hoursAgo": "há {{count}} h",
+    "minutes": "{{m}} min {{s}} s"
+  },
+  "ui": {
+    "loading": "Carregando…",
+    "retry": "Tentar novamente",
+    "close": "Fechar",
+    "cancel": "Cancelar",
+    "dismiss": "Dispensar aviso",
+    "toasts": "Avisos"
+  },
+  "freshness": {
+    "noReading": "sem leitura",
+    "lastRead": "Última leitura: {{when}}",
+    "unavailable": "Indisponível · última leitura {{when}}",
+    "stale": "Desatualizado · {{when}}",
+    "read": "Lido {{when}}"
+  },
+  "theme": {
+    "useDark": "Usar tema escuro",
+    "useLight": "Usar tema claro",
+    "dark": "Tema escuro",
+    "light": "Tema claro"
+  },
+  "roles": {
+    "viewer": "Somente leitura",
+    "operator": "Operador",
+    "admin": "Administrador",
+    "master": "Master"
+  },
+  "nav": {
+    "main": "Principal",
+    "more": "Mais",
+    "moreScreens": "Mais telas",
+    "manage": "Gerenciar",
+    "overview": "Visão geral",
+    "projects": "Projetos",
+    "schedules": "Agendas",
+    "history": "Histórico",
+    "logs": "Logs",
+    "console": "Console",
+    "users": "Usuários",
+    "settings": "Configurações"
+  },
+  "layout": {
+    "consoleCloseHint": "Ctrl+` ou Esc fecha",
+    "commandBarTitle": "Ir para uma tela ou abrir o console",
+    "commandBar": "Executar comando…",
+    "goTo": "Ir para",
+    "openConsolePanel": "Abrir painel do console",
+    "switchToCli": "Mudar para o modo CLI",
+    "cliMode": "Modo CLI",
+    "cliModeTitle": "Usar só a linha de comando (a sessão continua)",
+    "logout": "Sair",
+    "notFound": "Página não encontrada."
+  },
+  "palette": {
+    "label": "Paleta de comandos",
+    "search": "Buscar tela ou ação",
+    "placeholder": "Ir para…",
+    "empty": "Nada encontrado para “{{query}}”.",
+    "results": "Resultados"
+  },
+  "flow": {
+    "will_stop": "Será desligada",
+    "will_start": "Será iniciada",
+    "will_skip": "Ignorada",
+    "affected_one": "serviço será afetado",
+    "affected_other": "serviços serão afetados",
+    "skipped_one": "{{count}} ignorada",
+    "skipped_other": "{{count}} ignoradas",
+    "calls_stop": "{{count}} chamada(s) de desligamento ao Railway; o plano expira às {{time}}.",
+    "calls_start": "{{count}} chamada(s) de início ao Railway; o plano expira às {{time}}.",
+    "plan": "Plano: {{project}}",
+    "service": "Serviço",
+    "environment": "Ambiente",
+    "currentState": "Estado atual",
+    "plannedAction": "Ação prevista",
+    "willFail": "Falhará",
+    "deployments": "({{count}} deployments)",
+    "progress": "Andamento: {{project}}",
+    "confirm": "Confirmar: {{kind}} {{count}}",
+    "closeBackground": "Fechar (continua em segundo plano)",
+    "reading": "Lendo o estado atual no Railway…",
+    "nothingToDo": "Nada a fazer: todos os serviços foram ignorados.",
+    "starting": "Iniciando…",
+    "refreshing": "atualiza a cada poucos segundos",
+    "operation": "Operação"
+  }
+}

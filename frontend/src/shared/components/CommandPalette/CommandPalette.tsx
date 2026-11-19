@@ -1,11 +1,14 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 
+import { useTranslation } from 'react-i18next'
+
 import { Icon, type IconName } from '@/shared/components/Icon/Icon'
 
 export type PaletteItem = { id: string; label: string; hint?: string; icon: IconName; run: () => void }
 
 /** Paleta de comandos (Ctrl+K): busca por parte do nome, setas para escolher, Enter para executar. */
 export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClose: () => void }) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLDialogElement>(null)
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
@@ -61,7 +64,7 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
     <dialog
       ref={ref}
       className="palette"
-      aria-label="Paleta de comandos"
+      aria-label={t('palette.label')}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <input
@@ -70,8 +73,8 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
         aria-expanded="true"
         aria-controls="palette-list"
         aria-activedescendant={matches[index] ? `palette-${matches[index].id}` : undefined}
-        aria-label="Buscar tela ou ação"
-        placeholder="Ir para…"
+        aria-label={t('palette.search')}
+        placeholder={t('palette.placeholder')}
         autoComplete="off"
         autoFocus
         value={query}
@@ -82,9 +85,9 @@ export function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClo
         onKeyDown={onKeyDown}
       />
       {matches.length === 0 ? (
-        <div className="palette-empty">Nada encontrado para “{query}”.</div>
+        <div className="palette-empty">{t('palette.empty', { query })}</div>
       ) : (
-        <ul className="palette-list" id="palette-list" role="listbox" aria-label="Resultados">
+        <ul className="palette-list" id="palette-list" role="listbox" aria-label={t('palette.results')}>
           {matches.map((item, i) => (
             // oxlint-disable-next-line click-events-have-key-events -- o teclado age pelo campo de busca (combobox)
             <li

@@ -1,13 +1,14 @@
 // Termos + registro → invocação validada. Nenhum erro aqui chega a chamar a API.
 
+import { ct } from '@/features/console/lib/i18n'
 import { tokenize } from './lexer'
 import type { CommandDef, Invocation, OptionDef, OptionValue } from '@/features/console/state/types'
 import { CommandError } from '@/features/console/state/types'
 
 /** Opções aceitas por qualquer comando. */
 export const GLOBAL_OPTIONS: OptionDef[] = [
-  { name: 'json', help: 'mostra a resposta da API em JSON, sem formatação' },
-  { name: 'help', short: 'h', help: 'mostra a ajuda do comando' },
+  Object.defineProperty({ name: 'json' } as OptionDef, 'help', { enumerable: true, get: () => ct('globalOpt.json') }),
+  Object.defineProperty({ name: 'help', short: 'h' } as OptionDef, 'help', { enumerable: true, get: () => ct('globalOpt.help') }),
 ]
 
 export function levenshtein(a: string, b: string): number {
@@ -53,7 +54,7 @@ function suggestion(input: string, list: CommandDef[]): string {
   const [best] = similar(input, list.flatMap(names), 1)
   if (!best) return ''
   const def = findCommand(list, best)
-  return ` — você quis dizer ${def?.name ?? best}?`
+  return ct('m.parse.didYouMean', { name: def?.name ?? best })
 }
 
 /** Opções do comando + globais. */
@@ -78,7 +79,7 @@ export function expandAlias(
 
 /** Resolve o comando (e subcomandos) e separa argumentos e opções. */
 export function parse(tokens: string[], commands: CommandDef[], line = tokens.join(' ')): Invocation {
-  if (tokens.length === 0) throw new CommandError('linha vazia')
+  if (tokens.length === 0) throw new CommandError(ct('m.parse.emptyLine'))
   let list = commands
   let def: CommandDef | undefined
   const path: string[] = []
@@ -86,7 +87,7 @@ export function parse(tokens: string[], commands: CommandDef[], line = tokens.jo
   for (; i < tokens.length; i++) {
     const found = findCommand(list, tokens[i])
     if (!found) {
-      if (!def) throw new CommandError(`comando desconhecido: ${tokens[i]}${suggestion(tokens[i], list)}`)
+      if (!def) throw new CommandError(ct('m.parse.unknownCommand', { token: tokens[i], hint: suggestion(tokens[i], list) }))
       break
     }
     def = found
@@ -97,7 +98,7 @@ export function parse(tokens: string[], commands: CommandDef[], line = tokens.jo
     }
     list = found.subcommands
   }
-  if (!def) throw new CommandError('linha vazia')
+  if (!def) throw new CommandError(ct('m.parse.emptyLine'))
 
   const rest = tokens.slice(i)
   const wantsHelp = rest.some((t) => t === '--help' || t === '-h')
@@ -105,10 +106,10 @@ export function parse(tokens: string[], commands: CommandDef[], line = tokens.jo
     if (wantsHelp || rest.length === 0) {
       if (wantsHelp) return { path, def, args: [], options: { help: true }, line }
       const subs = def.subcommands.map((s) => s.name).join('|')
-      throw new CommandError(`uso: ${path.join(' ')} <${subs}> — veja help ${path.join(' ')}`)
+      throw new CommandError(ct('m.parse.usageSub', { path: path.join(' '), subs }))
     }
     const [unknown] = rest
-    throw new CommandError(`subcomando desconhecido: ${path.join(' ')} ${unknown}${suggestion(unknown, def.subcommands)}`)
+    throw new CommandError(ct('m.parse.unknownSub', { path: path.join(' '), token: unknown, hint: suggestion(unknown, def.subcommands) }))
   }
 
   const defs = optionsOf(def)
@@ -141,23 +142,23 @@ export function parse(tokens: string[], commands: CommandDef[], line = tokens.jo
       const known = defs.map((o) => `--${o.name}`)
       const [close] = similar(`--${name}`, known, 1)
       throw new CommandError(
-        `opção desconhecida para ${path.join(' ')}: ${token}${close ? ` — você quis dizer ${close}?` : ''}`,
+        ct('m.parse.unknownOption', { path: path.join(' '), token, hint: close ? ct('m.parse.didYouMean', { name: close }) : '' }),
       )
     }
     let value: string | true
     if (option.value) {
       if (inline !== undefined) value = inline
       else if (j + 1 < rest.length) value = rest[++j]
-      else throw new CommandError(`a opção --${option.name} exige um valor (${option.value})`)
+      else throw new CommandError(ct('m.parse.needsValue', { name: option.name, value: option.value }))
     } else {
-      if (inline !== undefined) throw new CommandError(`a opção --${option.name} não aceita valor`)
+      if (inline !== undefined) throw new CommandError(ct('m.parse.noValue', { name: option.name }))
       value = true
     }
     if (option.repeatable) {
       const prev = options[option.name]
       options[option.name] = [...(Array.isArray(prev) ? prev : []), String(value)]
     } else if (option.name in options && option.value) {
-      throw new CommandError(`a opção --${option.name} foi informada mais de uma vez`)
+      throw new CommandError(ct('m.parse.twice', { name: option.name }))
     } else {
       options[option.name] = value
     }
@@ -168,11 +169,11 @@ export function parse(tokens: string[], commands: CommandDef[], line = tokens.jo
     const required = specs.filter((a) => a.required)
     if (args.length < required.length) {
       const missing = required[args.length]
-      throw new CommandError(`argumento obrigatório ausente: <${missing.name}> — uso: ${usage(path, def)}`)
+      throw new CommandError(ct('m.parse.missingArg', { name: missing.name, usage: usage(path, def) }))
     }
     const variadic = specs.some((a) => a.variadic)
     if (!variadic && args.length > specs.length) {
-      throw new CommandError(`argumentos demais para ${path.join(' ')}: ${args.slice(specs.length).join(' ')}`)
+      throw new CommandError(ct('m.parse.tooMany', { path: path.join(' '), args: args.slice(specs.length).join(' ') }))
     }
   }
   return { path, def, args, options, line }
@@ -203,6 +204,6 @@ export function int(inv: Invocation, name: string, fallback: number): number {
   const raw = str(inv, name)
   if (raw === undefined) return fallback
   const n = Number(raw)
-  if (!Number.isInteger(n) || n < 1) throw new CommandError(`--${name} deve ser um inteiro positivo: '${raw}'`)
+  if (!Number.isInteger(n) || n < 1) throw new CommandError(ct('m.parse.positiveInt', { name, raw }))
   return n
 }

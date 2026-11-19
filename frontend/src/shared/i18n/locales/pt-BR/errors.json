@@ -1,0 +1,17 @@
+{
+  "generic": "Não foi possível concluir a ação.",
+  "unauthorized": "Autenticação necessária.",
+  "forbidden": "Seu papel não permite esta ação.",
+  "plan_already_used": "Este plano já foi executado.",
+  "plan_expired": "Este plano expirou. Gere um novo.",
+  "integration_not_configured": "A integração com o Railway não está configurada.",
+  "credential_invalid": "A credencial do Railway é inválida.",
+  "credential_undecipherable": "Não foi possível ler a credencial salva do Railway.",
+  "railway_unavailable": "O Railway está indisponível no momento.",
+  "rate_limited": "Muitas requisições. Tente novamente em {{count}} s.",
+  "rate_limited_unknown": "Muitas requisições. Tente novamente em instantes.",
+  "internal": "Erro interno. Tente novamente.",
+  "invalid_credentials": "Usuário ou senha incorretos.",
+  "too_many_attempts": "Muitas tentativas de login. Aguarde e tente novamente.",
+  "unsupported_token_kind": "Tokens de projeto não são suportados: use um token de conta ou de workspace."
+}

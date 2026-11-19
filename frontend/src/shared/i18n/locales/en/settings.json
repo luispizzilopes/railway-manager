@@ -1,0 +1,53 @@
+{
+  "title": "Settings",
+  "subtitle": "Token used to talk to the Railway API.",
+  "tokenCard": "Railway token",
+  "status": {
+    "valid": "Valid",
+    "invalid": "Rejected by Railway",
+    "undecipherable": "Cannot be decrypted with the current master key"
+  },
+  "form": {
+    "label": "Railway token",
+    "kindLegend": "Token type",
+    "account": "Account",
+    "workspace": "Workspace (recommended)",
+    "noProjectTokens": "Project tokens are not supported: they apply to a single environment and do not list projects.",
+    "workspaceId": "Workspace ID",
+    "invalidUuid": "Enter a valid UUID.",
+    "token": "Token",
+    "tokenHint": "Validated on Railway and stored encrypted. It is not shown again.",
+    "saved": "Token validated and saved.",
+    "validating": "Validating…",
+    "replaceToken": "Replace token",
+    "validateSave": "Validate and save"
+  },
+  "theme": {
+    "system": "Follow the system",
+    "light": "Light",
+    "dark": "Dark",
+    "appearance": "Appearance",
+    "legend": "Theme"
+  },
+  "info": {
+    "type": "Type",
+    "account": "Account",
+    "workspace": "Workspace",
+    "linkedTo": "Linked to",
+    "token": "Token",
+    "status": "Status",
+    "validatedAt": "Validated at"
+  },
+  "reactivate": "Add a new token to reactivate the integration.",
+  "inactive": "The integration is inactive: notify an administrator.",
+  "replace": "Replace",
+  "remove": "Remove",
+  "none": "No token registered. Ask an administrator to add one.",
+  "removed": "Token removed.",
+  "removeTitle": "Remove token",
+  "removeMessage": "Operations that depend on Railway stop working until a new token is added. Local projects, services and history are kept.",
+  "language": {
+    "title": "Language",
+    "legend": "Interface language"
+  }
+}

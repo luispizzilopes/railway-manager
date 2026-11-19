@@ -1,13 +1,16 @@
 // Blocos de saída do console como componentes (tabelas reais, cópia de IDs, estados em texto).
 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { OperationItem, Plan } from '@/shared/api/types'
 import { StateChip } from '@/shared/components/StateChip/StateChip'
+import { currentLanguage } from '@/shared/i18n'
 import { KIND_LABEL, RESULT_LABEL, STATUS_LABEL, formatDuration } from '@/shared/lib/format'
 import type { Block, Cell } from '@/features/console/state/types'
 
 function CopyId({ id }: { id: string }) {
+  const { t } = useTranslation('console')
   const [copied, setCopied] = useState(false)
   async function copy() {
     try {
@@ -19,8 +22,8 @@ function CopyId({ id }: { id: string }) {
     }
   }
   return (
-    <button type="button" className="con-id" title={`${id} — clique para copiar`} onClick={copy}>
-      {copied ? 'copiado' : id.slice(0, 8)}
+    <button type="button" className="con-id" title={t('m.out.copyTitle', { id })} onClick={copy}>
+      {copied ? t('m.out.copied') : id.slice(0, 8)}
     </button>
   )
 }
@@ -64,59 +67,54 @@ function Table({ title, columns, rows }: { title?: string; columns: string[]; ro
   )
 }
 
-const ACTION: Record<'will_stop' | 'will_start' | 'will_skip', string> = {
-  will_stop: 'desligar',
-  will_start: 'iniciar',
-  will_skip: 'ignorar',
-}
-
 function PlanBlock({ plan }: { plan: Plan }) {
+  const { t } = useTranslation('console')
   const counts = { will_stop: 0, will_start: 0, will_skip: 0 }
   for (const e of plan.entries) counts[e.action]++
   const total =
     [
-      counts.will_stop && `${counts.will_stop} a desligar`,
-      counts.will_start && `${counts.will_start} a iniciar`,
-      counts.will_skip && `${counts.will_skip} ignorada(s)`,
+      counts.will_stop && t('m.out.toStop', { count: counts.will_stop }),
+      counts.will_start && t('m.out.toStart', { count: counts.will_start }),
+      counts.will_skip && t('m.out.skipped', { count: counts.will_skip }),
     ]
       .filter(Boolean)
-      .join(' · ') || 'nada'
+      .join(' · ') || t('m.out.nothing')
   return (
     <div className="con-block" data-testid="con-plan">
       <Table
-        title={`Plano — ${KIND_LABEL[plan.kind]}: ${total}`}
-        columns={['Projeto', 'Serviço', 'Ambiente', 'Estado atual', 'Ação prevista']}
+        title={t('m.out.planTitle', { kind: KIND_LABEL[plan.kind], total })}
+        columns={[t('m.out.planCols.project'), t('m.out.planCols.service'), t('m.out.planCols.environment'), t('m.out.planCols.current'), t('m.out.planCols.action')]}
         rows={plan.entries.map((e) => [
           e.project_name,
           e.service_name,
           e.environment_name,
           { state: e.current_state },
           e.action === 'will_skip'
-            ? { text: `${e.fails ? 'falhará' : 'ignorar'}: ${e.reason ?? ''}`, tone: e.fails ? 'error' : 'muted' }
-            : { text: ACTION[e.action], tone: 'info' },
+            ? { text: `${e.fails ? t('m.out.willFail') : t('m.out.willSkip')}: ${e.reason ?? ''}`, tone: e.fails ? 'error' : 'muted' }
+            : { text: t(`m.out.act.${e.action}`), tone: 'info' },
         ])}
       />
       <div className="con-muted">
-        {plan.estimate.mutations} chamada(s) ao Railway · plano válido até{' '}
-        {new Date(plan.expires_at).toLocaleTimeString('pt-BR')}
+        {t('m.out.planFooter', { count: plan.estimate.mutations, time: new Date(plan.expires_at).toLocaleTimeString(currentLanguage()) })}
       </div>
     </div>
   )
 }
 
 function ProgressBlock({ block }: { block: Extract<Block, { kind: 'progress' }> }) {
+  const { t } = useTranslation('console')
   const items: OperationItem[] = block.items
-  const status = block.status ? STATUS_LABEL[block.status] : 'iniciando…'
+  const status = block.status ? STATUS_LABEL[block.status] : t('m.out.starting')
   return (
     <div className="con-block" data-testid="con-progress">
       <div className="con-title">
-        Operação <CopyId id={block.operationId} /> — {KIND_LABEL[block.powerKind]} · {status}
-        {!block.done && !block.detached && <span className="con-muted"> (acompanhando… Ctrl+C para soltar)</span>}
-        {block.detached && !block.done && <span className="con-muted"> (continua no servidor)</span>}
+        {t('m.out.operation')} <CopyId id={block.operationId} /> — {KIND_LABEL[block.powerKind]} · {status}
+        {!block.done && !block.detached && <span className="con-muted">{t('m.out.following')}</span>}
+        {block.detached && !block.done && <span className="con-muted">{t('m.out.detached')}</span>}
       </div>
       {items.length > 0 && (
         <Table
-          columns={['Projeto', 'Serviço', 'Ambiente', 'Resultado', 'Estado final', 'Duração']}
+          columns={[t('m.out.progCols.project'), t('m.out.progCols.service'), t('m.out.progCols.environment'), t('m.out.progCols.result'), t('m.out.progCols.final'), t('m.out.progCols.duration')]}
           rows={items.map((i) => [
             i.label.project_name,
             i.label.service_name,
@@ -132,6 +130,7 @@ function ProgressBlock({ block }: { block: Extract<Block, { kind: 'progress' }> 
 }
 
 export function BlockView({ block }: { block: Block }) {
+  const { t } = useTranslation('console')
   switch (block.kind) {
     case 'input':
       return (
@@ -155,7 +154,7 @@ export function BlockView({ block }: { block: Block }) {
     case 'error':
       return (
         <div className="con-text con-tone-error" role="alert">
-          erro{block.status ? ` ${block.status}` : ''}: {block.message}
+          {t('m.out.error', { status: block.status ? ` ${block.status}` : '', message: block.message })}
           {block.details !== undefined && block.details !== null && (
             <pre className="con-json">{JSON.stringify(block.details, null, 2)}</pre>
           )}

@@ -1,0 +1,110 @@
+{
+  "title": "Overview",
+  "loading": "Loading…",
+  "loadingOverview": "Loading the overview…",
+  "live": {
+    "auto": "Automatic refresh",
+    "paused": "Refresh paused (Railway quota)",
+    "updated": "{{mode}} · updated {{when}}",
+    "quota": " · Railway quota: {{remaining}}/{{limit}}"
+  },
+  "selected": "{{count}} project(s) selected",
+  "kindProjects": "{{kind}} selected projects",
+  "kindSelected": "{{kind}} selected",
+  "refresh": "Refresh states",
+  "refreshed": "States refreshed.",
+  "alerts": {
+    "no_credential": "No Railway token configured: add one in Settings.",
+    "credential_invalid": "The Railway token was rejected (revoked or missing permission). Add a new one.",
+    "credential_undecipherable": "The saved token cannot be decrypted with the current RM_MASTER_KEY. Add it again.",
+    "rate_limited": "Railway rate limit reached; calls paused until {{until}}.",
+    "configure": "Configure token"
+  },
+  "summary": {
+    "label": "Summary",
+    "none": "No monitored services",
+    "failed_one": "{{count}} service failed",
+    "failed_other": "{{count}} services failed",
+    "operating": "{{running}} of {{total}} services operating",
+    "activeOrSleeping": "Services running or sleeping",
+    "pctOperating": "operating",
+    "sleepingNote": "{{count}} sleeping"
+  },
+  "stats": {
+    "projects": "Projects",
+    "monitored": "Monitored services",
+    "active": "Running",
+    "stopped": "Stopped",
+    "failed": "Failed",
+    "other": "Other states"
+  },
+  "attention": {
+    "title": "Needs attention",
+    "none": "No service needs attention.",
+    "notFound": "Not found on Railway",
+    "failed": "Failed",
+    "awaiting_approval": "Awaiting approval",
+    "unavailable": "Reading unavailable",
+    "stale": "Reading out of date",
+    "start": "Start",
+    "viewProject": "View project",
+    "startTitle": "Start {{service}} ({{environment}}) — {{project}}"
+  },
+  "row": {
+    "busy": "operation in progress",
+    "start": "Start",
+    "stop": "Stop",
+    "notFound": "Not found on Railway",
+    "stopAll": "Stop all",
+    "startAll": "Start all",
+    "actionTitle": "{{kind}} {{service}} ({{environment}})",
+    "allTitle": "{{kind}} all — {{project}}"
+  },
+  "inOperation": "{{running}} of {{total}} operating",
+  "empty": {
+    "title": "No managed projects",
+    "body": "Import projects from your Railway account to get started.",
+    "import": "Import projects"
+  },
+  "filters": {
+    "searchLabel": "Search service",
+    "searchPlaceholder": "Search service…",
+    "state": "Filter by state",
+    "allStates": "All states",
+    "project": "Filter by project",
+    "allProjects": "All projects",
+    "environment": "Filter by environment",
+    "allEnvironments": "All environments",
+    "clear": "Clear filters",
+    "found_one": "{{count}} service found",
+    "found_other": "{{count}} services found",
+    "count_one": "{{count}} service",
+    "count_other": "{{count}} services",
+    "noneTitle": "No services found",
+    "noneBody": "No service matches the applied filters."
+  },
+  "card": {
+    "select": "Select {{name}}",
+    "notFound": "not found on Railway",
+    "next": "Next: {{kind}} at {{time}} · ",
+    "noServices": "No managed services. ",
+    "importServices": "Import services",
+    "servicesOf": "Services of {{name}}"
+  },
+  "table": {
+    "service": "Service",
+    "state": "State",
+    "reading": "Reading",
+    "actions": "Actions"
+  },
+  "recent": {
+    "title": "Latest operations",
+    "history": "View history",
+    "when": "When",
+    "type": "Type",
+    "projects": "Projects",
+    "result": "Result",
+    "items": "Items",
+    "skipped": "{{count}} skipped"
+  }
+}

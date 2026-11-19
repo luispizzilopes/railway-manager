@@ -1,0 +1,110 @@
+{
+  "title": "Visão geral",
+  "loading": "Carregando…",
+  "loadingOverview": "Carregando a visão geral…",
+  "live": {
+    "auto": "Atualização automática",
+    "paused": "Atualização pausada (cota do Railway)",
+    "updated": "{{mode}} · atualizado {{when}}",
+    "quota": " · cota do Railway: {{remaining}}/{{limit}}"
+  },
+  "selected": "{{count}} projeto(s) selecionado(s)",
+  "kindProjects": "{{kind}} projetos selecionados",
+  "kindSelected": "{{kind}} selecionados",
+  "refresh": "Atualizar estados",
+  "refreshed": "Estados atualizados.",
+  "alerts": {
+    "no_credential": "Nenhum token do Railway configurado: cadastre um em Configurações.",
+    "credential_invalid": "O token do Railway foi recusado (revogado ou sem permissão). Cadastre um novo.",
+    "credential_undecipherable": "O token salvo não pode ser decifrado com a RM_MASTER_KEY atual. Cadastre-o novamente.",
+    "rate_limited": "Rate limit do Railway atingido; chamadas pausadas até {{until}}.",
+    "configure": "Configurar token"
+  },
+  "summary": {
+    "label": "Resumo",
+    "none": "Nenhum serviço monitorado",
+    "failed_one": "{{count}} serviço com falha",
+    "failed_other": "{{count}} serviços com falha",
+    "operating": "{{running}} de {{total}} serviços em operação",
+    "activeOrSleeping": "Serviços ativos ou dormindo",
+    "pctOperating": "em operação",
+    "sleepingNote": "{{count}} dormindo"
+  },
+  "stats": {
+    "projects": "Projetos",
+    "monitored": "Serviços monitorados",
+    "active": "Ativos",
+    "stopped": "Desligados",
+    "failed": "Com falha",
+    "other": "Outros estados"
+  },
+  "attention": {
+    "title": "Requer atenção",
+    "none": "Nenhum serviço requer atenção.",
+    "notFound": "Não encontrado no Railway",
+    "failed": "Com falha",
+    "awaiting_approval": "Aguardando aprovação",
+    "unavailable": "Leitura indisponível",
+    "stale": "Leitura desatualizada",
+    "start": "Iniciar",
+    "viewProject": "Ver projeto",
+    "startTitle": "Iniciar {{service}} ({{environment}}) — {{project}}"
+  },
+  "row": {
+    "busy": "operação em andamento",
+    "start": "Iniciar",
+    "stop": "Desligar",
+    "notFound": "Não encontrado no Railway",
+    "stopAll": "Desligar todos",
+    "startAll": "Iniciar todos",
+    "actionTitle": "{{kind}} {{service}} ({{environment}})",
+    "allTitle": "{{kind}} todos — {{project}}"
+  },
+  "inOperation": "{{running}} de {{total}} em operação",
+  "empty": {
+    "title": "Nenhum projeto gerenciado",
+    "body": "Importe projetos da sua conta do Railway para começar.",
+    "import": "Importar projetos"
+  },
+  "filters": {
+    "searchLabel": "Buscar serviço",
+    "searchPlaceholder": "Buscar serviço…",
+    "state": "Filtrar por estado",
+    "allStates": "Todos os estados",
+    "project": "Filtrar por projeto",
+    "allProjects": "Todos os projetos",
+    "environment": "Filtrar por ambiente",
+    "allEnvironments": "Todos os ambientes",
+    "clear": "Limpar filtros",
+    "found_one": "{{count}} serviço encontrado",
+    "found_other": "{{count}} serviços encontrados",
+    "count_one": "{{count}} serviço",
+    "count_other": "{{count}} serviços",
+    "noneTitle": "Nenhum serviço encontrado",
+    "noneBody": "Nenhum serviço corresponde aos filtros aplicados."
+  },
+  "card": {
+    "select": "Selecionar {{name}}",
+    "notFound": "não encontrado no Railway",
+    "next": "Próxima: {{kind}} às {{time}} · ",
+    "noServices": "Nenhum serviço gerenciado. ",
+    "importServices": "Importar serviços",
+    "servicesOf": "Serviços de {{name}}"
+  },
+  "table": {
+    "service": "Serviço",
+    "state": "Estado",
+    "reading": "Leitura",
+    "actions": "Ações"
+  },
+  "recent": {
+    "title": "Últimas operações",
+    "history": "Ver histórico",
+    "when": "Quando",
+    "type": "Tipo",
+    "projects": "Projetos",
+    "result": "Resultado",
+    "items": "Itens",
+    "skipped": "{{count}} ignorado(s)"
+  }
+}

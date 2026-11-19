@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Navigate, Route, Routes } from 'react-router'
 
 import { UNAUTHORIZED_EVENT, api } from '@/shared/api/client'
@@ -20,6 +21,8 @@ import { Settings } from '@/features/settings/components/Settings'
 import { Users } from '@/features/users/components/Users'
 
 export function App() {
+  // Assina o idioma: trocar de idioma re-renderiza a árvore inteira sem remontá-la.
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const session = useQuery({ queryKey: ['session'], queryFn: api.session, retry: false, staleTime: Infinity })
   const mobile = useIsMobile()
@@ -72,7 +75,7 @@ export function App() {
         <Route path="console" element={mobile ? <Navigate to="/" replace /> : <ConsolePage />} />
         <Route path="users" element={<Users />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="*" element={<p className="muted">Página não encontrada.</p>} />
+        <Route path="*" element={<p className="muted">{t('layout.notFound')}</p>} />
       </Route>
     </Routes>
   )

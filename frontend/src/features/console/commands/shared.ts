@@ -3,10 +3,11 @@
 import type { OperationDetail, PowerKind } from '@/shared/api/types'
 import { formatDateTime } from '@/shared/lib/format'
 import { flag } from '@/features/console/engine/parse'
-import type { Block, Ctx, Invocation, OptionDef, Tone } from '@/features/console/state/types'
+import type { Block, Ctx, Invocation, OptionSource, Tone } from '@/features/console/state/types'
+import { ct } from '@/features/console/lib/i18n'
 import { Aborted, CommandError } from '@/features/console/state/types'
 
-export const YES: OptionDef = { name: 'yes', short: 'y', help: 'não pede confirmação' }
+export const YES: OptionSource = { name: 'yes', short: 'y' }
 
 export function short(id: string): string {
   return id.slice(0, 8)
@@ -30,7 +31,13 @@ export function note(ctx: Ctx, text: string, tone: Tone = 'muted') {
  * Item pelo ID (completo ou prefixo de 4+ caracteres) ou nome exato.
  * Ambíguo ou inexistente → erro com as opções.
  */
-export function pick<T>(items: T[], text: string, kind: string, id: (t: T) => string, name?: (t: T) => string): T {
+export function pick<T>(
+  items: T[],
+  text: string,
+  kind: 'operation' | 'scheduledAction' | 'schedule',
+  id: (t: T) => string,
+  name?: (t: T) => string,
+): T {
   const lower = text.toLowerCase()
   const byName = name ? items.filter((t) => name(t).toLowerCase() === lower) : []
   if (byName.length === 1) return byName[0]
@@ -39,22 +46,33 @@ export function pick<T>(items: T[], text: string, kind: string, id: (t: T) => st
   if (found.length === 1) return found[0]
   if (found.length > 1) {
     throw new CommandError(
-      `'${text}' corresponde a vários ${kind}s: ${found.map((t) => (name ? `${name(t)} (${short(id(t))})` : short(id(t)))).join(', ')}`,
+      ct('m.pick.ambiguous', {
+        text,
+        kinds: ct(`m.pick.kind.${kind}.many`),
+        list: found.map((t) => (name ? `${name(t)} (${short(id(t))})` : short(id(t)))).join(', '),
+      }),
     )
   }
   const known = items.slice(0, 8).map((t) => (name ? name(t) : short(id(t))))
-  throw new CommandError(`nenhum ${kind} '${text}'${known.length ? ` — existentes: ${known.join(', ')}` : ''}`)
+  throw new CommandError(
+    ct('m.pick.none', {
+      kind: ct(`m.pick.kind.${kind}.one`),
+      text,
+      known: known.length ? ct('m.pick.known', { list: known.join(', ') }) : '',
+    }),
+  )
 }
 
 /** Confirmação padrão para ações destrutivas, dispensável com `-y`. */
 export async function confirmOrCancel(ctx: Ctx, inv: Invocation, question: string, word?: string): Promise<boolean> {
   if (flag(inv, 'yes')) return true
   const ok = await ctx.confirm(question, word ? { word } : undefined)
-  if (!ok) ctx.print({ kind: 'text', text: 'cancelado', tone: 'muted' })
+  if (!ok) ctx.print({ kind: 'text', text: ct('m.common.cancelled'), tone: 'muted' })
   return ok
 }
 
-export const VERB: Record<PowerKind, string> = { start: 'iniciar', stop: 'desligar' }
+/** Verbo no infinitivo, no idioma ativo. */
+export const verb = (kind: PowerKind): string => ct(`m.verb.${kind}`)
 
 /**
  * Acompanha a operação até o fim, atualizando um bloco de progresso.
@@ -92,7 +110,7 @@ export async function watch(ctx: Ctx, operationId: string, kind: PowerKind, once
     ctx.print({
       kind: 'text',
       tone: 'warn',
-      text: `acompanhamento interrompido; a operação continua no servidor — retome com: op ${operationId}`,
+      text: ct('m.watch.interrupted', { id: operationId }),
     })
     return null
   }

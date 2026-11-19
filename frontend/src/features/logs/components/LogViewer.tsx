@@ -1,20 +1,19 @@
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 
 import { ApiError } from '@/shared/api/client'
 import type { LogLine, LogSeverity } from '@/shared/api/types'
+import { i18n } from '@/shared/i18n'
+import { errorMessage } from '@/shared/i18n/errors'
 import { Button } from '@/shared/ui/Button/Button'
 import { Checkbox, Field, Input } from '@/shared/ui/Field/Field'
 import { EmptyState, ErrorState, Skeleton } from '@/shared/ui/Feedback/Feedback'
 import { useToast } from '@/shared/ui/Toast/Toast'
 import { formatTime, stripAnsi, toText } from '@/features/logs/lib/utils'
 
-export const SEVERITY_LABEL: Record<LogSeverity, string> = {
-  error: 'ERRO',
-  warn: 'AVISO',
-  info: 'INFO',
-  debug: 'DEBUG',
-}
+/** Rótulo da severidade no idioma ativo. */
+export const severityLabel = (level: LogSeverity): string => i18n.t(`logs:severity.${level}`)
 
 /** Linhas maiores que isto aparecem cortadas, com "ver mais". */
 const LONG_LINE = 2000
@@ -51,6 +50,7 @@ function countMatches(lines: LogLine[], query: string): number {
 }
 
 function Row({ line, query }: { line: LogLine; query: string }) {
+  const { t } = useTranslation('logs')
   const [expanded, setExpanded] = useState(false)
   const message = stripAnsi(line.message)
   const long = message.length > LONG_LINE
@@ -60,12 +60,12 @@ function Row({ line, query }: { line: LogLine; query: string }) {
       <time className="log-time" dateTime={line.timestamp} title={line.timestamp}>
         {formatTime(line.timestamp)}
       </time>
-      <span className="log-sev">{line.severity ? SEVERITY_LABEL[line.severity] : '—'}</span>
+      <span className="log-sev">{line.severity ? severityLabel(line.severity) : '—'}</span>
       <span className="log-msg">
         {highlight(shown, query)}
         {long && (
           <button type="button" className="log-more" onClick={() => setExpanded(!expanded)}>
-            {expanded ? ' ver menos' : '… ver mais'}
+            {expanded ? t('viewer.seeLess') : t('viewer.seeMore')}
           </button>
         )}
       </span>
@@ -75,18 +75,19 @@ function Row({ line, query }: { line: LogLine; query: string }) {
 
 /** Mensagem do estado de erro, separando credencial, indisponibilidade e falha genérica. */
 function Failure({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const { t } = useTranslation('logs')
   if (error instanceof ApiError && CREDENTIAL_CODES.has(error.code)) {
     return (
       <div className="alert alert-danger" role="alert">
-        <span className="alert-text">A credencial do Railway foi recusada ou não está configurada. {error.message}</span>
+        <span className="alert-text">{t('viewer.credential', { message: errorMessage(error) })}</span>
         <Link className="btn btn-sm" to="/settings">
-          Ir para Configurações
+          {t('viewer.goSettings')}
         </Link>
       </div>
     )
   }
   if (error instanceof ApiError && (error.code === 'railway_unavailable' || error.status === 503)) {
-    return <ErrorState error={new Error('O Railway está indisponível no momento. Tente novamente em instantes.')} onRetry={onRetry} />
+    return <ErrorState error={new Error(t('viewer.unavailable'))} onRetry={onRetry} />
   }
   return <ErrorState error={error} onRetry={onRetry} />
 }
@@ -108,6 +109,7 @@ export interface LogViewerProps {
 }
 
 export function LogViewer({ lines, loading, error, notice, truncated, noDeployment, fileName = 'logs', onRetry, toolbar }: LogViewerProps) {
+  const { t } = useTranslation('logs')
   const toast = useToast()
   const [wrap, setWrap] = useState(true)
   const [query, setQuery] = useState('')
@@ -145,9 +147,9 @@ export function LogViewer({ lines, loading, error, notice, truncated, noDeployme
   async function copy() {
     try {
       await navigator.clipboard.writeText(toText(lines))
-      toast.success(`${lines.length} linhas copiadas.`)
+      toast.success(t('viewer.copied', { count: lines.length }))
     } catch {
-      toast.error('Não foi possível copiar. Use o download.')
+      toast.error(t('viewer.copyFailed'))
     }
   }
 
@@ -164,14 +166,14 @@ export function LogViewer({ lines, loading, error, notice, truncated, noDeployme
   if (error && lines.length === 0) {
     body = <Failure error={error} onRetry={onRetry} />
   } else if (loading && lines.length === 0) {
-    body = <Skeleton lines={6} label="Carregando logs…" />
+    body = <Skeleton lines={6} label={t('viewer.loading')} />
   } else if (noDeployment) {
-    body = <EmptyState title="Nenhum deploy ainda">Este serviço ainda não teve deploy neste ambiente, então não há logs.</EmptyState>
+    body = <EmptyState title={t('viewer.noDeployTitle')}>{t('viewer.noDeployBody')}</EmptyState>
   } else if (lines.length === 0) {
-    body = <EmptyState title="Nenhum log no período">Amplie o intervalo, retire filtros ou escolha outro deploy.</EmptyState>
+    body = <EmptyState title={t('viewer.noLogsTitle')}>{t('viewer.noLogsBody')}</EmptyState>
   } else {
     body = (
-      <div className="log-box" ref={box} onScroll={onScroll} role="log" aria-label="Logs do serviço" tabIndex={0}>
+      <div className="log-box" ref={box} onScroll={onScroll} role="log" aria-label={t('viewer.logLabel')} tabIndex={0}>
         <ol className={`log-list${wrap ? ' log-wrap' : ''}`}>
           {lines.map((line, i) => (
             <Row key={`${line.timestamp}-${i}`} line={line} query={query} />
@@ -184,24 +186,24 @@ export function LogViewer({ lines, loading, error, notice, truncated, noDeployme
   return (
     <div className="logviewer">
       <div className="log-toolbar">
-        <Field label="Buscar nos logs exibidos" className="log-search">
-          {(p) => <Input {...p} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Texto" />}
+        <Field label={t('viewer.searchLabel')} className="log-search">
+          {(p) => <Input {...p} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('viewer.searchPlaceholder')} />}
         </Field>
         <div className="log-actions">
-          <Checkbox label="Quebrar linhas" checked={wrap} onChange={(e) => setWrap(e.target.checked)} />
+          <Checkbox label={t('viewer.wrap')} checked={wrap} onChange={(e) => setWrap(e.target.checked)} />
           {toolbar}
           <Button size="sm" onClick={() => void copy()} disabled={lines.length === 0}>
-            Copiar
+            {t('viewer.copy')}
           </Button>
           <Button size="sm" onClick={download} disabled={lines.length === 0}>
-            Baixar
+            {t('viewer.download')}
           </Button>
         </div>
       </div>
       <p className="log-meta subtle" aria-live="polite">
-        {lines.length} {lines.length === 1 ? 'linha' : 'linhas'}
-        {query.trim() && ` · ${matches} ${matches === 1 ? 'ocorrência' : 'ocorrências'}`}
-        {truncated && ' · há mais linhas: só as mais recentes foram carregadas'}
+        {t('viewer.lineCount', { count: lines.length })}
+        {query.trim() && t('viewer.matches', { count: matches })}
+        {truncated && t('viewer.truncated')}
       </p>
       {notice && (
         <div className="alert alert-warn" role="status">
@@ -211,7 +213,7 @@ export function LogViewer({ lines, loading, error, notice, truncated, noDeployme
       {body}
       {!atEnd && lines.length > 0 && (
         <Button size="sm" className="log-jump" onClick={goToEnd}>
-          Ir para o fim
+          {t('viewer.jump')}
         </Button>
       )}
     </div>

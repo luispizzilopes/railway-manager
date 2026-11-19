@@ -1,5 +1,7 @@
 // Divide uma linha em comandos (`;`) e cada comando em termos, respeitando aspas.
 
+import { ct } from '@/features/console/lib/i18n'
+
 export class SyntaxError_ extends Error {}
 
 /** Termos de cada comando da linha. Aspas simples ou duplas agrupam; `\` escapa. */
@@ -44,7 +46,7 @@ export function tokenize(line: string): string[][] {
       started = true
     }
   }
-  if (quote) throw new SyntaxError_(`aspas ${quote} sem fechamento`)
+  if (quote) throw new SyntaxError_(ct('m.lexer.quote', { quote }))
   endCommand()
   return commands
 }

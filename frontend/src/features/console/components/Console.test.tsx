@@ -53,10 +53,10 @@ describe('console', () => {
     expect(search).toHaveFocus()
     await userEvent.type(search, 'agen{Enter}')
     expect(screen.getByTestId('location')).toHaveTextContent('/schedules')
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Buscar tela ou ação' })).not.toBeInTheDocument()
 
     fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
-    await userEvent.type(await screen.findByRole('combobox'), 'painel{Enter}')
+    await userEvent.type(await screen.findByRole('combobox', { name: 'Buscar tela ou ação' }), 'painel{Enter}')
     expect(await screen.findByRole('region', { name: 'Console' })).toBeInTheDocument()
   })
 

@@ -1,6 +1,7 @@
 // Visão do console: saída (role="log") e linha de comando com histórico, busca e Tab.
 
 import { useQueryClient } from '@tanstack/react-query'
+import { Trans, useTranslation } from 'react-i18next'
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { api } from '@/shared/api/client'
@@ -39,6 +40,7 @@ export function Console({
   /** Texto mostrado enquanto a saída está vazia. */
   welcome?: ReactNode
 }) {
+  const { t } = useTranslation('console')
   const c = useConsole()
   const queryClient = useQueryClient()
   const completionData = useCompletionData()
@@ -171,12 +173,11 @@ export function Console({
   return (
     // oxlint-disable-next-line click-events-have-key-events, no-static-element-interactions -- o teclado já tem a própria linha de comando
     <div className={`console console-${variant}`} onClick={focusInput}>
-      <div className="console-log" ref={logRef} role="log" aria-live="polite" aria-label="Saída do console">
+      <div className="console-log" ref={logRef} role="log" aria-live="polite" aria-label={t('m.ui.log')}>
         {c.blocks.length === 0 && welcome}
         {c.blocks.length === 0 && !welcome && (
           <div className="con-text con-tone-muted">
-            Console do Railway Manager. Digite <strong>help</strong> para ver os comandos — por exemplo{' '}
-            <code>stop all --dry-run</code> ou <code>start loja@production</code>.
+            <Trans t={t} i18nKey="m.ui.welcome" components={{ 1: <strong />, 2: <code /> }} />
           </div>
         )}
         {c.blocks.map(({ id, block }) => (
@@ -192,14 +193,14 @@ export function Console({
         <label htmlFor="console-input" className="con-prompt-label">
           {prompt ? (
             <>
-              {prompt.question} {prompt.secret || prompt.plain ? '' : prompt.word ? `[${prompt.word}]` : '[s/N]'}
+              {prompt.question} {prompt.secret || prompt.plain ? '' : prompt.word ? `[${prompt.word}]` : t('m.ui.yesNo')}
             </>
           ) : search ? (
-            `busca (${search.term || '…'})${search.from < 0 ? ' sem resultado' : ''} ›`
+            t('m.ui.search', { term: search.term || '…', noResult: search.from < 0 ? t('m.ui.noResult') : '' })
           ) : (
             <span aria-hidden>›</span>
           )}
-          <span className="visually-hidden">{prompt ? '' : 'Comando'}</span>
+          <span className="visually-hidden">{prompt ? '' : t('m.ui.command')}</span>
         </label>
         <input
           id="console-input"
@@ -211,7 +212,7 @@ export function Console({
           spellCheck={false}
           value={prompt ? answer : c.input}
           readOnly={c.running && !prompt}
-          placeholder={c.running && !prompt ? 'executando… (Ctrl+C interrompe)' : prompt ? '' : 'digite um comando — help'}
+          placeholder={c.running && !prompt ? t('m.ui.running') : prompt ? '' : t('m.ui.placeholder')}
           onChange={(e) => {
             if (prompt) setAnswer(e.target.value)
             else {
@@ -225,7 +226,7 @@ export function Console({
         />
         {c.running && !prompt && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={c.interrupt}>
-            Interromper
+            {t('m.ui.interrupt')}
           </button>
         )}
       </div>

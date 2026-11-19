@@ -1,5 +1,6 @@
 // Ajuda gerada do registro de comandos (a mesma fonte da referência em docs/console.md).
 
+import { ct, groupLabel } from '@/features/console/lib/i18n'
 import { GLOBAL_OPTIONS, findCommand, usage } from '@/features/console/engine/parse'
 import type { Block, CommandDef, OptionDef } from '@/features/console/state/types'
 import { CommandError } from '@/features/console/state/types'
@@ -17,13 +18,13 @@ export function lookup(commands: CommandDef[], path: string[]): { def: CommandDe
   for (const name of path) {
     const found = findCommand(list, name)
     if (!found) {
-      throw new CommandError(`sem ajuda para '${[...canonical, name].join(' ')}': comando desconhecido — veja help`)
+      throw new CommandError(ct('m.help.noHelp', { path: [...canonical, name].join(' ') }))
     }
     def = found
     canonical.push(found.name)
     list = found.subcommands ?? []
   }
-  if (!def) throw new CommandError('informe um comando')
+  if (!def) throw new CommandError(ct('m.help.needCommand'))
   return { def, path: canonical }
 }
 
@@ -42,14 +43,14 @@ function overview(commands: CommandDef[]): Block[] {
   const blocks: Block[] = [
     {
       kind: 'text',
-      text: 'Comandos do Railway Manager. Use `help <comando>` (ou `<comando> --help`) para ver opções e exemplos.',
+      text: ct('m.help.intro'),
     },
   ]
   for (const [group, defs] of groups) {
     blocks.push({
       kind: 'table',
-      title: group,
-      columns: ['Comando', 'Também', 'Descrição'],
+      title: groupLabel(group),
+      columns: [ct('m.help.cols.command'), ct('m.help.cols.also'), ct('m.help.cols.description')],
       rows: defs.map((d) => [
         d.subcommands ? `${d.name} <${d.subcommands.map((s) => s.name).join('|')}>` : d.name,
         (d.aliases ?? []).join(', '),
@@ -60,9 +61,7 @@ function overview(commands: CommandDef[]): Block[] {
   blocks.push({
     kind: 'text',
     tone: 'muted',
-    text:
-      'Seletores: all · projeto · projeto@ambiente · projeto/serviço · projeto/serviço@ambiente · curinga * (ex.: */worker).\n' +
-      'Atalhos: Ctrl+` ou Ctrl+K abre/fecha · ↑/↓ histórico · Ctrl+R busca · Tab completa · Ctrl+C interrompe · Ctrl+L limpa.',
+    text: ct('m.help.footer'),
   })
   return blocks
 }
@@ -73,43 +72,43 @@ export function helpBlocks(commands: CommandDef[], path: string[]): Block[] {
   const blocks: Block[] = [{ kind: 'text', text: `${canonical.join(' ')} — ${def.summary}` }]
   const lines: string[] = []
   if (def.subcommands && !def.run) {
-    lines.push(`uso: ${canonical.join(' ')} <${def.subcommands.map((s) => s.name).join('|')}> …`)
+    lines.push(ct('m.help.usageSub', { path: canonical.join(' '), subs: def.subcommands.map((s) => s.name).join('|') }))
   } else {
-    lines.push(`uso: ${usage(canonical, def)}`)
+    lines.push(ct('m.help.usage', { usage: usage(canonical, def) }))
   }
-  if (def.aliases?.length) lines.push(`também: ${def.aliases.join(', ')}`)
+  if (def.aliases?.length) lines.push(ct('m.help.also', { list: def.aliases.join(', ') }))
   if (def.details) lines.push('', def.details)
   blocks.push({ kind: 'text', text: lines.join('\n') })
   if (def.subcommands) {
     blocks.push({
       kind: 'table',
-      title: 'Subcomandos',
-      columns: ['Subcomando', 'Também', 'Descrição'],
+      title: ct('m.help.subcommands'),
+      columns: [ct('m.help.cols.subcommand'), ct('m.help.cols.also'), ct('m.help.cols.description')],
       rows: def.subcommands.map((s) => [`${s.name}${s.usage ? ` ${s.usage}` : ''}`, (s.aliases ?? []).join(', '), s.summary]),
     })
   }
   if (def.args?.length) {
     blocks.push({
       kind: 'table',
-      title: 'Argumentos',
-      columns: ['Argumento', 'Descrição'],
-      rows: def.args.map((a) => [`<${a.name}${a.variadic ? '...' : ''}>${a.required ? '' : ' (opcional)'}`, a.help]),
+      title: ct('m.help.arguments'),
+      columns: [ct('m.help.cols.argument'), ct('m.help.cols.description')],
+      rows: def.args.map((a) => [`<${a.name}${a.variadic ? '...' : ''}>${a.required ? '' : ct('m.help.optional')}`, a.help]),
     })
   }
   if (def.run) {
     blocks.push({
       kind: 'table',
-      title: 'Opções',
-      columns: ['Opção', 'Padrão', 'Descrição'],
+      title: ct('m.help.options'),
+      columns: [ct('m.help.cols.option'), ct('m.help.cols.default'), ct('m.help.cols.description')],
       rows: [...(def.options ?? []), ...GLOBAL_OPTIONS].map((o) => [
-        optionLabel(o) + (o.repeatable ? ' (repetível)' : ''),
+        optionLabel(o) + (o.repeatable ? ct('m.help.repeatable') : ''),
         o.default ?? '—',
         o.help,
       ]),
     })
   }
   if (def.examples?.length) {
-    blocks.push({ kind: 'text', text: ['Exemplos:', ...def.examples.map((e) => `  ${e}`)].join('\n') })
+    blocks.push({ kind: 'text', text: [ct('m.help.examples'), ...def.examples.map((e) => `  ${e}`)].join('\n') })
   }
   return blocks
 }

@@ -1,25 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { api, isUuid } from '@/shared/api/client'
-import type { Credential, CredentialKind } from '@/shared/api/types'
+import type { CredentialKind } from '@/shared/api/types'
+import { LanguageSwitcher } from '@/shared/components/LanguageSwitcher/LanguageSwitcher'
 import { ConfirmDialog } from '@/shared/components/Modal/Modal'
 import { Button } from '@/shared/ui/Button/Button'
 import { ErrorState } from '@/shared/ui/Feedback/Feedback'
 import { Field, Input, RadioGroup } from '@/shared/ui/Field/Field'
+import { errorMessage } from '@/shared/i18n/errors'
 import { useFeedbackMutation } from '@/shared/hooks/useFeedbackMutation'
 import { type ThemePreference, useTheme } from '@/shared/lib/theme'
 import { formatDateTime } from '@/shared/lib/format'
 import { useSession } from '@/features/auth/lib/session'
 
-const STATUS_TEXT: Record<Credential['status'], string> = {
-  valid: 'Válido',
-  invalid: 'Recusado pelo Railway',
-  undecipherable: 'Indecifrável com a chave mestra atual',
-}
-
 /** Formulário de token. O valor digitado é descartado assim que enviado. */
 export function CredentialForm({ replacing, onSaved }: { replacing: boolean; onSaved?: () => void }) {
+  const { t } = useTranslation('settings')
   const [kind, setKind] = useState<CredentialKind>('account')
   const [token, setToken] = useState('')
   const [workspace, setWorkspace] = useState('')
@@ -27,7 +25,7 @@ export function CredentialForm({ replacing, onSaved }: { replacing: boolean; onS
 
   const save = useFeedbackMutation({
     mutationFn: (input: { kind: CredentialKind; token: string; workspace_id?: string }) => api.saveCredential(input),
-    success: 'Token validado e salvo.',
+    success: t('form.saved'),
     invalidate: [[]],
     onSuccess: () => onSaved?.(),
   })
@@ -41,22 +39,22 @@ export function CredentialForm({ replacing, onSaved }: { replacing: boolean; onS
   }
 
   return (
-    <form className="stack" onSubmit={submit} aria-label="Token do Railway">
+    <form className="stack" onSubmit={submit} aria-label={t('form.label')}>
       <RadioGroup
-        legend="Tipo de token"
+        legend={t('form.kindLegend')}
         name="kind"
         value={kind}
         onChange={setKind}
         options={[
-          { value: 'account', label: 'Conta' },
-          { value: 'workspace', label: 'Workspace (recomendado)' },
+          { value: 'account', label: t('form.account') },
+          { value: 'workspace', label: t('form.workspace') },
         ]}
       />
       <span className="subtle">
-        Tokens de projeto não são suportados: eles valem para um único ambiente e não listam projetos.
+        {t('form.noProjectTokens')}
       </span>
       {kind === 'workspace' && (
-        <Field label="ID do workspace" error={workspaceInvalid ? 'Informe um UUID válido.' : undefined}>
+        <Field label={t('form.workspaceId')} error={workspaceInvalid ? t('form.invalidUuid') : undefined}>
           {(p) => (
             <Input
               {...p}
@@ -69,12 +67,12 @@ export function CredentialForm({ replacing, onSaved }: { replacing: boolean; onS
           )}
         </Field>
       )}
-      <Field label="Token" hint="Validado no Railway e guardado cifrado. Ele não é exibido novamente.">
+      <Field label={t('form.token')} hint={t('form.tokenHint')}>
         {(p) => (
           <Input {...p} className="mono" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} required />
         )}
       </Field>
-      {save.isSuccess && <div className="alert alert-success">Token validado e salvo.</div>}
+      {save.isSuccess && <div className="alert alert-success">{t('form.saved')}</div>}
       <div className="row">
         <Button
           variant="primary"
@@ -82,41 +80,46 @@ export function CredentialForm({ replacing, onSaved }: { replacing: boolean; onS
           loading={save.isPending}
           disabled={!token.trim() || workspaceInvalid || (kind === 'workspace' && !workspace.trim())}
         >
-          {save.isPending ? 'Validando…' : replacing ? 'Substituir token' : 'Validar e salvar'}
+          {save.isPending ? t('form.validating') : replacing ? t('form.replaceToken') : t('form.validateSave')}
         </Button>
       </div>
     </form>
   )
 }
 
-const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: 'Seguir o sistema' },
-  { value: 'light', label: 'Claro' },
-  { value: 'dark', label: 'Escuro' },
-]
+const THEMES: ThemePreference[] = ['system', 'light', 'dark']
 
 function Appearance() {
+  const { t } = useTranslation('settings')
   const { preference, setPreference } = useTheme()
+  const options = THEMES.map((value) => ({ value, label: t(`theme.${value}`) }))
   return (
     <div className="card" style={{ marginTop: 'var(--space-4)' }}>
       <div className="card-head">
-        <h3>Aparência</h3>
+        <h3>{t('theme.appearance')}</h3>
       </div>
       <div className="card-body">
-        <RadioGroup legend="Tema" name="theme" value={preference} options={THEME_OPTIONS} onChange={setPreference} />
+        <RadioGroup legend={t('theme.legend')} name="theme" value={preference} options={options} onChange={setPreference} />
+      </div>
+      <div className="card-head">
+        <h3>{t('language.title')}</h3>
+      </div>
+      <div className="card-body">
+        <span className="subtle">{t('language.legend')}</span> <LanguageSwitcher />
       </div>
     </div>
   )
 }
 
 export function Settings() {
+  const { t } = useTranslation('settings')
   const credential = useQuery({ queryKey: ['credential'], queryFn: api.credential })
   const canManage = useSession().can('admin')
   const [replacing, setReplacing] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const remove = useFeedbackMutation({
     mutationFn: api.removeCredential,
-    success: 'Token removido.',
+    success: t('removed'),
     invalidate: [[]],
     onSuccess: () => setConfirmRemove(false),
   })
@@ -126,56 +129,56 @@ export function Settings() {
     <>
       <div className="page-head">
         <div>
-          <h1>Configurações</h1>
-          <p className="muted">Token usado para falar com a API do Railway.</p>
+          <h1>{t('title')}</h1>
+          <p className="muted">{t('subtitle')}</p>
         </div>
       </div>
       <ErrorState error={credential.error} onRetry={() => void credential.refetch()} />
       <div className="card">
         <div className="card-head">
-          <h3>Token do Railway</h3>
+          <h3>{t('tokenCard')}</h3>
         </div>
         <div className="card-body stack">
           {current ? (
             <>
               <dl className="form-grid" style={{ margin: 0 }}>
                 <div>
-                  <dt className="subtle">Tipo</dt>
-                  <dd style={{ margin: 0 }}>{current.kind === 'account' ? 'Conta' : 'Workspace'}</dd>
+                  <dt className="subtle">{t('info.type')}</dt>
+                  <dd style={{ margin: 0 }}>{current.kind === 'account' ? t('info.account') : t('info.workspace')}</dd>
                 </div>
                 <div>
-                  <dt className="subtle">Associado a</dt>
+                  <dt className="subtle">{t('info.linkedTo')}</dt>
                   <dd style={{ margin: 0 }}>{current.label}</dd>
                 </div>
                 <div>
-                  <dt className="subtle">Token</dt>
+                  <dt className="subtle">{t('info.token')}</dt>
                   <dd className="mono" style={{ margin: 0 }}>
                     ••••••••{current.masked_suffix}
                   </dd>
                 </div>
                 <div>
-                  <dt className="subtle">Situação</dt>
+                  <dt className="subtle">{t('info.status')}</dt>
                   <dd style={{ margin: 0 }} className={current.status === 'valid' ? '' : 'result result-failed'}>
-                    {STATUS_TEXT[current.status]}
+                    {t(`status.${current.status}`)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="subtle">Validado em</dt>
+                  <dt className="subtle">{t('info.validatedAt')}</dt>
                   <dd style={{ margin: 0 }}>{formatDateTime(current.validated_at)}</dd>
                 </div>
               </dl>
               {current.status !== 'valid' && (
                 <div className="alert alert-warn">
-                  {canManage ? 'Cadastre um novo token para reativar a integração.' : 'A integração está inativa: avise um administrador.'}
+                  {canManage ? t('reactivate') : t('inactive')}
                 </div>
               )}
               {!canManage ? null : replacing || current.status !== 'valid' ? (
                 <CredentialForm replacing onSaved={() => setReplacing(false)} />
               ) : (
                 <div className="row">
-                  <Button onClick={() => setReplacing(true)}>Substituir</Button>
+                  <Button onClick={() => setReplacing(true)}>{t('replace')}</Button>
                   <Button variant="ghost" onClick={() => setConfirmRemove(true)}>
-                    Remover
+                    {t('remove')}
                   </Button>
                 </div>
               )}
@@ -185,7 +188,7 @@ export function Settings() {
             (canManage ? (
               <CredentialForm replacing={false} />
             ) : (
-              <p className="muted">Nenhum token cadastrado. Peça a um administrador para cadastrá-lo.</p>
+              <p className="muted">{t('none')}</p>
             ))
           )}
         </div>
@@ -193,12 +196,12 @@ export function Settings() {
       <Appearance />
       {confirmRemove && (
         <ConfirmDialog
-          title="Remover token"
-          message="As operações que dependem do Railway deixam de funcionar até um novo cadastro. Projetos, serviços e histórico locais são mantidos."
-          confirmLabel="Remover token"
+          title={t('removeTitle')}
+          message={t('removeMessage')}
+          confirmLabel={t('removeTitle')}
           danger
           busy={remove.isPending}
-          error={remove.error?.message}
+          error={remove.error ? errorMessage(remove.error) : undefined}
           onConfirm={() => remove.mutate()}
           onClose={() => setConfirmRemove(false)}
         />

@@ -2,6 +2,8 @@
 // ajuda e tradução de erros em blocos de saída.
 
 import { ApiError } from '@/shared/api/client'
+import { ct } from '@/features/console/lib/i18n'
+import { errorMessage } from '@/shared/i18n/errors'
 import { helpBlocks } from '@/features/console/lib/help'
 import { SyntaxError_, tokenize } from './lexer'
 import { expandAlias, findCommand, parse } from './parse'
@@ -27,13 +29,13 @@ export function carriesSecret(line: string): boolean {
 
 export function errorBlock(err: unknown): Block {
   if (err instanceof ApiError) {
-    if (err.status === 401) return { kind: 'error', message: 'sessão expirada: entre novamente', status: 401, code: err.code }
-    return { kind: 'error', message: err.message, status: err.status, code: err.code, details: err.details }
+    if (err.status === 401) return { kind: 'error', message: ct('m.engine.sessionExpired'), status: 401, code: err.code }
+    return { kind: 'error', message: errorMessage(err), status: err.status, code: err.code, details: err.details }
   }
   if (err instanceof CommandError) return { kind: 'error', message: err.message, details: err.details }
-  if (err instanceof Aborted) return { kind: 'text', text: 'interrompido', tone: 'muted' }
+  if (err instanceof Aborted) return { kind: 'text', text: ct('m.engine.interrupted'), tone: 'muted' }
   if (err instanceof TypeError && /fetch|network/i.test(err.message)) {
-    return { kind: 'error', message: `falha de rede: ${err.message}` }
+    return { kind: 'error', message: ct('m.engine.network', { message: err.message }) }
   }
   return { kind: 'error', message: err instanceof Error ? err.message : String(err) }
 }
@@ -47,7 +49,7 @@ export async function runLine(line: string, makeCtx: CtxFactory): Promise<boolea
   if (carriesSecret(line)) {
     base.print({
       kind: 'error',
-      message: 'não informe o token na linha de comando: use `credential set <account|workspace>` e digite-o no campo mascarado',
+      message: ct('m.engine.secretInLine'),
     })
     return false
   }
@@ -55,7 +57,7 @@ export async function runLine(line: string, makeCtx: CtxFactory): Promise<boolea
   try {
     commands = tokenize(line)
   } catch (err) {
-    base.print({ kind: 'error', message: err instanceof SyntaxError_ ? `erro de sintaxe: ${err.message}` : String(err) })
+    base.print({ kind: 'error', message: err instanceof SyntaxError_ ? ct('m.engine.syntax', { message: err.message }) : String(err) })
     return false
   }
   const expanded = commands.flatMap((tokens) => expandAlias(tokens, base.commands, base.aliases))
@@ -69,7 +71,7 @@ export async function runLine(line: string, makeCtx: CtxFactory): Promise<boolea
         for (const block of helpBlocks(ctx.commands, inv.path)) ctx.print(block)
         ok = true
       } else if (!inv.def.run) {
-        throw new CommandError(`'${inv.path.join(' ')}' não executa nada sozinho — veja help ${inv.path.join(' ')}`)
+        throw new CommandError(ct('m.engine.notRunnable', { path: inv.path.join(' ') }))
       } else {
         ok = (await inv.def.run(ctx, inv)) !== false
       }

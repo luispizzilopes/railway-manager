@@ -1,11 +1,13 @@
 // Consultas: status, refresh, ops, op, history e ações agendadas (at).
 
 import type { HistoryFilters, ScheduledAction, ScheduledActionStatus } from '@/shared/api/types'
+import { errorMessage } from '@/shared/i18n/errors'
 import { KIND_LABEL, RESULT_LABEL, STATUS_LABEL } from '@/shared/lib/format'
 import { flag, int, str } from '@/features/console/engine/parse'
 import { findProject, flatten, resolveSelectors } from '@/features/console/state/selectors'
 import { describeWhen } from '@/features/console/lib/time'
 import type { Cell, CommandDef, Ctx, Invocation } from '@/features/console/state/types'
+import { ct, defineCommands } from '@/features/console/lib/i18n'
 import { CommandError } from '@/features/console/state/types'
 import { YES, confirmOrCancel, note, pick, short, show, succeeded, watch, when } from './shared'
 
@@ -28,23 +30,23 @@ async function status(ctx: Ctx, inv: Invocation) {
     const i = dashboard.indicators
     ctx.print({
       kind: 'text',
-      text: `${i.projects} projeto(s) · ${i.instances} instância(s): ${i.running} ativas, ${i.sleeping} dormindo, ${i.stopped} desligadas, ${i.failed} com falha, ${i.other} outras`,
+      text: ct('m.info.summary', { projects: i.projects, instances: i.instances, running: i.running, sleeping: i.sleeping, stopped: i.stopped, failed: i.failed, other: i.other }),
     })
     for (const a of dashboard.alerts) ctx.print({ kind: 'text', tone: 'warn', text: `⚠ ${a.message}` })
-    if (!dashboard.integration_ready) note(ctx, 'integração não configurada: use credential set', 'warn')
+    if (!dashboard.integration_ready) note(ctx, ct('m.info.notConfigured'), 'warn')
   }
   if (instances.length === 0) {
-    note(ctx, 'nenhuma instância gerenciada — importe com: project import --all; instance import <projeto> --all')
+    note(ctx, ct('m.info.noInstances'))
     return
   }
   ctx.print({
     kind: 'table',
-    columns: ['Projeto', 'Serviço', 'Ambiente', 'Estado', 'Próxima ação', 'ID'],
+    columns: [ct('m.info.col.project'), ct('m.info.col.service'), ct('m.info.col.environment'), ct('m.info.col.state'), ct('m.info.col.nextAction'), ct('m.info.col.id')],
     rows: instances.map((i) => {
       const n = next.get(i.projectId)
       return [
         i.projectName,
-        i.service + (i.busy ? ' (em operação)' : ''),
+        i.service + (i.busy ? ct('m.info.busy') : ''),
         i.environment,
         { state: i.state },
         n ? `${KIND_LABEL[n.action]} ${when(n.at)} (${n.schedule_name})` : '',
@@ -60,7 +62,7 @@ async function refresh(ctx: Ctx) {
   show(ctx, report, {
     kind: 'text',
     tone: report.failed ? 'warn' : 'success',
-    text: `estados atualizados: ${report.refreshed} lidos, ${report.not_found} não encontrados, ${report.failed} falhas`,
+    text: ct('m.info.refreshed', { refreshed: report.refreshed, notFound: report.not_found, failed: report.failed }),
   })
 }
 
@@ -70,25 +72,25 @@ async function ops(ctx: Ctx, inv: Invocation) {
   const recent = (await ctx.dashboard(true)).recent_operations.slice(0, int(inv, 'limit', 10))
   show(ctx, recent, {
     kind: 'table',
-    columns: ['ID', 'Tipo', 'Origem', 'Situação', 'Itens', 'Projetos', 'Criada'],
+    columns: [ct('m.info.ops.col.id'), ct('m.info.ops.col.kind'), ct('m.info.ops.col.trigger'), ct('m.info.ops.col.status'), ct('m.info.ops.col.items'), ct('m.info.ops.col.projects'), ct('m.info.ops.col.created')],
     rows: recent.map((s) => [
       { id: s.operation.id },
       KIND_LABEL[s.operation.kind],
       s.operation.trigger,
       STATUS_LABEL[s.operation.status],
-      `${s.succeeded} ok · ${s.failed} falhas · ${s.skipped} ignorados${s.active ? ` · ${s.active} ativos` : ''}`,
+      ct('m.info.ops.items', { ok: s.succeeded, failed: s.failed, skipped: s.skipped }) + (s.active ? ct('m.info.ops.active', { count: s.active }) : ''),
       s.projects.join(', '),
       when(s.operation.created_at),
     ]),
   })
-  if (recent.length === 0) note(ctx, 'nenhuma operação recente')
+  if (recent.length === 0) note(ctx, ct('m.info.ops.none'))
 }
 
 async function op(ctx: Ctx, inv: Invocation) {
   let id = inv.args[0]
   if (!UUID.test(id)) {
     const recent = (await ctx.dashboard(true)).recent_operations.map((s) => s.operation)
-    id = pick(recent, id, 'operação', (o) => o.id).id
+    id = pick(recent, id, 'operation', (o) => o.id).id
   }
   if (ctx.json) {
     ctx.print({ kind: 'json', value: await ctx.api.operation(id) })
@@ -107,7 +109,7 @@ const TRIGGERS = ['manual', 'schedule', 'scheduled_action']
 
 function oneOf(name: string, value: string | undefined, allowed: string[]): string | undefined {
   if (value !== undefined && !allowed.includes(value)) {
-    throw new CommandError(`--${name} inválido: '${value}' — use ${allowed.join(', ')}`)
+    throw new CommandError(ct('m.info.invalidOption', { name, value, allowed: allowed.join(', ') }))
   }
   return value
 }
@@ -120,8 +122,8 @@ async function serviceId(ctx: Ctx, text: string, projectIds: string[]): Promise<
       if (v.service.name.toLowerCase() === text.toLowerCase()) found.add(v.service.railway_service_id)
     }
   }
-  if (found.size === 0) throw new CommandError(`nenhum serviço '${text}' nos projetos gerenciados`)
-  if (found.size > 1) throw new CommandError(`'${text}' existe em vários projetos: informe também --project`)
+  if (found.size === 0) throw new CommandError(ct('m.info.noService', { text }))
+  if (found.size > 1) throw new CommandError(ct('m.info.serviceAmbiguous', { text }))
   return [...found][0]
 }
 
@@ -153,8 +155,17 @@ async function history(ctx: Ctx, inv: Invocation) {
   const page = await ctx.api.history({ ...filters, per_page: limit } as HistoryFilters)
   show(ctx, page, {
     kind: 'table',
-    title: `Histórico — página ${page.page} de ${Math.max(1, Math.ceil(page.total / page.per_page))} (${page.total} itens)`,
-    columns: ['Quando', 'Tipo', 'Projeto', 'Serviço', 'Ambiente', 'Resultado', 'Origem', 'Mensagem'],
+    title: ct('m.info.history.title', { page: page.page, pages: Math.max(1, Math.ceil(page.total / page.per_page)), total: page.total }),
+    columns: [
+      ct('m.info.history.col.when'),
+      ct('m.info.history.col.kind'),
+      ct('m.info.history.col.project'),
+      ct('m.info.history.col.service'),
+      ct('m.info.history.col.environment'),
+      ct('m.info.history.col.result'),
+      ct('m.info.history.col.trigger'),
+      ct('m.info.history.col.message'),
+    ],
     rows: page.items.map((h) => [
       when(h.created_at),
       KIND_LABEL[h.kind],
@@ -163,9 +174,9 @@ async function history(ctx: Ctx, inv: Invocation) {
       h.item.label.environment_name,
       { result: h.item.result },
       h.trigger === 'schedule'
-        ? `agenda ${h.schedule_name ?? ''}`
+        ? ct('m.info.history.schedule', { name: h.schedule_name ?? '' })
         : h.trigger === 'scheduled_action'
-          ? `ação agendada (${h.scheduled_action_label ?? ''})`
+          ? ct('m.info.history.action', { label: h.scheduled_action_label ?? '' })
           : h.requested_by,
       h.item.error_message ?? '',
     ]),
@@ -174,16 +185,8 @@ async function history(ctx: Ctx, inv: Invocation) {
 
 // ---------- ações agendadas ----------
 
-const ACTION_STATUS: Record<ScheduledActionStatus, string> = {
-  pending: 'pendente',
-  processing: 'executando',
-  executed: 'executada',
-  late: 'executada com atraso',
-  skipped: 'ignorada',
-  missed: 'perdida',
-  failed: 'falhou',
-  cancelled: 'cancelada',
-}
+const ACTION_STATUSES: ScheduledActionStatus[] = ['pending', 'processing', 'executed', 'late', 'skipped', 'missed', 'failed', 'cancelled']
+const actionStatus = (status: ScheduledActionStatus) => ct(`m.info.actionStatus.${status}`)
 
 function actionRow(ctx: Ctx, a: ScheduledAction, timeZone: string): Cell[] {
   const tone = a.status === 'failed' || a.status === 'missed' ? 'error' : a.status === 'pending' ? 'info' : 'muted'
@@ -192,13 +195,21 @@ function actionRow(ctx: Ctx, a: ScheduledAction, timeZone: string): Cell[] {
     KIND_LABEL[a.kind],
     a.status === 'pending' ? describeWhen(new Date(a.run_at), timeZone, ctx.now()) : when(a.run_at),
     a.label,
-    { text: ACTION_STATUS[a.status] + (a.message ? ` — ${a.message}` : ''), tone },
+    { text: actionStatus(a.status) + (a.message ? ` — ${a.message}` : ''), tone },
     a.operation_id ? { id: a.operation_id } : '',
     a.note ?? '',
   ]
 }
 
-const ACTION_COLUMNS = ['ID', 'Ação', 'Quando', 'Alvo', 'Situação', 'Operação', 'Observação']
+const actionColumns = () => [
+  ct('m.info.action.col.id'),
+  ct('m.info.action.col.action'),
+  ct('m.info.action.col.when'),
+  ct('m.info.action.col.target'),
+  ct('m.info.action.col.status'),
+  ct('m.info.action.col.operation'),
+  ct('m.info.action.col.note'),
+]
 
 async function allActions(ctx: Ctx) {
   return ctx.api.scheduledActions(undefined, 1, 200)
@@ -206,53 +217,53 @@ async function allActions(ctx: Ctx) {
 
 async function atList(ctx: Ctx, inv: Invocation) {
   const raw = str(inv, 'status')
-  const statuses = Object.keys(ACTION_STATUS)
+  const statuses: string[] = ACTION_STATUSES
   const status = flag(inv, 'all') ? undefined : ((oneOf('status', raw, statuses) ?? 'pending') as ScheduledActionStatus)
   const page = await ctx.api.scheduledActions(status, 1, 200)
   show(ctx, page, {
     kind: 'table',
-    title: `Ações agendadas${status ? ` (${ACTION_STATUS[status]})` : ''} — fuso ${page.default_timezone}`,
-    columns: ACTION_COLUMNS,
+    title: ct('m.info.at.title', { status: status ? ` (${actionStatus(status)})` : '', tz: page.default_timezone }),
+    columns: actionColumns(),
     rows: page.items.map((a) => actionRow(ctx, a, page.default_timezone)),
   })
-  if (page.items.length === 0) note(ctx, status === 'pending' ? 'nenhuma ação pendente — crie com: stop <seletor> --at 18:00' : 'nenhuma ação')
+  if (page.items.length === 0) note(ctx, ct(status === 'pending' ? 'm.info.at.none.pending' : 'm.info.at.none.any'))
 }
 
 async function findAction(ctx: Ctx, text: string) {
   const page = await allActions(ctx)
-  return { action: pick(page.items, text, 'ação agendada', (a) => a.id), timeZone: page.default_timezone }
+  return { action: pick(page.items, text, 'scheduledAction', (a) => a.id), timeZone: page.default_timezone }
 }
 
 async function atShow(ctx: Ctx, inv: Invocation) {
   const { action, timeZone } = await findAction(ctx, inv.args[0])
   const detail = await ctx.api.scheduledAction(action.id)
-  show(ctx, detail, { kind: 'table', columns: ACTION_COLUMNS, rows: [actionRow(ctx, detail, timeZone)] })
+  show(ctx, detail, { kind: 'table', columns: actionColumns(), rows: [actionRow(ctx, detail, timeZone)] })
   if (!ctx.json && detail.operation_id) await watch(ctx, detail.operation_id, detail.kind, true)
 }
 
 async function atCancel(ctx: Ctx, inv: Invocation) {
   let targets: ScheduledAction[]
   if (flag(inv, 'all')) {
-    if (inv.args.length) throw new CommandError('use IDs ou --all, não os dois')
+    if (inv.args.length) throw new CommandError(ct('m.info.at.idsOrAll'))
     targets = (await ctx.api.scheduledActions('pending', 1, 200)).items
     if (targets.length === 0) {
-      note(ctx, 'nenhuma ação pendente')
+      note(ctx, ct('m.info.at.nonePending'))
       return
     }
-    if (!(await confirmOrCancel(ctx, inv, `Cancelar ${targets.length} ação(ões) pendente(s)?`))) return false
+    if (!(await confirmOrCancel(ctx, inv, ct('m.info.at.confirmCancel', { count: targets.length })))) return false
   } else {
-    if (inv.args.length === 0) throw new CommandError('informe o ID da ação (veja at list) ou --all')
+    if (inv.args.length === 0) throw new CommandError(ct('m.info.at.needId'))
     const page = await allActions(ctx)
-    targets = inv.args.map((text) => pick(page.items, text, 'ação agendada', (a) => a.id))
+    targets = inv.args.map((text) => pick(page.items, text, 'scheduledAction', (a) => a.id))
   }
   let ok = true
   for (const a of targets) {
     try {
       await ctx.api.cancelScheduledAction(a.id)
-      note(ctx, `ação ${short(a.id)} cancelada (${KIND_LABEL[a.kind]} · ${a.label})`, 'success')
+      note(ctx, ct('m.info.at.cancelled', { id: short(a.id), kind: KIND_LABEL[a.kind], label: a.label }), 'success')
     } catch (err) {
       ok = false
-      ctx.print({ kind: 'error', message: `ação ${short(a.id)}: ${err instanceof Error ? err.message : String(err)}` })
+      ctx.print({ kind: 'error', message: ct('m.info.at.failed', { id: short(a.id), reason: errorMessage(err) }) })
     }
   }
   ctx.invalidate()
@@ -261,17 +272,16 @@ async function atCancel(ctx: Ctx, inv: Invocation) {
 
 // ---------- definições ----------
 
-export const infoCommands: CommandDef[] = [
+export const infoCommands: CommandDef[] = defineCommands([
   {
     name: 'status',
     aliases: ['ls', 'estado'],
     group: 'Consulta',
-    summary: 'visão geral: indicadores, alertas e estado de cada instância',
     usage: '[seletor...] [opções]',
-    args: [{ name: 'seletor', variadic: true, help: 'filtra as instâncias (padrão: todas)', complete: 'selector' }],
+    args: [{ name: 'seletor', variadic: true, complete: 'selector' }],
     options: [
-      { name: 'env', value: 'ambiente', help: 'só um ambiente', complete: 'environment' },
-      { name: 'state', value: 'estado', help: 'só instâncias neste estado', complete: 'state' },
+      { name: 'env', value: 'ambiente', complete: 'environment' },
+      { name: 'state', value: 'estado', complete: 'state' },
     ],
     examples: ['status', 'status loja', 'ls --state stopped', 'status */worker --env staging'],
     run: status,
@@ -280,7 +290,6 @@ export const infoCommands: CommandDef[] = [
     name: 'refresh',
     aliases: ['atualizar'],
     group: 'Consulta',
-    summary: 'lê de novo o estado de todas as instâncias no Railway',
     examples: ['refresh'],
     run: refresh,
   },
@@ -288,8 +297,7 @@ export const infoCommands: CommandDef[] = [
     name: 'ops',
     aliases: ['operacoes'],
     group: 'Operações',
-    summary: 'operações recentes',
-    options: [{ name: 'limit', value: 'n', default: '10', help: 'quantas mostrar' }],
+    options: [{ name: 'limit', value: 'n' }],
     examples: ['ops', 'ops --limit 3'],
     run: ops,
   },
@@ -297,10 +305,9 @@ export const infoCommands: CommandDef[] = [
     name: 'op',
     aliases: ['operacao'],
     group: 'Operações',
-    summary: 'mostra e acompanha uma operação até o fim',
     usage: '<id> [opções]',
-    args: [{ name: 'id', required: true, help: 'ID completo ou prefixo (de ops)', complete: 'operation' }],
-    options: [{ name: 'no-wait', help: 'mostra o estado atual sem acompanhar' }],
+    args: [{ name: 'id', required: true, complete: 'operation' }],
+    options: [{ name: 'no-wait' }],
     examples: ['op 3f2a91c0', 'op 3f2a91c0 --no-wait'],
     run: op,
   },
@@ -308,18 +315,17 @@ export const infoCommands: CommandDef[] = [
     name: 'history',
     aliases: ['historico'],
     group: 'Operações',
-    summary: 'histórico de itens de operações, com os filtros da tela',
     options: [
-      { name: 'project', value: 'projeto', help: 'projeto (nome ou ID)', complete: 'project' },
-      { name: 'service', value: 'serviço', help: 'serviço (nome ou ID Railway)', complete: 'service' },
-      { name: 'env', value: 'ambiente', help: 'ambiente', complete: 'environment' },
-      { name: 'kind', value: 'tipo', help: 'start ou stop', complete: { values: KINDS } },
-      { name: 'result', value: 'resultado', help: RESULTS.join(', '), complete: { values: RESULTS } },
-      { name: 'trigger', value: 'origem', help: TRIGGERS.join(', '), complete: { values: TRIGGERS } },
-      { name: 'from', value: 'data', help: 'a partir de (AAAA-MM-DD ou RFC 3339)' },
-      { name: 'to', value: 'data', help: 'até (AAAA-MM-DD ou RFC 3339, inclusive)' },
-      { name: 'page', value: 'n', default: '1', help: 'página' },
-      { name: 'limit', value: 'n', default: '20', help: 'itens por página' },
+      { name: 'project', value: 'projeto', complete: 'project' },
+      { name: 'service', value: 'serviço', complete: 'service' },
+      { name: 'env', value: 'ambiente', complete: 'environment' },
+      { name: 'kind', value: 'tipo', complete: { values: KINDS } },
+      { name: 'result', value: 'resultado', complete: { values: RESULTS } },
+      { name: 'trigger', value: 'origem', complete: { values: TRIGGERS } },
+      { name: 'from', value: 'data' },
+      { name: 'to', value: 'data' },
+      { name: 'page', value: 'n' },
+      { name: 'limit', value: 'n' },
     ],
     examples: ['history', 'history --project loja --kind stop --result failed', 'history --trigger scheduled_action --from 2026-11-01'],
     run: history,
@@ -328,16 +334,14 @@ export const infoCommands: CommandDef[] = [
     name: 'at',
     aliases: ['agendadas'],
     group: 'Agendamento',
-    summary: 'ações agendadas pontuais (criadas com start/stop --at/--in)',
     subcommands: [
       {
         name: 'list',
         aliases: ['ls'],
         group: 'Agendamento',
-        summary: 'lista ações agendadas (padrão: pendentes)',
         options: [
-          { name: 'all', help: 'inclui executadas, canceladas, perdidas…' },
-          { name: 'status', value: 'situação', help: Object.keys(ACTION_STATUS).join(', '), complete: { values: Object.keys(ACTION_STATUS) } },
+          { name: 'all' },
+          { name: 'status', value: 'situação', complete: { values: ACTION_STATUSES } },
         ],
         examples: ['at list', 'at list --all', 'at list --status failed'],
         run: atList,
@@ -345,9 +349,8 @@ export const infoCommands: CommandDef[] = [
       {
         name: 'show',
         group: 'Agendamento',
-        summary: 'mostra uma ação e a operação que ela gerou',
         usage: '<id>',
-        args: [{ name: 'id', required: true, help: 'ID ou prefixo', complete: 'action' }],
+        args: [{ name: 'id', required: true, complete: 'action' }],
         examples: ['at show 7c1e'],
         run: atShow,
       },
@@ -355,13 +358,12 @@ export const infoCommands: CommandDef[] = [
         name: 'cancel',
         aliases: ['cancelar'],
         group: 'Agendamento',
-        summary: 'cancela ações pendentes',
         usage: '<id...> | --all',
-        args: [{ name: 'id', variadic: true, help: 'IDs ou prefixos', complete: 'action' }],
-        options: [{ name: 'all', help: 'cancela todas as pendentes' }, YES],
+        args: [{ name: 'id', variadic: true, complete: 'action' }],
+        options: [{ name: 'all' }, YES],
         examples: ['at cancel 7c1e', 'at cancel --all -y'],
         run: atCancel,
       },
     ],
   },
-]
+])

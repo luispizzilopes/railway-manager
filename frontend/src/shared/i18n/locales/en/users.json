@@ -1,0 +1,47 @@
+{
+  "hint": {
+    "viewer": "Read-only: overview, projects, schedules, history and logs.",
+    "operator": "Also starts and stops services, refreshes states and pauses/resumes schedules.",
+    "admin": "Also manages projects, services, schedules and the Railway token."
+  },
+  "create": {
+    "label": "New user",
+    "username": "Username",
+    "usernameHint": "3 to 32 characters: letters, numbers, '.', '_' or '-'.",
+    "password": "Password",
+    "passwordHint": "At least 8 characters.",
+    "role": "Role",
+    "submit": "Create user",
+    "done": "User created."
+  },
+  "password": {
+    "label": "New password for {{user}}",
+    "field": "New password",
+    "submit": "Reset password",
+    "done": "Password reset; the user's sessions were ended.",
+    "title": "Reset password for {{user}}"
+  },
+  "denied": "Only the master user manages users.",
+  "title": "Users",
+  "subtitle": "Who can log in and what each person can do.",
+  "new": "New user",
+  "loading": "Loading users…",
+  "emptyTitle": "No users registered",
+  "emptyBody": "Create users to give your team access with the right role.",
+  "table": "Users",
+  "user": "User",
+  "role": "Role",
+  "status": "Status",
+  "created": "Created",
+  "roleOf": "Role of {{user}}",
+  "active": "Active",
+  "inactive": "Inactive",
+  "deactivate": "Deactivate",
+  "activate": "Activate",
+  "resetPassword": "Reset password",
+  "remove": "Remove",
+  "updated": "User updated.",
+  "removed": "User removed.",
+  "removeTitle": "Remove user",
+  "removeMessage": "Remove <1>{{user}}</1>? Open sessions are ended and the operation history keeps the name."
+}

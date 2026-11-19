@@ -1,9 +1,13 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
+import { errorMessage } from '@/shared/i18n/errors'
 import { Button } from '@/shared/ui/Button/Button'
 import './Feedback.css'
 
-export function Skeleton({ lines = 3, label = 'Carregando…' }: { lines?: number; label?: string }) {
+export function Skeleton({ lines = 3, label }: { lines?: number; label?: string }) {
+  const { t } = useTranslation()
+  label ??= t('ui.loading')
   return (
     <div className="skeleton" role="status" aria-label={label}>
       {Array.from({ length: lines }, (_, i) => (
@@ -24,14 +28,15 @@ export function EmptyState({ title, children, action }: { title: ReactNode; chil
 }
 
 export function ErrorState({ error, onRetry, retrying }: { error: unknown; onRetry?: () => void; retrying?: boolean }) {
+  const { t } = useTranslation()
   if (!error) return null
-  const message = error instanceof Error ? error.message : String(error)
+  const message = errorMessage(error)
   return (
     <div className="alert alert-danger" role="alert">
       <span className="alert-text">{message}</span>
       {onRetry && (
         <Button size="sm" onClick={onRetry} loading={retrying}>
-          Tentar novamente
+          {t('ui.retry')}
         </Button>
       )}
     </div>

@@ -36,7 +36,7 @@ describe('dashboard', () => {
       }),
     })
     renderWithProviders(<Dashboard />)
-    expect(await screen.findByText('Nenhum token do Railway configurado.')).toBeInTheDocument()
+    expect(await screen.findByText(/Nenhum token do Railway configurado/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Configurar token' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('button', { name: 'Desligar todos' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Desligar' })).toBeDisabled()
@@ -51,10 +51,10 @@ describe('dashboard', () => {
       'POST /api/dashboard/refresh': { report: { refreshed: 1, not_found: 0, failed: 0 } },
     })
     renderWithProviders(<Dashboard />)
-    const running = await screen.findByTestId('stat-Ativos')
+    const running = await screen.findByTestId('stat-active')
     expect(running).toHaveTextContent('3')
     expect(running).toHaveTextContent('1 dormindo')
-    expect(screen.getByTestId('stat-Serviços monitorados')).toHaveTextContent('5')
+    expect(screen.getByTestId('stat-monitored')).toHaveTextContent('5')
   })
 
   const MIXED = [
@@ -112,7 +112,7 @@ describe('dashboard', () => {
       'GET /api/dashboard': () => {
         calls++
         return calls === 1
-          ? { status: 500, json: { code: 'internal', message: 'falha ao ler o painel' } }
+          ? { status: 500, json: { code: 'railway_error', message: 'falha ao ler o painel' } }
           : { json: dashboard([card({ id: 'a' })]) }
       },
     })

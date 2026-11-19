@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
 
 import { api } from '@/shared/api/client'
@@ -10,6 +11,7 @@ import { LogsPanel } from './LogsPanel'
 
 /** Escolha do serviço (projeto → ambiente → serviço) e logs dele, com o estado na URL. */
 export function Logs() {
+  const { t } = useTranslation('logs')
   const [params, setParams] = useSearchParams()
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard })
   const instanceId = params.get('instance') ?? ''
@@ -72,7 +74,7 @@ export function Logs() {
   }
 
   if (dashboard.error) return <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />
-  if (!dashboard.data) return <Skeleton lines={4} label="Carregando serviços…" />
+  if (!dashboard.data) return <Skeleton lines={4} label={t('loadingServices')} />
 
   const missing = Boolean(instanceId) && !found
 
@@ -80,17 +82,17 @@ export function Logs() {
     <div className="log-page">
       <div className="page-head">
         <div>
-          <h1>Logs</h1>
-          <p className="muted">Escolha um serviço para ver os logs de execução e de build.</p>
+          <h1>{t('title')}</h1>
+          <p className="muted">{t('pageSubtitle')}</p>
         </div>
       </div>
 
       {options.length === 0 ? (
-        <EmptyState title="Nenhum serviço gerenciado">Importe serviços em um projeto para ver os logs deles aqui.</EmptyState>
+        <EmptyState title={t('emptyTitle')}>{t('emptyBody')}</EmptyState>
       ) : (
         <div className="card card-body" style={{ marginBottom: 'var(--space-4)' }}>
           <div className="form-grid">
-            <Field label="Projeto">
+            <Field label={t('project')}>
               {(p) => (
                 <Select
                   {...p}
@@ -101,7 +103,7 @@ export function Logs() {
                     chooseInstance('')
                   }}
                 >
-                  <option value="">Escolha…</option>
+                  <option value="">{t('choose')}</option>
                   {projects.map(([id, name]) => (
                     <option key={id} value={id}>
                       {name}
@@ -110,7 +112,7 @@ export function Logs() {
                 </Select>
               )}
             </Field>
-            <Field label="Ambiente">
+            <Field label={t('environment')}>
               {(p) => (
                 <Select
                   {...p}
@@ -121,7 +123,7 @@ export function Logs() {
                     chooseInstance('')
                   }}
                 >
-                  <option value="">Escolha…</option>
+                  <option value="">{t('choose')}</option>
                   {environments.map(([id, name]) => (
                     <option key={id} value={id}>
                       {name}
@@ -130,10 +132,10 @@ export function Logs() {
                 </Select>
               )}
             </Field>
-            <Field label="Serviço">
+            <Field label={t('service')}>
               {(p) => (
                 <Select {...p} value={found ? instanceId : ''} disabled={!environmentId} onChange={(e) => chooseInstance(e.target.value)}>
-                  <option value="">Escolha…</option>
+                  <option value="">{t('choose')}</option>
                   {services.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.service}
@@ -147,7 +149,7 @@ export function Logs() {
       )}
 
       {missing ? (
-        <EmptyState title="Serviço não encontrado">Este serviço não está mais gerenciado. Escolha outro acima.</EmptyState>
+        <EmptyState title={t('missingTitle')}>{t('missingBody')}</EmptyState>
       ) : found ? (
         <LogsPanel
           // A troca de serviço recomeça o estado interno do painel.
@@ -159,7 +161,7 @@ export function Logs() {
           title={`${found.service} · ${found.environmentName}`}
         />
       ) : options.length > 0 ? (
-        <EmptyState title="Escolha um serviço">Selecione o projeto, o ambiente e o serviço para ver os logs.</EmptyState>
+        <EmptyState title={t('pickTitle')}>{t('pickBody')}</EmptyState>
       ) : null}
     </div>
   )

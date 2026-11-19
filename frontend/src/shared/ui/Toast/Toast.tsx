@@ -1,5 +1,7 @@
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 
+import { useTranslation } from 'react-i18next'
+
 import { Icon } from '@/shared/components/Icon/Icon'
 import './Toast.css'
 
@@ -21,6 +23,7 @@ export const TOAST_MS: Record<Tone, number> = { success: 4000, info: 4000, error
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Item[]>([])
   const seq = useRef(0)
+  const { t } = useTranslation()
 
   const dismiss = useCallback((id: number) => setItems((all) => all.filter((t) => t.id !== id)), [])
   const push = useCallback(
@@ -39,11 +42,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="toasts" role="region" aria-label="Avisos" aria-live="polite">
-        {items.map((t) => (
-          <div key={t.id} className={`toast toast-${t.tone}`} role={t.tone === 'error' ? 'alert' : 'status'}>
-            <span>{t.message}</span>
-            <button type="button" className="toast-close" aria-label="Dispensar aviso" onClick={() => dismiss(t.id)}>
+      <div className="toasts" role="region" aria-label={t('ui.toasts')} aria-live="polite">
+        {items.map((item) => (
+          <div key={item.id} className={`toast toast-${item.tone}`} role={item.tone === 'error' ? 'alert' : 'status'}>
+            <span>{item.message}</span>
+            <button type="button" className="toast-close" aria-label={t('ui.dismiss')} onClick={() => dismiss(item.id)}>
               <Icon name="close" />
             </button>
           </div>

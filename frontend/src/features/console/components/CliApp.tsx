@@ -1,6 +1,7 @@
 // Modo "somente linha de comando": o console em tela cheia também é a tela de login.
 
 import { useEffect, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Brand } from '@/shared/components/Brand/Brand'
 import { Button } from '@/shared/ui/Button/Button'
@@ -33,14 +34,15 @@ export function CliApp({
   onLogout: () => Promise<void>
   onMode: (mode: Mode) => void
 }) {
+  const { t } = useTranslation('console')
   const commands = useMemo(() => (authenticated ? COMMANDS : requireLogin(COMMANDS)), [authenticated])
   return (
     <div className="cli-app">
       <header className="cli-head">
         <Brand />
-        <span className="subtle">linha de comando · {authenticated ? 'autenticado' : 'não autenticado'}</span>
+        <span className="subtle">{t('m.ui.cliLabel', { status: authenticated ? t('m.ui.authenticated') : t('m.ui.notAuthenticated') })}</span>
         <Button variant="ghost" size="sm" onClick={() => onMode('ui')}>
-          Interface gráfica
+          {t('m.ui.graphical')}
         </Button>
       </header>
       <ConsoleProvider
@@ -57,8 +59,7 @@ export function CliApp({
           prefetch={authenticated}
           welcome={
             <div className="con-text con-tone-muted">
-              Railway Manager — linha de comando. {authenticated ? 'Digite help para ver os comandos' : 'Digite login para entrar'}
-              {' '}e ui para usar a interface gráfica.
+              {authenticated ? t('m.ui.cliWelcomeIn') : t('m.ui.cliWelcomeOut')}
             </div>
           }
         />

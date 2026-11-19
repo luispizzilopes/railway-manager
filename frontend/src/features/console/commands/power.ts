@@ -2,33 +2,35 @@
 
 import { ApiError } from '@/shared/api/client'
 import type { ActionTarget, Plan, PowerKind } from '@/shared/api/types'
+import { currentLanguage } from '@/shared/i18n'
 import { KIND_LABEL } from '@/shared/lib/format'
 import { flag, list, str } from '@/features/console/engine/parse'
 import { type ResolvedInstance, instanceName, parseSelector, resolveSelectors } from '@/features/console/state/selectors'
 import { describeWhen, parseWhen } from '@/features/console/lib/time'
-import type { Block, CommandDef, Ctx, Invocation, OptionDef } from '@/features/console/state/types'
+import type { Block, CommandDef, CommandSource, Ctx, Invocation, OptionSource, ArgSource } from '@/features/console/state/types'
+import { ct, defineCommands } from '@/features/console/lib/i18n'
 import { CommandError } from '@/features/console/state/types'
-import { VERB, YES, note, short, show, succeeded, watch } from './shared'
+import { YES, note, short, show, succeeded, verb, watch } from './shared'
 
-const TARGET_OPTIONS: OptionDef[] = [
-  { name: 'env', value: 'ambiente', help: 'restringe todos os seletores a um ambiente', complete: 'environment' },
-  { name: 'except', value: 'seletor', repeatable: true, help: 'remove instâncias do alvo', complete: 'selector' },
-  { name: 'state', value: 'estado', help: 'filtra pelo estado observado (running, stopped, …)', complete: 'state' },
+const TARGET_OPTIONS: OptionSource[] = [
+  { name: 'env', value: 'ambiente', complete: 'environment' },
+  { name: 'except', value: 'seletor', repeatable: true, complete: 'selector' },
+  { name: 'state', value: 'estado', complete: 'state' },
 ]
 
-const RUN_OPTIONS: OptionDef[] = [
-  { name: 'dry-run', help: 'só mostra o plano; nada é executado' },
+const RUN_OPTIONS: OptionSource[] = [
+  { name: 'dry-run' },
   YES,
 ]
 
-const SCHEDULE_OPTIONS: OptionDef[] = [
-  { name: 'at', value: 'quando', help: 'agenda para um instante: HH:MM, AAAA-MM-DD HH:MM, DD/MM HH:MM, "amanhã HH:MM"' },
-  { name: 'in', value: 'duração', help: 'agenda para daqui a uma duração: 30m, 2h, 1h30m' },
-  { name: 'tz', value: 'fuso', help: 'fuso IANA de --at', default: 'fuso padrão das agendas' },
-  { name: 'note', value: 'texto', help: 'observação da ação agendada' },
+const SCHEDULE_OPTIONS: OptionSource[] = [
+  { name: 'at', value: 'quando' },
+  { name: 'in', value: 'duração' },
+  { name: 'tz', value: 'fuso' },
+  { name: 'note', value: 'texto' },
 ]
 
-const NO_WAIT: OptionDef = { name: 'no-wait', help: 'não acompanha a operação; mostra só o identificador' }
+const NO_WAIT: OptionSource = { name: 'no-wait' }
 
 const RESTART_KEY = 'restart'
 
@@ -68,7 +70,7 @@ async function executePlan(ctx: Ctx, plan: Plan): Promise<string> {
     return (await ctx.api.execute(plan.plan_id)).operation_id
   } catch (err) {
     if (err instanceof ApiError && err.status === 410) {
-      throw new CommandError('o plano expirou antes da confirmação — repita o comando para gerar um novo plano')
+      throw new CommandError(ct('m.power.planExpired'))
     }
     const existing = err instanceof ApiError ? err.details?.operation_id : undefined
     if (typeof existing === 'string') return existing
@@ -79,7 +81,7 @@ async function executePlan(ctx: Ctx, plan: Plan): Promise<string> {
 async function confirmPlan(ctx: Ctx, inv: Invocation, question: string): Promise<boolean> {
   if (flag(inv, 'yes')) return true
   const ok = isAll(inv)
-    ? await ctx.confirm(`${question} Isto afeta TODOS os projetos: digite "tudo" para confirmar.`, { word: 'tudo' })
+    ? await ctx.confirm(ct('m.power.confirmAll', { question, word: ct('m.power.allWord') }), { word: ct('m.power.allWord') })
     : await ctx.confirm(question)
   if (!ok) ctx.print({ kind: 'text', text: 'cancelado', tone: 'muted' })
   return ok
@@ -100,7 +102,7 @@ export function actionTarget(inv: Invocation, targets: ResolvedInstance[]): { ta
   if (noExcept && sameEnv && selectors.every((s) => s.all)) {
     return {
       target: { type: 'all', environment_name: environment ?? null },
-      describe: `todos os projetos${environment ? ` · ${environment}` : ''} (dinâmico: inclui projetos importados depois)`,
+      describe: ct('m.power.dynamicAll', { env: environment ? ` · ${environment}` : '' }),
     }
   }
   if (noExcept && sameEnv && selectors.every((s) => !s.all && !s.service)) {
@@ -108,17 +110,17 @@ export function actionTarget(inv: Invocation, targets: ResolvedInstance[]): { ta
     const names = [...new Set(targets.map((t) => t.projectName))]
     return {
       target: { type: 'projects', project_ids: ids, environment_name: environment ?? null },
-      describe: `projetos ${names.join(', ')}${environment ? ` · ${environment}` : ''} (inclui instâncias importadas depois)`,
+      describe: ct('m.power.dynamicProjects', { names: names.join(', '), env: environment ? ` · ${environment}` : '' }),
     }
   }
   return {
     target: { type: 'instances', instance_ids: targets.map((t) => t.id) },
-    describe: `${targets.length} instância(s) fixas`,
+    describe: ct('m.power.fixed', { count: targets.length }),
   }
 }
 
 async function scheduleAction(ctx: Ctx, inv: Invocation, kind: PowerKind): Promise<boolean> {
-  if (str(inv, 'state')) throw new CommandError('a opção --state não pode ser usada com --at/--in: o estado só é conhecido na hora')
+  if (str(inv, 'state')) throw new CommandError(ct('m.power.stateWithAt'))
   const targets = await resolve(ctx, inv)
   const tz = str(inv, 'tz') ?? (await defaultTimeZone(ctx))
   const now = ctx.now()
@@ -128,17 +130,17 @@ async function scheduleAction(ctx: Ctx, inv: Invocation, kind: PowerKind): Promi
   if (!ctx.json) {
     ctx.print({
       kind: 'table',
-      title: 'Ação agendada',
-      columns: ['Ação', 'Quando', 'Fuso', 'Alvo', 'Instâncias hoje'],
+      title: ct('m.power.scheduledTitle'),
+      columns: [ct('m.power.scheduledCols.action'), ct('m.power.scheduledCols.when'), ct('m.power.scheduledCols.tz'), ct('m.power.scheduledCols.target'), ct('m.power.scheduledCols.instances')],
       rows: [[KIND_LABEL[kind], description, when.timeZone, describe, targets.length]],
     })
   }
   if (flag(inv, 'dry-run')) {
-    note(ctx, 'simulação: nada foi agendado')
+    note(ctx, ct('m.power.notScheduled'))
     return true
   }
-  if (!flag(inv, 'yes') && !(await ctx.confirm(`Agendar ${VERB[kind]} para ${description}?`))) {
-    ctx.print({ kind: 'text', text: 'cancelado', tone: 'muted' })
+  if (!flag(inv, 'yes') && !(await ctx.confirm(ct('m.power.confirmSchedule', { verb: verb(kind), when: description })))) {
+    ctx.print({ kind: 'text', text: ct('m.common.cancelled'), tone: 'muted' })
     return false
   }
   const action = await ctx.api.createScheduledAction({
@@ -151,7 +153,7 @@ async function scheduleAction(ctx: Ctx, inv: Invocation, kind: PowerKind): Promi
   show(ctx, action, {
     kind: 'text',
     tone: 'success',
-    text: `ação agendada ${short(action.id)} criada: ${KIND_LABEL[kind]} · ${action.label} · ${description}\ncancele com: at cancel ${short(action.id)}`,
+    text: ct('m.power.scheduled', { id: short(action.id), kind: KIND_LABEL[kind], label: action.label, when: description }),
   })
   return true
 }
@@ -159,7 +161,7 @@ async function scheduleAction(ctx: Ctx, inv: Invocation, kind: PowerKind): Promi
 async function power(ctx: Ctx, inv: Invocation, kind: PowerKind): Promise<boolean> {
   if (str(inv, 'at') || str(inv, 'in')) return scheduleAction(ctx, inv, kind)
   for (const only of ['tz', 'note']) {
-    if (str(inv, only) !== undefined) throw new CommandError(`--${only} só vale junto com --at ou --in`)
+    if (str(inv, only) !== undefined) throw new CommandError(ct('m.power.onlyWithAt', { name: only }))
   }
   const targets = await resolve(ctx, inv)
   const plan = await planFor(
@@ -169,20 +171,20 @@ async function power(ctx: Ctx, inv: Invocation, kind: PowerKind): Promise<boolea
   )
   const todo = actionable(plan).length
   if (todo === 0) {
-    note(ctx, 'nada a executar: todas as instâncias foram ignoradas', 'info')
+    note(ctx, ct('m.power.nothingToRun'), 'info')
     return true
   }
   if (flag(inv, 'dry-run')) {
-    note(ctx, 'simulação: nada foi executado')
+    note(ctx, ct('m.common.simulation'))
     return true
   }
-  if (!(await confirmPlan(ctx, inv, `${VERB[kind][0].toUpperCase()}${VERB[kind].slice(1)} ${todo} instância(s)?`))) {
+  if (!(await confirmPlan(ctx, inv, ct('m.power.confirmRun', { verb: verb(kind)[0].toUpperCase() + verb(kind).slice(1), count: todo })))) {
     return false
   }
   const operationId = await executePlan(ctx, plan)
   ctx.invalidate()
   if (flag(inv, 'no-wait')) {
-    show(ctx, { operation_id: operationId }, { kind: 'text', text: `operação ${operationId} criada — acompanhe com: op ${short(operationId)}` })
+    show(ctx, { operation_id: operationId }, { kind: 'text', text: ct('m.power.opCreated', { id: operationId, short: short(operationId) }) })
     return true
   }
   const detail = await watch(ctx, operationId, kind)
@@ -191,15 +193,15 @@ async function power(ctx: Ctx, inv: Invocation, kind: PowerKind): Promise<boolea
 
 // ---------- restart ----------
 
-type Outcome = 'reiniciada' | 'falhou ao desligar' | 'falhou ao ligar' | 'ignorada'
+type Outcome = 'restarted' | 'stopFailed' | 'startFailed' | 'skipped'
 
 async function restart(ctx: Ctx, inv: Invocation): Promise<boolean> {
   if (str(inv, 'at') || str(inv, 'in')) {
-    throw new CommandError('restart não pode ser agendado: agende stop e start separadamente')
+    throw new CommandError(ct('m.power.restartNoSchedule'))
   }
   const targets = await resolve(ctx, inv)
   const byId = new Map(targets.map((t) => [t.id, t]))
-  note(ctx, 'etapa 1/2 — desligar', 'info')
+  note(ctx, ct('m.power.step1'), 'info')
   const stopPlan = await planFor(
     ctx,
     'stop',
@@ -208,20 +210,20 @@ async function restart(ctx: Ctx, inv: Invocation): Promise<boolean> {
   const outcome = new Map<string, { result: Outcome; reason?: string }>()
   for (const e of stopPlan.entries) {
     if (e.action === 'will_skip') {
-      const reason = e.reason_code === 'already_in_desired_state' ? 'não estava ligada' : (e.reason ?? undefined)
-      outcome.set(e.instance_id, { result: 'ignorada', reason })
+      const reason = e.reason_code === 'already_in_desired_state' ? ct('m.power.wasOff') : (e.reason ?? undefined)
+      outcome.set(e.instance_id, { result: 'skipped', reason })
     }
   }
   const toStop = actionable(stopPlan)
   if (toStop.length === 0) {
-    note(ctx, 'nada a reiniciar: nenhuma instância do alvo está ligada', 'info')
+    note(ctx, ct('m.power.nothingToRestart'), 'info')
     return true
   }
   if (flag(inv, 'dry-run')) {
-    note(ctx, 'simulação: nada foi executado')
+    note(ctx, ct('m.common.simulation'))
     return true
   }
-  const question = `Reiniciar ${toStop.length} instância(s)? Elas ficarão fora do ar até a etapa de ligar terminar.`
+  const question = ct('m.power.confirmRestart', { count: toStop.length })
   if (!(await confirmPlan(ctx, inv, question))) return false
 
   const stopId = await executePlan(ctx, stopPlan)
@@ -236,22 +238,22 @@ async function restart(ctx: Ctx, inv: Invocation): Promise<boolean> {
   const stopped = await watch(ctx, stopId, 'stop')
   if (!stopped) {
     ctx.store.remove(RESTART_KEY)
-    note(ctx, `reinício interrompido: as instâncias desligadas continuam desligadas — para ligá-las: ${restartCommand(record)}`, 'warn')
+    note(ctx, ct('m.power.restartInterrupted', { command: restartCommand(record) }), 'warn')
     return false
   }
   const down: string[] = []
   for (const item of stopped.items) {
     if (!item.service_instance_id || outcome.has(item.service_instance_id)) continue
     if (item.result === 'succeeded') down.push(item.service_instance_id)
-    else outcome.set(item.service_instance_id, { result: 'falhou ao desligar', reason: item.error_message ?? item.result })
+    else outcome.set(item.service_instance_id, { result: 'stopFailed', reason: item.error_message ?? item.result })
   }
 
   let ok = true
   if (down.length > 0) {
-    note(ctx, 'etapa 2/2 — ligar', 'info')
+    note(ctx, ct('m.power.step2'), 'info')
     const startPlan = await planFor(ctx, 'start', down)
     for (const e of startPlan.entries) {
-      if (e.action === 'will_skip') outcome.set(e.instance_id, { result: 'falhou ao ligar', reason: e.reason ?? undefined })
+      if (e.action === 'will_skip') outcome.set(e.instance_id, { result: 'startFailed', reason: e.reason ?? undefined })
     }
     if (actionable(startPlan).length > 0) {
       const startId = await executePlan(ctx, startPlan)
@@ -263,8 +265,8 @@ async function restart(ctx: Ctx, inv: Invocation): Promise<boolean> {
         outcome.set(
           item.service_instance_id,
           item.result === 'succeeded'
-            ? { result: 'reiniciada' }
-            : { result: 'falhou ao ligar', reason: item.error_message ?? item.result },
+            ? { result: 'restarted' }
+            : { result: 'startFailed', reason: item.error_message ?? item.result },
         )
       }
     } else {
@@ -275,12 +277,17 @@ async function restart(ctx: Ctx, inv: Invocation): Promise<boolean> {
   }
 
   const rows = targets.map((t) => {
-    const o = outcome.get(t.id) ?? { result: 'falhou ao ligar' as Outcome, reason: 'sem resultado' }
-    if (o.result !== 'reiniciada' && o.result !== 'ignorada') ok = false
-    const tone = o.result === 'reiniciada' ? 'success' : o.result === 'ignorada' ? 'muted' : 'error'
-    return [instanceName(byId.get(t.id)!), { text: o.result, tone } as const, o.reason ?? '']
+    const o = outcome.get(t.id) ?? { result: 'startFailed' as Outcome, reason: ct('m.power.noResult') }
+    if (o.result !== 'restarted' && o.result !== 'skipped') ok = false
+    const tone = o.result === 'restarted' ? 'success' : o.result === 'skipped' ? 'muted' : 'error'
+    return [instanceName(byId.get(t.id)!), { text: ct(`m.power.outcome.${o.result}`), tone } as const, o.reason ?? '']
   })
-  show(ctx, Object.fromEntries(outcome), { kind: 'table', title: 'Resumo do reinício', columns: ['Instância', 'Resultado', 'Motivo'], rows })
+  show(ctx, Object.fromEntries(outcome), {
+    kind: 'table',
+    title: ct('m.power.restartSummary'),
+    columns: [ct('m.power.restartCols.instance'), ct('m.power.restartCols.result'), ct('m.power.restartCols.reason')],
+    rows,
+  })
   return ok
 }
 
@@ -302,36 +309,30 @@ export function restartNotice(record: RestartRecord): Block {
   return {
     kind: 'text',
     tone: 'warn',
-    text:
-      `reinício interrompido (iniciado em ${new Date(record.startedAt).toLocaleString('pt-BR')}): ` +
-      `${record.names.join(', ')} podem ter ficado desligadas. O comando para ligá-las está pronto abaixo — pressione Enter.`,
+    text: ct('m.power.restartNotice', {
+      when: new Date(record.startedAt).toLocaleString(currentLanguage()),
+      names: record.names.join(', '),
+    }),
   }
 }
 
 // ---------- definições ----------
 
-const SELECTOR_ARG = {
+const SELECTOR_ARG: ArgSource = {
   name: 'seletor',
   required: true,
   variadic: true,
-  help: 'all, projeto, projeto@ambiente, projeto/serviço, projeto/serviço@ambiente; aceita * e IDs',
-  complete: 'selector' as const,
+  complete: 'selector',
 }
 
-function powerDef(kind: PowerKind, name: string, alias: string): CommandDef {
-  const verb = VERB[kind]
+function powerDef(kind: PowerKind, name: string, alias: string): CommandSource {
   return {
     name,
     aliases: [alias],
     group: 'Energia',
-    summary: kind === 'stop' ? 'desliga instâncias (interrompe os deployments ativos)' : 'liga instâncias (reaproveita o último deployment)',
     usage: '<seletor...> [opções]',
     args: [SELECTOR_ARG],
     options: [...TARGET_OPTIONS, ...RUN_OPTIONS, NO_WAIT, ...SCHEDULE_OPTIONS],
-    details:
-      `Gera um plano no servidor, mostra o que será feito e pede confirmação antes de ${verb}. ` +
-      'Com o seletor all, a confirmação exige digitar "tudo". Com --at/--in, cria uma ação agendada ' +
-      'em vez de executar agora (alvo all é dinâmico; projetos inteiros incluem instâncias novas; o resto fica fixo).',
     examples:
       kind === 'stop'
         ? ['stop loja', 'stop all --except infra', 'stop */worker --env staging --dry-run', 'stop all --at 18:00 -y', 'desligar loja/api@production -y --no-wait']
@@ -340,26 +341,22 @@ function powerDef(kind: PowerKind, name: string, alias: string): CommandDef {
   }
 }
 
-export const powerCommands: CommandDef[] = [
+export const powerCommands: CommandDef[] = defineCommands([
   powerDef('stop', 'stop', 'desligar'),
   powerDef('start', 'start', 'ligar'),
   {
     name: 'restart',
     aliases: ['reiniciar'],
     group: 'Energia',
-    summary: 'reinicia instâncias: desliga e, ao terminar, liga as que desligaram',
     usage: '<seletor...> [opções]',
     args: [SELECTOR_ARG],
     options: [
       ...TARGET_OPTIONS,
       ...RUN_OPTIONS,
-      { name: 'at', value: 'quando', help: 'não suportado: o reinício não pode ser agendado' },
-      { name: 'in', value: 'duração', help: 'não suportado: o reinício não pode ser agendado' },
+      { name: 'at', value: 'quando' },
+      { name: 'in', value: 'duração' },
     ],
-    details:
-      'Duas operações no histórico (desligar, depois iniciar). Instâncias que não estavam ligadas não são ligadas. ' +
-      'Se o console for fechado entre as etapas, as instâncias ficam desligadas e, ao reabrir, o console mostra o comando para ligá-las.',
     examples: ['restart loja/api@production', 'restart loja --env staging -y', 'reiniciar */worker --dry-run'],
     run: restart,
   },
-]
+])

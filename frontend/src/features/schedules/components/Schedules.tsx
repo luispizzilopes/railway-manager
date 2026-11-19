@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useMemo, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
 
 import { ApiError, api } from '@/shared/api/client'
 import type { Project, ScheduleInput, ScheduleView, ScheduleWindow } from '@/shared/api/types'
 import { ConfirmDialog, Modal } from '@/shared/components/Modal/Modal'
+import { i18n } from '@/shared/i18n'
+import { errorMessage } from '@/shared/i18n/errors'
 import { useFeedbackMutation } from '@/shared/hooks/useFeedbackMutation'
 import { OperationResult } from '@/shared/components/OperationFlow/OperationFlow'
 import { DAY_LABEL, KIND_LABEL, RUN_LABEL, formatDays, formatInZone } from '@/shared/lib/format'
@@ -85,15 +88,16 @@ function draftFrom(view: ScheduleView | null, defaultTimezone: string, projectId
 /** Erros que impedem enviar o formulário. */
 export function draftErrors(d: Draft): string[] {
   const errors: string[] = []
-  if (!d.project_id) errors.push('Escolha o projeto.')
-  if (!d.name.trim()) errors.push('Dê um nome à agenda.')
-  if (d.days.length === 0) errors.push('Selecione ao menos um dia da semana.')
-  if (d.windows.length === 0) errors.push('Adicione ao menos uma janela de horário.')
+  const t = i18n.getFixedT(null, 'schedules')
+  if (!d.project_id) errors.push(t('errors.project'))
+  if (!d.name.trim()) errors.push(t('errors.name'))
+  if (d.days.length === 0) errors.push(t('errors.days'))
+  if (d.windows.length === 0) errors.push(t('errors.windows'))
   d.windows.forEach((w, i) => {
-    if (!/^\d{2}:\d{2}$/.test(w.start) || !/^\d{2}:\d{2}$/.test(w.end)) errors.push(`Janela ${i + 1}: horário incompleto.`)
-    else if (w.start === w.end) errors.push(`Janela ${i + 1}: início e fim iguais.`)
+    if (!/^\d{2}:\d{2}$/.test(w.start) || !/^\d{2}:\d{2}$/.test(w.end)) errors.push(t('errors.incomplete', { n: i + 1 }))
+    else if (w.start === w.end) errors.push(t('errors.same', { n: i + 1 }))
   })
-  if (d.targetType === 'instances' && d.instance_ids.length === 0) errors.push('Selecione ao menos um serviço.')
+  if (d.targetType === 'instances' && d.instance_ids.length === 0) errors.push(t('errors.instances'))
   return errors
 }
 
@@ -124,6 +128,7 @@ export function ScheduleEditor({
   onSaved: (saved: ScheduleView) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation('schedules')
   const [draft, setDraft] = useState<Draft>(() => draftFrom(view, defaultTimezone, projects[0]?.id ?? ''))
   const [touched, setTouched] = useState(false)
   const errors = draftErrors(draft)
@@ -143,7 +148,7 @@ export function ScheduleEditor({
   const save = useFeedbackMutation({
     mutationFn: (input: ScheduleInput) =>
       view ? api.updateSchedule(view.schedule.id, input) : api.createSchedule(input),
-    success: view ? 'Agenda atualizada.' : 'Agenda criada.',
+    success: view ? t('editor.updated') : t('editor.created'),
     invalidate: [[]],
     onSuccess: (saved) => onSaved(saved),
   })
@@ -173,32 +178,30 @@ export function ScheduleEditor({
 
   return (
     <Modal
-      title={view ? 'Editar agenda' : 'Nova agenda'}
+      title={view ? t('editor.titleEdit') : t('editor.titleNew')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>
-            Cancelar
-          </Button>
+          <Button onClick={onClose}>{t('ui.cancel', { ns: 'common' })}</Button>
           <Button variant="primary" type="submit" form="schedule-form" loading={save.isPending}>
-            {view ? 'Salvar' : 'Criar agenda'}
+            {view ? t('editor.save') : t('editor.create')}
           </Button>
         </>
       }
     >
-      <form id="schedule-form" className="stack" onSubmit={submit} aria-label="Agenda">
+      <form id="schedule-form" className="stack" onSubmit={submit} aria-label={t('editor.label')}>
         <div className="form-grid">
           <div className="field">
-            <label htmlFor="schedule-name">Nome</label>
+            <label htmlFor="schedule-name">{t('editor.name')}</label>
             <Input
               id="schedule-name"
               value={draft.name}
-              placeholder="ex.: horário comercial"
+              placeholder={t('editor.namePlaceholder')}
               onChange={(e) => set({ name: e.target.value })}
             />
           </div>
           <div className="field">
-            <label htmlFor="schedule-project">Projeto</label>
+            <label htmlFor="schedule-project">{t('editor.project')}</label>
             <Select
               id="schedule-project"
               value={draft.project_id}
@@ -213,7 +216,7 @@ export function ScheduleEditor({
             </Select>
           </div>
           <div className="field">
-            <label htmlFor="schedule-timezone">Fuso horário</label>
+            <label htmlFor="schedule-timezone">{t('editor.timezone')}</label>
             <Input
               id="schedule-timezone"
               list="timezones"
@@ -229,7 +232,7 @@ export function ScheduleEditor({
         </div>
 
         <div className="field">
-          <span className="section-title">O que ligar e desligar</span>
+          <span className="section-title">{t('editor.target')}</span>
           <div className="radio-row">
             <label>
               <input
@@ -238,7 +241,7 @@ export function ScheduleEditor({
                 checked={draft.targetType === 'project'}
                 onChange={() => set({ targetType: 'project' })}
               />{' '}
-              Projeto inteiro
+              {t('editor.wholeProject')}
             </label>
             <label>
               <input
@@ -247,29 +250,29 @@ export function ScheduleEditor({
                 checked={draft.targetType === 'instances'}
                 onChange={() => set({ targetType: 'instances' })}
               />{' '}
-              Serviços selecionados
+              {t('editor.selectedServices')}
             </label>
           </div>
         </div>
         {draft.targetType === 'project' ? (
           <div className="field">
-            <label htmlFor="schedule-environment">Ambiente</label>
+            <label htmlFor="schedule-environment">{t('editor.environment')}</label>
             <Select
               id="schedule-environment"
               value={draft.environment_id}
               onChange={(e) => set({ environment_id: e.target.value })}
             >
-              <option value="">Todos os ambientes</option>
+              <option value="">{t('editor.allEnvs')}</option>
               {environments.data?.environments.map((env) => (
                 <option key={env.id} value={env.id}>
                   {env.name}
                 </option>
               ))}
             </Select>
-            <span className="hint">Serviços importados depois entram automaticamente.</span>
+            <span className="hint">{t('editor.envHint')}</span>
           </div>
         ) : (
-          <ul className="check-list" aria-label="Serviços">
+          <ul className="check-list" aria-label={t('editor.services')}>
             {instances.data?.instances.map((v) => (
               <li key={v.instance.id}>
                 <label>
@@ -283,16 +286,16 @@ export function ScheduleEditor({
                 </label>
               </li>
             ))}
-            {instances.data?.instances.length === 0 && <li className="subtle">Nenhum serviço importado neste projeto.</li>}
+            {instances.data?.instances.length === 0 && <li className="subtle">{t('editor.noServices')}</li>}
           </ul>
         )}
 
         <div className="field">
-          <span className="section-title">Dias</span>
-          <div className="row" role="group" aria-label="Dias da semana">
+          <span className="section-title">{t('editor.daysTitle')}</span>
+          <div className="row" role="group" aria-label={t('editor.weekdays')}>
             {DAY_LABEL.map((label, day) => (
               <Button
-                key={label}
+                key={day}
                 variant={draft.days.includes(day) ? 'primary' : 'secondary'}
                 size="sm"
                 aria-pressed={draft.days.includes(day)}
@@ -305,36 +308,36 @@ export function ScheduleEditor({
         </div>
 
         <div className="field">
-          <span className="section-title">Horários ligados</span>
+          <span className="section-title">{t('editor.onTimes')}</span>
           <div className="stack" style={{ gap: 'var(--space-2)' }}>
             {draft.windows.map((w, i) => (
               <div className="row" key={i} data-testid="window-row">
                 <span className="subtle" style={{ width: 64 }}>
-                  Janela {i + 1}
+                  {t('editor.window', { n: i + 1 })}
                 </span>
                 <Input
                   type="time"
                   style={{ width: 130 }}
-                  aria-label={`Início da janela ${i + 1}`}
+                  aria-label={t('editor.startOf', { n: i + 1 })}
                   aria-invalid={conflicts.includes(i + 1)}
                   value={w.start}
                   onChange={(e) => setWindow(i, { start: e.target.value })}
                 />
-                <span className="subtle">até</span>
+                <span className="subtle">{t('editor.until')}</span>
                 <Input
                   type="time"
                   style={{ width: 130 }}
-                  aria-label={`Fim da janela ${i + 1}`}
+                  aria-label={t('editor.endOf', { n: i + 1 })}
                   aria-invalid={conflicts.includes(i + 1)}
                   value={w.end}
                   onChange={(e) => setWindow(i, { end: e.target.value })}
                 />
-                {w.end < w.start && <span className="subtle">termina no dia seguinte</span>}
+                {w.end < w.start && <span className="subtle">{t('editor.nextDay')}</span>}
                 <Button variant="ghost" size="sm"
-                  aria-label={`Remover janela ${i + 1}`}
+                  aria-label={t('editor.removeWindow', { n: i + 1 })}
                   onClick={() => set({ windows: draft.windows.filter((_, j) => j !== i) })}
                 >
-                  Remover
+                  {t('editor.remove')}
                 </Button>
               </div>
             ))}
@@ -342,11 +345,11 @@ export function ScheduleEditor({
               <Button size="sm"
                 onClick={() => set({ windows: [...draft.windows, { start: '13:00', end: '18:00' }] })}
               >
-                Adicionar janela
+                {t('editor.addWindow')}
               </Button>
             </div>
           </div>
-          <span className="hint">Liga no início e desliga no fim de cada janela, nos dias marcados.</span>
+          <span className="hint">{t('editor.windowHint')}</span>
         </div>
 
         {touched && errors.length > 0 && (
@@ -363,6 +366,7 @@ export function ScheduleEditor({
 // ---------- detalhe ----------
 
 export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose: () => void }) {
+  const { t } = useTranslation('schedules')
   const runs = useQuery({ queryKey: ['schedule-runs', view.schedule.id], queryFn: () => api.scheduleRuns(view.schedule.id) })
   const [operation, setOperation] = useState<string | null>(null)
   const tz = view.schedule.timezone
@@ -371,19 +375,15 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
     <Modal
       title={view.schedule.name}
       onClose={onClose}
-      footer={
-        <Button onClick={onClose}>
-          Fechar
-        </Button>
-      }
+      footer={<Button onClick={onClose}>{t('ui.close', { ns: 'common' })}</Button>}
     >
       <p className="muted">
         {formatDays(view.schedule.days)} · {windowsLabel(view.schedule.windows)} · {tz}
       </p>
       <div>
-        <div className="group-title">Próximas execuções</div>
+        <div className="group-title">{t('detail.next')}</div>
         {view.next_runs.length === 0 ? (
-          <p className="subtle">Agenda pausada: nenhuma execução prevista.</p>
+          <p className="subtle">{t('detail.pausedNone')}</p>
         ) : (
           <ul className="check-list">
             {view.next_runs.map((o) => (
@@ -397,17 +397,17 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
         )}
       </div>
       <div>
-        <div className="group-title">Últimas execuções</div>
+        <div className="group-title">{t('detail.last')}</div>
         <ErrorState error={runs.error} />
-        {runs.data && runs.data.items.length === 0 && <p className="subtle">Nenhuma execução ainda.</p>}
+        {runs.data && runs.data.items.length === 0 && <p className="subtle">{t('detail.noRuns')}</p>}
         {runs.data && runs.data.items.length > 0 && (
           <div className="card">
-            <Table label="Execuções da agenda">
+            <Table label={t('detail.table')}>
               <thead>
                 <tr>
-                  <th>Horário</th>
-                  <th>Ação</th>
-                  <th>Situação</th>
+                  <th>{t('detail.time')}</th>
+                  <th>{t('detail.action')}</th>
+                  <th>{t('detail.status')}</th>
                   <th />
                 </tr>
               </thead>
@@ -423,7 +423,7 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
                     <td className="num">
                       {r.operation_id && (
                         <Button size="sm" onClick={() => setOperation(r.operation_id)}>
-                          Ver operação
+                          {t('detail.viewOperation')}
                         </Button>
                       )}
                     </td>
@@ -442,6 +442,7 @@ export function ScheduleDetail({ view, onClose }: { view: ScheduleView; onClose:
 
 /** Ações pendentes criadas pelo console (`stop all --at 18:00`), com cancelamento. */
 export function PendingActions() {
+  const { t } = useTranslation('schedules')
   const canCancel = useSession().can('operator')
   const actions = useQuery({
     queryKey: ['scheduled-actions', 'pending'],
@@ -450,31 +451,30 @@ export function PendingActions() {
   })
   const cancel = useFeedbackMutation({
     mutationFn: (id: string) => api.cancelScheduledAction(id),
-    success: 'Ação cancelada.',
+    success: t('pending.cancelled'),
     invalidate: [['scheduled-actions']],
   })
   const items = actions.data?.items ?? []
-  if (!actions.data && !actions.error) return <Skeleton lines={3} label="Carregando ações agendadas…" />
+  if (!actions.data && !actions.error) return <Skeleton lines={3} label={t('pending.loading')} />
   return (
-    <section aria-label="Ações agendadas" className="stack">
+    <section aria-label={t('pending.label')} className="stack">
       <p className="subtle">
-        Ações únicas criadas pelo console, por exemplo <code>stop all --at 18:00</code>. Veja <code>help stop</code> no
-        console.
+        <Trans t={t} i18nKey="pending.hint" components={{ 1: <code /> }} />
       </p>
       <ErrorState error={actions.error ?? cancel.error} />
       {items.length === 0 ? (
         <div className="card">
-          <EmptyState title="Nenhuma ação pendente." />
+          <EmptyState title={t('pending.none')} />
         </div>
       ) : (
         <div className="card">
-          <Table label="Ações agendadas">
+          <Table label={t('pending.label')}>
             <thead>
               <tr>
-                <th>Ação</th>
-                <th>Alvo</th>
-                <th>Quando</th>
-                <th>Observação</th>
+                <th>{t('pending.action')}</th>
+                <th>{t('pending.target')}</th>
+                <th>{t('pending.when')}</th>
+                <th>{t('pending.note')}</th>
                 <th />
               </tr>
             </thead>
@@ -488,7 +488,7 @@ export function PendingActions() {
                   <td className="num">
                     {canCancel && (
                       <Button variant="ghost" size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate(a.id)}>
-                        Cancelar
+                        {t('pending.cancel')}
                       </Button>
                     )}
                   </td>
@@ -505,6 +505,7 @@ export function PendingActions() {
 // ---------- lista ----------
 
 export function Schedules() {
+  const { t } = useTranslation('schedules')
   const schedules = useQuery({ queryKey: ['schedules'], queryFn: () => api.schedules() })
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects })
   const [editing, setEditing] = useState<ScheduleView | 'new' | null>(null)
@@ -525,12 +526,12 @@ export function Schedules() {
   const toggle = useFeedbackMutation({
     mutationFn: (view: ScheduleView) =>
       view.schedule.enabled ? api.pauseSchedule(view.schedule.id) : api.resumeSchedule(view.schedule.id),
-    success: (_, view) => (view.schedule.enabled ? 'Agenda pausada.' : 'Agenda retomada.'),
+    success: (_, view) => (view.schedule.enabled ? t('pausedDone') : t('resumedDone')),
     invalidate: [['schedules']],
   })
   const remove = useFeedbackMutation({
     mutationFn: (id: string) => api.deleteSchedule(id),
-    success: 'Agenda excluída.',
+    success: t('deleted'),
     invalidate: [[]],
     onSuccess: () => setRemoving(null),
   })
@@ -542,23 +543,23 @@ export function Schedules() {
     <>
       <div className="page-head">
         <div>
-          <h1>Agendas</h1>
-          <p className="muted">Liga e desliga projetos ou serviços automaticamente nos horários definidos.</p>
+          <h1>{t('title')}</h1>
+          <p className="muted">{t('subtitle')}</p>
         </div>
         {tab === 'schedules' && canManage && (
           <Button variant="primary" disabled={projectList.length === 0} onClick={() => setEditing('new')}>
-            Nova agenda
+            {t('new')}
           </Button>
         )}
       </div>
 
       <Tabs
-        label="Seções de agendas"
+        label={t('sections')}
         value={tab}
         onChange={(id) => setParams(id === 'actions' ? { aba: 'acoes' } : {}, { replace: true })}
         items={[
-          { id: 'schedules', label: 'Agendas', count: schedules.data?.schedules.length },
-          { id: 'actions', label: 'Ações agendadas', count: pending.data?.items.length },
+          { id: 'schedules', label: t('tabSchedules'), count: schedules.data?.schedules.length },
+          { id: 'actions', label: t('tabActions'), count: pending.data?.items.length },
         ]}
       />
       <div style={{ marginTop: 'var(--space-4)' }}>
@@ -572,9 +573,9 @@ export function Schedules() {
         {warnings.length > 0 && (
           <div className="alert alert-warn" role="status">
             <span>
-              Agenda salva com avisos: {warnings.join(' ')}{' '}
+              {t('warnings', { warnings: warnings.join(' ') })}
               <Button variant="ghost" size="sm" onClick={() => setWarnings([])}>
-                Dispensar
+                {t('dismiss')}
               </Button>
             </span>
           </div>
@@ -582,39 +583,37 @@ export function Schedules() {
 
         {schedules.isPending && (
           <div className="card">
-            <Skeleton lines={4} label="Carregando agendas…" />
+            <Skeleton lines={4} label={t('loading')} />
           </div>
         )}
         {schedules.data && list.length === 0 && (
           <div className="card">
             <EmptyState
-              title="Nenhuma agenda"
+              title={t('emptyTitle')}
               action={
                 canManage ? (
                   <Button variant="primary" disabled={projectList.length === 0} onClick={() => setEditing('new')}>
-                    Nova agenda
+                    {t('new')}
                   </Button>
                 ) : undefined
               }
             >
-              {canManage
-                ? 'Crie uma agenda para ligar e desligar serviços nos horários de uso.'
-                : 'Peça a um administrador para criar agendas.'}
+              {canManage ? t('emptyAdmin') : t('emptyViewer')}
             </EmptyState>
           </div>
         )}
 
         {list.length > 0 && (
           <div className="card">
-            <Table label="Agendas">
+            <Table label={t('table')}>
               <thead>
                 <tr>
-                  <th>Agenda</th>
-                  <th>Projeto</th>
-                  <th>Dias</th>
-                  <th>Horários ligados</th>
-                  <th>Próxima execução</th>
-                  <th>Situação</th>
+                  <th>{t('schedule')}</th>
+                  <th>{t('project')}</th>
+                  <th>{t('days')}</th>
+                  <th>{t('windows')}</th>
+                  <th>{t('nextRun')}</th>
+                  <th>{t('status')}</th>
                   <th />
                 </tr>
               </thead>
@@ -643,7 +642,7 @@ export function Schedules() {
                       </td>
                       <td>
                         <span className={s.enabled ? 'result result-succeeded' : 'result result-skipped'}>
-                          {s.enabled ? 'Ativa' : 'Pausada'}
+                          {s.enabled ? t('active') : t('paused')}
                         </span>
                         {s.paused_reason && <div className="subtle">{s.paused_reason}</div>}
                       </td>
@@ -651,16 +650,16 @@ export function Schedules() {
                         <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
                           {canOperate && (
                             <Button size="sm" onClick={() => toggle.mutate(view)}>
-                              {s.enabled ? 'Pausar' : 'Retomar'}
+                              {s.enabled ? t('pause') : t('resume')}
                             </Button>
                           )}
                           {canManage && (
                             <>
                               <Button size="sm" onClick={() => setEditing(view)}>
-                                Editar
+                                {t('edit')}
                               </Button>
                               <Button variant="ghost" size="sm" onClick={() => setRemoving(view)}>
-                                Excluir
+                                {t('delete')}
                               </Button>
                             </>
                           )}
@@ -675,7 +674,7 @@ export function Schedules() {
         )}
         {list.length > 0 && (
           <p className="subtle">
-            O agendador age só nos horários: ligar ou desligar manualmente vale até o próximo evento.
+            {t('note')}
           </p>
         )}
       </div>
@@ -696,16 +695,16 @@ export function Schedules() {
       {detail && <ScheduleDetail view={detail} onClose={() => setDetail(null)} />}
       {removing && (
         <ConfirmDialog
-          title="Excluir agenda"
+          title={t('deleteTitle')}
           message={
             <p>
-              Excluir <strong>{removing.schedule.name}</strong>? As operações já feitas por ela continuam no histórico.
+              <Trans t={t} i18nKey="deleteMessage" values={{ name: removing.schedule.name }} components={{ 1: <strong /> }} />
             </p>
           }
-          confirmLabel="Excluir"
+          confirmLabel={t('delete')}
           danger
           busy={remove.isPending}
-          error={remove.error?.message}
+          error={remove.error ? errorMessage(remove.error) : undefined}
           onConfirm={() => remove.mutate(removing.schedule.id)}
           onClose={() => setRemoving(null)}
         />

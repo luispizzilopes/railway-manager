@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { Brand } from '@/shared/components/Brand/Brand'
@@ -9,20 +10,22 @@ import { Button } from '@/shared/ui/Button/Button'
 import { Console } from '@/features/console/components/Console'
 import { ConsoleProvider, useConsole } from '@/features/console/context/ConsoleProvider'
 import type { Mode } from '@/features/auth/lib/mode'
-import { ROLE_LABEL, useSession } from '@/features/auth/lib/session'
+import { roleLabel, useSession } from '@/features/auth/lib/session'
 import { useTheme } from '@/shared/lib/theme'
 
-type NavItem = { to: string; label: string; icon: IconName; end?: boolean; master?: boolean }
+/** Chave do rótulo em `nav.*` no catálogo. */
+type NavKey = 'overview' | 'projects' | 'schedules' | 'history' | 'logs' | 'console' | 'users' | 'settings'
+type NavItem = { to: string; label: NavKey; icon: IconName; end?: boolean; master?: boolean }
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Visão geral', icon: 'overview', end: true },
-  { to: '/projects', label: 'Projetos', icon: 'projects' },
-  { to: '/schedules', label: 'Agendas', icon: 'schedules' },
-  { to: '/history', label: 'Histórico', icon: 'history' },
-  { to: '/logs', label: 'Logs', icon: 'logs' },
-  { to: '/console', label: 'Console', icon: 'console' },
-  { to: '/users', label: 'Usuários', icon: 'users', master: true },
-  { to: '/settings', label: 'Configurações', icon: 'settings' },
+  { to: '/', label: 'overview', icon: 'overview', end: true },
+  { to: '/projects', label: 'projects', icon: 'projects' },
+  { to: '/schedules', label: 'schedules', icon: 'schedules' },
+  { to: '/history', label: 'history', icon: 'history' },
+  { to: '/logs', label: 'logs', icon: 'logs' },
+  { to: '/console', label: 'console', icon: 'console' },
+  { to: '/users', label: 'users', icon: 'users', master: true },
+  { to: '/settings', label: 'settings', icon: 'settings' },
 ]
 
 /** Telas que ficam na barra do celular; as demais vão para o menu "Mais". */
@@ -30,6 +33,7 @@ const MOBILE_PRIMARY = ['/', '/projects', '/schedules', '/history']
 
 /** Navegação do celular: abas principais e um menu "Mais" com o restante. */
 function MobileNav({ items }: { items: NavItem[] }) {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -54,11 +58,11 @@ function MobileNav({ items }: { items: NavItem[] }) {
   }, [open])
 
   return (
-    <nav className="nav" aria-label="Principal">
+    <nav className="nav" aria-label={t('nav.main')}>
       {primary.map((item) => (
         <NavLink key={item.to} to={item.to} end={item.end}>
           <Icon name={item.icon} />
-          {item.label}
+          {t(`nav.${item.label}`)}
         </NavLink>
       ))}
       <div className="nav-more" ref={ref}>
@@ -70,14 +74,14 @@ function MobileNav({ items }: { items: NavItem[] }) {
           onClick={() => setOpen((o) => !o)}
         >
           <Icon name="more" />
-          Mais
+          {t('nav.more')}
         </button>
         {open && (
-          <div className="nav-more-menu" aria-label="Mais telas">
+          <div className="nav-more-menu" aria-label={t('nav.moreScreens')}>
             {more.map((item) => (
               <NavLink key={item.to} to={item.to}>
                 <Icon name={item.icon} />
-                {item.label}
+                {t(`nav.${item.label}`)}
               </NavLink>
             ))}
           </div>
@@ -89,16 +93,17 @@ function MobileNav({ items }: { items: NavItem[] }) {
 
 /** Painel do console aberto por atalho em qualquer tela (exceto na própria página). */
 function ConsolePanel() {
+  const { t } = useTranslation()
   const { open, setOpen } = useConsole()
   const { pathname } = useLocation()
   if (!open || pathname === '/console') return null
   return (
-    <section className="console-drawer" aria-label="Console">
+    <section className="console-drawer" aria-label={t('nav.console')}>
       <header className="console-drawer-head">
-        <strong>Console</strong>
-        <span className="subtle">Ctrl+` ou Esc fecha</span>
+        <strong>{t('nav.console')}</strong>
+        <span className="subtle">{t('layout.consoleCloseHint')}</span>
         <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-          Fechar
+          {t('ui.close')}
         </Button>
       </header>
       <Console variant="panel" onClose={() => setOpen(false)} />
@@ -108,10 +113,11 @@ function ConsolePanel() {
 
 /** Atalho no topo que abre a paleta de comandos. */
 function CommandBar({ onOpen }: { onOpen: () => void }) {
+  const { t } = useTranslation()
   return (
-    <button type="button" className="cmdbar" title="Ir para uma tela ou abrir o console" onClick={onOpen}>
+    <button type="button" className="cmdbar" title={t('layout.commandBarTitle')} onClick={onOpen}>
       <Icon name="search" />
-      <span>Executar comando…</span>
+      <span>{t('layout.commandBar')}</span>
       <kbd>Ctrl K</kbd>
     </button>
   )
@@ -119,32 +125,34 @@ function CommandBar({ onOpen }: { onOpen: () => void }) {
 
 /** Paleta aberta por Ctrl+K: telas, console, tema e modo CLI. */
 function Palette({ nav, onMode, mobile, onClose }: { nav: NavItem[]; onMode?: (mode: Mode) => void; mobile: boolean; onClose: () => void }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { setOpen } = useConsole()
   const { theme, setPreference } = useTheme()
   const items = useMemo<PaletteItem[]>(() => {
-    const list: PaletteItem[] = nav.map((n) => ({ id: n.to, label: n.label, hint: 'Ir para', icon: n.icon, run: () => navigate(n.to) }))
-    if (!mobile) list.push({ id: 'console-panel', label: 'Abrir painel do console', hint: 'Ctrl+`', icon: 'console', run: () => setOpen(true) })
+    const list: PaletteItem[] = nav.map((n) => ({ id: n.to, label: t(`nav.${n.label}`), hint: t('layout.goTo'), icon: n.icon, run: () => navigate(n.to) }))
+    if (!mobile) list.push({ id: 'console-panel', label: t('layout.openConsolePanel'), hint: 'Ctrl+`', icon: 'console', run: () => setOpen(true) })
     list.push({
       id: 'theme',
-      label: theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro',
+      label: theme === 'dark' ? t('theme.useLight') : t('theme.useDark'),
       icon: theme === 'dark' ? 'sun' : 'moon',
       run: () => setPreference(theme === 'dark' ? 'light' : 'dark'),
     })
-    if (onMode && !mobile) list.push({ id: 'cli', label: 'Mudar para o modo CLI', icon: 'console', run: () => onMode('cli') })
+    if (onMode && !mobile) list.push({ id: 'cli', label: t('layout.switchToCli'), icon: 'console', run: () => onMode('cli') })
     return list
-  }, [nav, navigate, setOpen, theme, setPreference, onMode, mobile])
+  }, [t, nav, navigate, setOpen, theme, setPreference, onMode, mobile])
   return <CommandPalette items={items} onClose={onClose} />
 }
 
 /** Alternância de tema na barra lateral (desktop), com rótulo. */
 function ThemeRow() {
+  const { t } = useTranslation()
   const { theme, setPreference } = useTheme()
   const dark = theme === 'dark'
   return (
     <Button variant="ghost" onClick={() => setPreference(dark ? 'light' : 'dark')}>
       <Icon name={dark ? 'sun' : 'moon'} />
-      {dark ? 'Tema claro' : 'Tema escuro'}
+      {dark ? t('theme.light') : t('theme.dark')}
     </Button>
   )
 }
@@ -158,6 +166,7 @@ export function Layout({
   onMode?: (mode: Mode) => void
   mobile?: boolean
 }) {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const [palette, setPalette] = useState(false)
   const session = useSession()
@@ -183,12 +192,12 @@ export function Layout({
           {mobile ? (
             <MobileNav items={nav} />
           ) : (
-            <nav className="nav" aria-label="Principal">
-              <span className="nav-label">Gerenciar</span>
+            <nav className="nav" aria-label={t('nav.main')}>
+              <span className="nav-label">{t('nav.manage')}</span>
               {nav.map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.end}>
                   <Icon name={item.icon} />
-                  {item.label}
+                  {t(`nav.${item.label}`)}
                 </NavLink>
               ))}
             </nav>
@@ -197,7 +206,7 @@ export function Layout({
             <ThemeRow />
             <Button variant="ghost" onClick={onLogout}>
               <Icon name="logout" />
-              Sair
+              {t('layout.logout')}
             </Button>
           </div>
         </aside>
@@ -208,19 +217,19 @@ export function Layout({
             <div className="topnav-right">
               {mobile && <ThemeToggle />}
               {onMode && !mobile && (
-                <Button variant="ghost" size="sm" title="Usar só a linha de comando (a sessão continua)" onClick={() => onMode('cli')}>
+                <Button variant="ghost" size="sm" title={t('layout.cliModeTitle')} onClick={() => onMode('cli')}>
                   <Icon name="console" />
-                  Modo CLI
+                  {t('layout.cliMode')}
                 </Button>
               )}
               {!mobile && session.username && session.role && (
                 <span className="subtle" data-testid="whoami">
-                  {session.username} · {ROLE_LABEL[session.role]}
+                  {session.username} · {roleLabel(session.role)}
                 </span>
               )}
               {mobile && (
                 <Button variant="ghost" size="sm" onClick={onLogout}>
-                  Sair
+                  {t('layout.logout')}
                 </Button>
               )}
             </div>

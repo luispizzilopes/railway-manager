@@ -1,5 +1,7 @@
 import { type ReactNode, useEffect, useId, useRef } from 'react'
 
+import { useTranslation } from 'react-i18next'
+
 import { Icon } from '@/shared/components/Icon/Icon'
 import { Button } from '@/shared/ui/Button/Button'
 import { ErrorState } from '@/shared/ui/Feedback/Feedback'
@@ -36,6 +38,7 @@ export function Modal({
   footer?: ReactNode
 }) {
   const titleId = useId()
+  const { t } = useTranslation()
   const ref = useRef<HTMLDialogElement>(null)
   const onCloseRef = useRef(onClose)
   useEffect(() => {
@@ -80,7 +83,7 @@ export function Modal({
       <div className="modal-head">
         <h2 id={titleId}>{title}</h2>
         <span className="spacer" />
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label={t('ui.close')}>
           <Icon name="close" />
         </Button>
       </div>
@@ -109,13 +112,14 @@ export function ConfirmDialog({
   onConfirm: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <Modal
       title={title}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Cancelar</Button>
+          <Button onClick={onClose}>{t('ui.cancel')}</Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy}>
             {confirmLabel}
           </Button>

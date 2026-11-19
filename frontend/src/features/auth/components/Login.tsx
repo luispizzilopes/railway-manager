@@ -1,11 +1,15 @@
 import { type FormEvent, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Brand } from '@/shared/components/Brand/Brand'
-import { ApiError, api } from '@/shared/api/client'
+import { LanguageSwitcher } from '@/shared/components/LanguageSwitcher/LanguageSwitcher'
+import { errorMessage } from '@/shared/i18n/errors'
+import { api } from '@/shared/api/client'
 import { Button } from '@/shared/ui/Button/Button'
 import { Field, Input } from '@/shared/ui/Field/Field'
 
 export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => void }) {
+  const { t } = useTranslation('auth')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +24,7 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
       setPassword('')
       onLogin()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Não foi possível entrar.')
+      setError(errorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -28,14 +32,15 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
 
   return (
     <div className="login">
+      <LanguageSwitcher className="login-lang" />
       <form className="card" onSubmit={submit}>
         <div className="login-head">
           <Brand />
-          <h1>Entrar</h1>
-          <p className="muted">Entre com seu usuário e senha.</p>
+          <h1>{t('login.title')}</h1>
+          <p className="muted">{t('login.subtitle')}</p>
         </div>
         <div className="stack">
-          <Field label="Usuário">
+          <Field label={t('login.username')}>
             {(p) => (
               <Input
                 {...p}
@@ -50,7 +55,7 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
               />
             )}
           </Field>
-          <Field label="Senha">
+          <Field label={t('login.password')}>
             {(p) => (
               <Input
                 {...p}
@@ -68,11 +73,11 @@ export function Login({ onLogin, onCli }: { onLogin: () => void; onCli?: () => v
             </div>
           )}
           <Button variant="primary" type="submit" loading={busy} disabled={!username.trim() || !password}>
-            Entrar
+            {t('login.submit')}
           </Button>
           {onCli && (
             <Button variant="ghost" onClick={onCli}>
-              Mudar para linha de comando (CLI)
+              {t('login.toCli')}
             </Button>
           )}
         </div>

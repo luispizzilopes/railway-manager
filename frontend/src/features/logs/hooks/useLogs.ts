@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ApiError, api } from '@/shared/api/client'
+import { i18n } from '@/shared/i18n'
+import { errorMessage } from '@/shared/i18n/errors'
 import type { LogLine, LogsFilters, LogsResponse } from '@/shared/api/types'
 import { mergeLines } from '@/features/logs/lib/utils'
 
@@ -58,10 +60,10 @@ function retryDelayMs(error: unknown, failures: number): number {
 function noticeFor(error: unknown, delayMs: number): string {
   const wait = Math.round(delayMs / 1000)
   if (error instanceof ApiError && error.status === 429) {
-    return `Limite de requisições do Railway atingido. Nova tentativa em ${wait}s.`
+    return i18n.t('logs:notice.rateLimited', { wait })
   }
-  const reason = error instanceof Error ? error.message : 'falha desconhecida'
-  return `Não foi possível atualizar os logs (${reason}). Nova tentativa em ${wait}s.`
+  const reason = error instanceof Error ? errorMessage(error) : i18n.t('logs:notice.unknown')
+  return i18n.t('logs:notice.failed', { reason, wait })
 }
 
 export function useLogs({ instanceId, filters, live }: UseLogsOptions): LogsState {

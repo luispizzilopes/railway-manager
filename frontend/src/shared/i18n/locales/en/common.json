@@ -1,0 +1,157 @@
+{
+  "language": {
+    "label": "Language",
+    "pt-BR": "Português",
+    "en": "English"
+  },
+  "state": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "sleeping": "Sleeping",
+    "transitioning": "Transitioning",
+    "failed": "Failed",
+    "awaiting_approval": "Awaiting approval",
+    "unknown": "Unknown"
+  },
+  "result": {
+    "pending": "Pending",
+    "running": "Running",
+    "verifying": "Verifying",
+    "succeeded": "Done",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "timed_out": "No confirmation",
+    "interrupted": "Interrupted"
+  },
+  "opStatus": {
+    "pending": "Pending",
+    "running": "In progress",
+    "succeeded": "Succeeded",
+    "partially_failed": "Partially failed",
+    "failed": "Failed"
+  },
+  "kind": {
+    "start": "Start",
+    "stop": "Stop"
+  },
+  "sync": {
+    "never": "Never synced",
+    "ok": "Synced",
+    "failed": "Sync failed",
+    "not_found": "Not found on Railway"
+  },
+  "run": {
+    "pending": "Running",
+    "executed": "Executed",
+    "late": "Executed late",
+    "skipped": "Nothing to do",
+    "missed": "Missed",
+    "failed": "Failed"
+  },
+  "day": {
+    "short": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
+    "everyDay": "Every day"
+  },
+  "time": {
+    "never": "never",
+    "now": "now",
+    "secondsAgo": "{{count}}s ago",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} h ago",
+    "minutes": "{{m}} min {{s}} s"
+  },
+  "ui": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "close": "Close",
+    "cancel": "Cancel",
+    "dismiss": "Dismiss notification",
+    "toasts": "Notifications"
+  },
+  "freshness": {
+    "noReading": "no reading",
+    "lastRead": "Last read: {{when}}",
+    "unavailable": "Unavailable · last read {{when}}",
+    "stale": "Out of date · {{when}}",
+    "read": "Read {{when}}"
+  },
+  "theme": {
+    "useDark": "Use dark theme",
+    "useLight": "Use light theme",
+    "dark": "Dark theme",
+    "light": "Light theme"
+  },
+  "roles": {
+    "viewer": "Read-only",
+    "operator": "Operator",
+    "admin": "Administrator",
+    "master": "Master"
+  },
+  "nav": {
+    "main": "Main",
+    "more": "More",
+    "moreScreens": "More screens",
+    "manage": "Manage",
+    "overview": "Overview",
+    "projects": "Projects",
+    "schedules": "Schedules",
+    "history": "History",
+    "logs": "Logs",
+    "console": "Console",
+    "users": "Users",
+    "settings": "Settings"
+  },
+  "layout": {
+    "consoleCloseHint": "Ctrl+` or Esc closes",
+    "commandBarTitle": "Go to a screen or open the console",
+    "commandBar": "Run command…",
+    "goTo": "Go to",
+    "openConsolePanel": "Open console panel",
+    "switchToCli": "Switch to CLI mode",
+    "cliMode": "CLI mode",
+    "cliModeTitle": "Use only the command line (the session continues)",
+    "logout": "Log out",
+    "notFound": "Page not found."
+  },
+  "palette": {
+    "label": "Command palette",
+    "search": "Search for a screen or action",
+    "placeholder": "Go to…",
+    "empty": "Nothing found for “{{query}}”.",
+    "results": "Results"
+  },
+  "flow": {
+    "will_stop": "Will be stopped",
+    "will_start": "Will be started",
+    "will_skip": "Skipped",
+    "affected_one": "service will be affected",
+    "affected_other": "services will be affected",
+    "skipped_one": "{{count}} skipped",
+    "skipped_other": "{{count}} skipped",
+    "calls_stop": "{{count}} stop call(s) to Railway; the plan expires at {{time}}.",
+    "calls_start": "{{count}} start call(s) to Railway; the plan expires at {{time}}.",
+    "plan": "Plan: {{project}}",
+    "service": "Service",
+    "environment": "Environment",
+    "currentState": "Current state",
+    "plannedAction": "Planned action",
+    "willFail": "Will fail",
+    "deployments": "({{count}} deployments)",
+    "progress": "Progress: {{project}}",
+    "confirm": "Confirm: {{kind}} {{count}}",
+    "closeBackground": "Close (keeps running in the background)",
+    "reading": "Reading the current state on Railway…",
+    "nothingToDo": "Nothing to do: all services were skipped.",
+    "starting": "Starting…",
+    "refreshing": "refreshes every few seconds",
+    "operation": "Operation"
+  }
+}

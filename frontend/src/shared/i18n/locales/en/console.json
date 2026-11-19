@@ -1,0 +1,920 @@
+{
+  "cmd": {
+    "stop": {
+      "summary": "stops instances (interrupts the active deployments)",
+      "details": "Builds a plan on the server, shows what will be done and asks for confirmation before stopping. With the all selector, confirmation requires typing \"all\". With --at/--in, it creates a scheduled action instead of running now (target all is dynamic; whole projects include new instances; anything else stays fixed).",
+      "options": {
+        "tz": {
+          "default": "default schedule time zone"
+        }
+      }
+    },
+    "start": {
+      "summary": "starts instances (reuses the last deployment)",
+      "details": "Builds a plan on the server, shows what will be done and asks for confirmation before starting. With the all selector, confirmation requires typing \"all\". With --at/--in, it creates a scheduled action instead of running now (target all is dynamic; whole projects include new instances; anything else stays fixed).",
+      "options": {
+        "tz": {
+          "default": "default schedule time zone"
+        }
+      }
+    },
+    "restart": {
+      "summary": "restarts instances: stops, then starts the ones that stopped",
+      "details": "Two operations in the history (stop, then start). Instances that were not running are not started. If the console is closed between the steps, the instances stay stopped and, when reopened, the console shows the command to start them.",
+      "options": {
+        "at": {
+          "help": "not supported: a restart cannot be scheduled"
+        },
+        "in": {
+          "help": "not supported: a restart cannot be scheduled"
+        }
+      }
+    },
+    "status": {
+      "summary": "overview: indicators, alerts and the state of each instance",
+      "options": {
+        "env": {
+          "help": "one environment only"
+        },
+        "state": {
+          "help": "only instances in this state"
+        }
+      },
+      "args": {
+        "seletor": "filters the instances (default: all)"
+      }
+    },
+    "refresh": {
+      "summary": "reads the state of every instance on Railway again"
+    },
+    "ops": {
+      "summary": "recent operations",
+      "options": {
+        "limit": {
+          "default": "10"
+        }
+      }
+    },
+    "op": {
+      "summary": "shows and follows an operation until the end",
+      "options": {
+        "no-wait": {
+          "help": "shows the current state without following"
+        }
+      }
+    },
+    "history": {
+      "summary": "history of operation items, with the same filters as the screen",
+      "options": {
+        "env": {
+          "help": "environment"
+        },
+        "page": {
+          "default": "1"
+        },
+        "limit": {
+          "help": "items per page",
+          "default": "20"
+        }
+      }
+    },
+    "at": {
+      "summary": "one-off scheduled actions (created with start/stop --at/--in)"
+    },
+    "at/list": {
+      "summary": "lists scheduled actions (default: pending)"
+    },
+    "at/show": {
+      "summary": "shows an action and the operation it generated",
+      "args": {
+        "id": "ID or prefix"
+      }
+    },
+    "at/cancel": {
+      "summary": "cancels pending actions",
+      "options": {
+        "all": {
+          "help": "cancels every pending one"
+        }
+      },
+      "args": {
+        "id": "IDs or prefixes"
+      }
+    },
+    "schedule": {
+      "summary": "recurring start/stop schedules"
+    },
+    "schedule/list": {
+      "summary": "lists schedules with the next run",
+      "args": {
+        "projeto": "this project only"
+      }
+    },
+    "schedule/show": {
+      "summary": "details, next 5 and last runs"
+    },
+    "schedule/create": {
+      "summary": "creates a schedule for a project (or environment, or instances)",
+      "options": {
+        "tz": {
+          "help": "IANA time zone",
+          "default": "default schedule time zone"
+        }
+      }
+    },
+    "schedule/edit": {
+      "summary": "changes a schedule (only the given fields; --window replaces all)",
+      "options": {
+        "tz": {
+          "help": "IANA time zone",
+          "default": "default schedule time zone"
+        },
+        "env": {
+          "help": "target: whole project restricted to one environment"
+        }
+      }
+    },
+    "schedule/pause": {
+      "summary": "pauses (events during the pause are not recovered)"
+    },
+    "schedule/resume": {
+      "summary": "resumes from the next event"
+    },
+    "schedule/rm": {
+      "summary": "deletes the schedule"
+    },
+    "schedule/runs": {
+      "summary": "schedule runs, newest first",
+      "options": {
+        "page": {
+          "help": "page (20 per page)",
+          "default": "1"
+        }
+      }
+    },
+    "project": {
+      "summary": "managed projects"
+    },
+    "project/list": {
+      "summary": "lists managed projects"
+    },
+    "project/discover": {
+      "summary": "lists the projects reachable by the token on Railway"
+    },
+    "project/import": {
+      "summary": "imports projects from Railway (name or ID) or all unmanaged ones",
+      "options": {
+        "all": {
+          "help": "imports every accessible project not yet managed"
+        }
+      },
+      "args": {
+        "projeto": "name or Railway ID"
+      }
+    },
+    "project/add": {
+      "summary": "registers a project by its Railway ID",
+      "options": {
+        "name": {
+          "help": "display name"
+        }
+      }
+    },
+    "project/show": {
+      "summary": "details, instances and schedules of a project"
+    },
+    "project/edit": {
+      "summary": "changes display name and description (empty clears)",
+      "options": {
+        "name": {
+          "help": "display name (\"\" goes back to the Railway name)"
+        }
+      }
+    },
+    "project/sync": {
+      "summary": "syncs name, environments and states with Railway",
+      "options": {
+        "all": {
+          "help": "syncs all"
+        }
+      }
+    },
+    "project/rm": {
+      "summary": "removes the project from management (nothing changes on Railway)"
+    },
+    "instance": {
+      "summary": "managed instances (service × environment)"
+    },
+    "instance/list": {
+      "summary": "lists managed instances with IDs",
+      "options": {
+        "env": {
+          "help": "one environment only"
+        },
+        "state": {
+          "help": "only in this state"
+        }
+      },
+      "args": {
+        "seletor": "default: all"
+      }
+    },
+    "instance/discover": {
+      "summary": "lists the project's instances on Railway and whether they are managed"
+    },
+    "instance/import": {
+      "summary": "imports instances from Railway",
+      "options": {
+        "all": {
+          "help": "imports every unmanaged one (except ephemeral environments)"
+        },
+        "env": {
+          "help": "this environment only"
+        }
+      }
+    },
+    "instance/add": {
+      "summary": "associates a specific instance",
+      "args": {
+        "serviço@ambiente": "names or Railway IDs"
+      }
+    },
+    "instance/rm": {
+      "summary": "removes instances from management (nothing changes on Railway)",
+      "options": {
+        "env": {
+          "help": "one environment only"
+        }
+      },
+      "args": {
+        "seletor": "instances to remove"
+      }
+    },
+    "service": {
+      "summary": "managed services"
+    },
+    "service/rm": {
+      "summary": "removes the service and all its instances from management"
+    },
+    "credential": {
+      "summary": "Railway token"
+    },
+    "credential/show": {
+      "summary": "shows the registered token (masked)"
+    },
+    "credential/set": {
+      "summary": "registers or replaces the token (typed in a masked field)",
+      "details": "The token is never accepted as an argument and never goes into the command history."
+    },
+    "credential/rm": {
+      "summary": "removes the token"
+    },
+    "help": {
+      "summary": "lists the commands or shows the help of a command"
+    },
+    "clear": {
+      "summary": "clears the output (Ctrl+L)"
+    },
+    "open": {
+      "summary": "opens a screen of the interface or a project page (in CLI mode, switches to the graphical interface)"
+    },
+    "alias": {
+      "summary": "creates or lists aliases (stored in this browser)"
+    },
+    "unalias": {
+      "summary": "removes an alias"
+    },
+    "logout": {
+      "summary": "ends the session"
+    },
+    "login": {
+      "summary": "logs in with username and password (the password is typed in a masked field)",
+      "details": "In CLI mode this is the first command: before logging in, only login, ui, cli, help, clear and language work."
+    },
+    "ui": {
+      "summary": "switches to the graphical interface (the session stays the same)"
+    },
+    "cli": {
+      "summary": "switches to command-line-only mode (the session stays the same)"
+    },
+    "language": {
+      "summary": "shows or changes the interface language (stored in this browser)",
+      "args": {
+        "idioma": "pt-BR or en; with no argument, shows the current language"
+      }
+    }
+  },
+  "opt": {
+    "env": {
+      "help": "restricts every selector to one environment"
+    },
+    "except": {
+      "help": "removes instances from the target"
+    },
+    "state": {
+      "help": "filters by observed state (running, stopped, …)"
+    },
+    "dry-run": {
+      "help": "only shows the plan; nothing is executed"
+    },
+    "yes": {
+      "help": "does not ask for confirmation"
+    },
+    "no-wait": {
+      "help": "does not follow the operation; shows only the identifier"
+    },
+    "at": {
+      "help": "schedules for an instant: HH:MM, YYYY-MM-DD HH:MM, DD/MM HH:MM, \"tomorrow HH:MM\""
+    },
+    "in": {
+      "help": "schedules for a duration from now: 30m, 2h, 1h30m"
+    },
+    "tz": {
+      "help": "IANA time zone of --at"
+    },
+    "note": {
+      "help": "note for the scheduled action"
+    },
+    "limit": {
+      "help": "how many to show"
+    },
+    "project": {
+      "help": "project (name or ID)"
+    },
+    "service": {
+      "help": "service (name or Railway ID)"
+    },
+    "kind": {
+      "help": "start or stop"
+    },
+    "result": {
+      "help": "pending, running, verifying, succeeded, failed, skipped, timed_out, interrupted"
+    },
+    "trigger": {
+      "help": "manual, schedule, scheduled_action"
+    },
+    "from": {
+      "help": "from (YYYY-MM-DD or RFC 3339)"
+    },
+    "to": {
+      "help": "until (YYYY-MM-DD or RFC 3339, inclusive)"
+    },
+    "page": {
+      "help": "page"
+    },
+    "all": {
+      "help": "includes executed, cancelled, missed…"
+    },
+    "status": {
+      "help": "pending, processing, executed, late, skipped, missed, failed, cancelled"
+    },
+    "name": {
+      "help": "schedule name"
+    },
+    "days": {
+      "help": "mon-fri, mon,wed,fri, all, weekend, weekdays"
+    },
+    "window": {
+      "help": "on window (start turns on, end turns off); end < start crosses midnight"
+    },
+    "instances": {
+      "help": "service@environment separated by commas (instead of the whole project)"
+    },
+    "whole": {
+      "help": "target: whole project, all environments"
+    },
+    "description": {
+      "help": "description (\"\" clears)"
+    },
+    "workspace": {
+      "help": "workspace ID (required for workspace tokens)"
+    }
+  },
+  "arg": {
+    "seletor": "all, project, project@environment, project/service, project/service@environment; accepts * and IDs",
+    "id": "full ID or prefix (from ops)",
+    "projeto": "name or ID",
+    "agenda": "name or ID (prefix)",
+    "projeto[@ambiente]": "schedule target",
+    "id-railway": "Railway Project ID",
+    "serviço@ambiente": "accepts * and Railway IDs",
+    "projeto/serviço": "e.g. shop/worker",
+    "tipo": "account or workspace",
+    "comando": "e.g. stop, project import",
+    "destino": "overview, visao, inicio, projects, projetos, schedules, agendas, history, historico, settings, config, console or project name",
+    "definição": "name=expansion; with no arguments, lists",
+    "nome": "alias to remove"
+  },
+  "group": {
+    "Energia": "Power",
+    "Consulta": "Query",
+    "Operações": "Operations",
+    "Agendamento": "Scheduling",
+    "Cadastro": "Registry",
+    "Configuração": "Configuration",
+    "Console": "Console",
+    "Sessão": "Session"
+  },
+  "globalOpt": {
+    "json": "shows the API response as JSON, unformatted",
+    "help": "shows the command help"
+  },
+  "m": {
+    "common": {
+      "cancelled": "cancelled",
+      "simulation": "simulation: nothing was executed"
+    },
+    "pick": {
+      "kind": {
+        "operation": {
+          "one": "operation",
+          "many": "operations"
+        },
+        "scheduledAction": {
+          "one": "scheduled action",
+          "many": "scheduled actions"
+        },
+        "schedule": {
+          "one": "schedule",
+          "many": "schedules"
+        }
+      },
+      "ambiguous": "'{{text}}' matches several {{kinds}}: {{list}}",
+      "none": "no {{kind}} '{{text}}'{{known}}",
+      "known": " — existing: {{list}}"
+    },
+    "verb": {
+      "start": "start",
+      "stop": "stop"
+    },
+    "watch": {
+      "interrupted": "follow-up interrupted; the operation keeps running on the server — resume with: op {{id}}"
+    },
+    "session": {
+      "already": "you are already logged in",
+      "username": "Username",
+      "password": "Password",
+      "badCredentials": "incorrect username or password",
+      "ok": "logged in — type help to see the commands",
+      "alreadyUi": "you are already in the graphical interface",
+      "alreadyCli": "you are already in command-line mode",
+      "loginFirst": "log in first: type login"
+    },
+    "misc": {
+      "aliasTitle": {
+        "alias": "Alias",
+        "expansion": "Expansion"
+      },
+      "noAliases": "no aliases — create one with: alias endofday=\"stop all -y\"",
+      "aliasUsage": "use alias <name>=<expansion> (e.g. alias endofday=\"stop all --except infra -y\")",
+      "aliasInvalid": "invalid alias name: '{{name}}' (letters, numbers, _ and -)",
+      "aliasIsCommand": "'{{name}}' is already a command: aliases do not replace commands",
+      "aliasEmpty": "the alias expansion is empty",
+      "aliasSet": "alias {{name}} → {{expansion}}",
+      "noAlias": "no alias '{{name}}'",
+      "aliasRemoved": "alias {{name}} removed",
+      "loggedOut": "session ended"
+    },
+    "info": {
+      "summary": "{{projects}} project(s) · {{instances}} instance(s): {{running}} running, {{sleeping}} sleeping, {{stopped}} stopped, {{failed}} failed, {{other}} other",
+      "notConfigured": "integration not configured: use credential set",
+      "noInstances": "no managed instances — import with: project import --all; instance import <project> --all",
+      "col": {
+        "project": "Project",
+        "service": "Service",
+        "environment": "Environment",
+        "state": "State",
+        "nextAction": "Next action",
+        "id": "ID"
+      },
+      "busy": " (busy)",
+      "refreshed": "states refreshed: {{refreshed}} read, {{notFound}} not found, {{failed}} failed",
+      "ops": {
+        "col": {
+          "id": "ID",
+          "kind": "Type",
+          "trigger": "Source",
+          "status": "Status",
+          "items": "Items",
+          "projects": "Projects",
+          "created": "Created"
+        },
+        "items": "{{ok}} ok · {{failed}} failed · {{skipped}} skipped",
+        "active": " · {{count}} active",
+        "none": "no recent operations"
+      },
+      "invalidOption": "invalid --{{name}}: '{{value}}' — use {{allowed}}",
+      "noService": "no service '{{text}}' in the managed projects",
+      "serviceAmbiguous": "'{{text}}' exists in several projects: also pass --project",
+      "history": {
+        "title": "History — page {{page}} of {{pages}} ({{total}} items)",
+        "col": {
+          "when": "When",
+          "kind": "Type",
+          "project": "Project",
+          "service": "Service",
+          "environment": "Environment",
+          "result": "Result",
+          "trigger": "Source",
+          "message": "Message"
+        },
+        "schedule": "schedule {{name}}",
+        "action": "scheduled action ({{label}})"
+      },
+      "actionStatus": {
+        "pending": "pending",
+        "processing": "running",
+        "executed": "executed",
+        "late": "executed late",
+        "skipped": "skipped",
+        "missed": "missed",
+        "failed": "failed",
+        "cancelled": "cancelled"
+      },
+      "action": {
+        "col": {
+          "id": "ID",
+          "action": "Action",
+          "when": "When",
+          "target": "Target",
+          "status": "Status",
+          "operation": "Operation",
+          "note": "Note"
+        }
+      },
+      "at": {
+        "title": "Scheduled actions{{status}} — time zone {{tz}}",
+        "none": {
+          "pending": "no pending actions — create one with: stop <selector> --at 18:00",
+          "any": "no actions"
+        },
+        "idsOrAll": "use IDs or --all, not both",
+        "nonePending": "no pending actions",
+        "confirmCancel": "Cancel {{count}} pending action(s)?",
+        "needId": "give the action ID (see at list) or --all",
+        "cancelled": "action {{id}} cancelled ({{kind}} · {{label}})",
+        "failed": "action {{id}}: {{reason}}"
+      }
+    },
+    "time": {
+      "durationInvalid": "invalid duration: '{{text}}' — use for example 30m, 2h or 1h30m",
+      "durationZero": "duration must be greater than zero: '{{text}}'",
+      "timeInvalid": "invalid time: '{{text}}' — use HH:MM",
+      "zoneInvalid": "invalid time zone: '{{tz}}' (use an IANA name, e.g. America/Sao_Paulo)",
+      "atOrIn": "use --at or --in, not both",
+      "needAtOrIn": "give --at or --in",
+      "dateInvalid": "invalid date: '{{text}}' — use YYYY-MM-DD, DD/MM, today or tomorrow",
+      "instantInvalid": "invalid instant: '{{text}}'",
+      "dateOnlyInvalid": "invalid date: '{{text}}'",
+      "today": "today",
+      "tomorrow": "tomorrow",
+      "in": "in {{span}}",
+      "ago": "{{span}} ago"
+    },
+    "power": {
+      "planExpired": "the plan expired before confirmation — repeat the command to generate a new plan",
+      "confirmAll": "{{question}} This affects ALL projects: type \"{{word}}\" to confirm.",
+      "allWord": "all",
+      "dynamicAll": "all projects{{env}} (dynamic: includes projects imported later)",
+      "dynamicProjects": "projects {{names}}{{env}} (includes instances imported later)",
+      "fixed": "{{count}} fixed instance(s)",
+      "stateWithAt": "the --state option cannot be used with --at/--in: the state is only known at run time",
+      "scheduledTitle": "Scheduled action",
+      "scheduledCols": {
+        "action": "Action",
+        "when": "When",
+        "tz": "Time zone",
+        "target": "Target",
+        "instances": "Instances today"
+      },
+      "notScheduled": "simulation: nothing was scheduled",
+      "confirmSchedule": "Schedule {{verb}} for {{when}}?",
+      "scheduled": "scheduled action {{id}} created: {{kind}} · {{label}} · {{when}}\ncancel with: at cancel {{id}}",
+      "onlyWithAt": "--{{name}} only works together with --at or --in",
+      "nothingToRun": "nothing to run: every instance was skipped",
+      "confirmRun": "{{verb}} {{count}} instance(s)?",
+      "opCreated": "operation {{id}} created — follow it with: op {{short}}",
+      "restartNoSchedule": "restart cannot be scheduled: schedule stop and start separately",
+      "step1": "step 1/2 — stop",
+      "step2": "step 2/2 — start",
+      "wasOff": "was not running",
+      "nothingToRestart": "nothing to restart: no instance of the target is running",
+      "confirmRestart": "Restart {{count}} instance(s)? They will be offline until the start step finishes.",
+      "restartInterrupted": "restart interrupted: the stopped instances stay stopped — to start them: {{command}}",
+      "outcome": {
+        "restarted": "restarted",
+        "stopFailed": "failed to stop",
+        "startFailed": "failed to start",
+        "skipped": "skipped"
+      },
+      "noResult": "no result",
+      "restartSummary": "Restart summary",
+      "restartCols": {
+        "instance": "Instance",
+        "result": "Result",
+        "reason": "Reason"
+      },
+      "restartNotice": "restart interrupted (started at {{when}}): {{names}} may have been left stopped. The command to start them is ready below — press Enter."
+    },
+    "sched": {
+      "dayInvalid": "invalid day: '{{part}}' — use mon, tue, wed, thu, fri, sat, sun (e.g. mon-fri, mon,wed,fri, all, weekend)",
+      "needDay": "give at least one day",
+      "windowInvalid": "invalid window: '{{text}}' — use HH:MM-HH:MM (e.g. 07:00-12:00)",
+      "instancesCount": "{{count}} instance(s)",
+      "wholeProject": "whole project",
+      "wholeProjectEnv": "whole project · {{env}}",
+      "noNext": "no upcoming runs",
+      "pausedShort": "paused{{reason}}",
+      "nextTitle": "Next runs ({{tz}})",
+      "nextCols": {
+        "when": "When",
+        "action": "Action"
+      },
+      "listCols": {
+        "id": "ID",
+        "schedule": "Schedule",
+        "project": "Project",
+        "target": "Target",
+        "days": "Days",
+        "windows": "Windows",
+        "next": "Next",
+        "status": "Status"
+      },
+      "active": "active",
+      "pausedWith": "paused{{reason}}",
+      "none": "no schedules — create one with: schedule create <project> --name … --days mon-fri --window 07:00-19:00",
+      "showRows": {
+        "field": "Field",
+        "value": "Value",
+        "project": "Project",
+        "target": "Target",
+        "days": "Days",
+        "windows": "Windows",
+        "tz": "Time zone",
+        "status": "Status",
+        "id": "ID"
+      },
+      "lastRuns": "Last runs",
+      "noRuns": "no runs yet",
+      "runCols": {
+        "scheduled": "Scheduled",
+        "action": "Action",
+        "status": "Status",
+        "operation": "Operation",
+        "message": "Message"
+      },
+      "noInstance": "no instance '{{spec}}' in {{project}} — existing: {{list}}",
+      "noEnvironment": "no environment '{{name}}' in {{project}} — existing: {{list}}",
+      "zoneInvalid": "invalid time zone: '{{tz}}' (use an IANA name, e.g. America/Sao_Paulo)",
+      "conflict": "{{message}} — conflicting windows: {{list}}",
+      "saved": "schedule \"{{name}}\" {{verb}} ({{id}})",
+      "created": "created",
+      "updated": "updated",
+      "targetNeeded": "use project or project@environment as target (for services, use --instances)",
+      "needName": "give --name",
+      "needDays": "give --days (e.g. mon-fri)",
+      "needWindow": "give at least one --window (e.g. 07:00-19:00)",
+      "envOrInstances": "use project@environment or --instances, not both",
+      "oneMode": "use only one of --instances, --env or --whole",
+      "pausedDone": "schedule \"{{name}}\" paused",
+      "resumedDone": "schedule \"{{name}}\" resumed",
+      "confirmDelete": "Delete the schedule \"{{name}}\"? Operations it already created stay in the history.",
+      "deleted": "schedule \"{{name}}\" deleted",
+      "runsTitle": "Runs of \"{{name}}\" — page {{page}} ({{total}} in total)"
+    },
+    "manage": {
+      "importReport": "{{imported}} {{what}} imported, {{already}} already managed, {{failed}} failure(s)",
+      "what": {
+        "project": "project(s)",
+        "instance": "instance(s)"
+      },
+      "listCols": {
+        "project": "Project",
+        "railwayName": "Name on Railway",
+        "sync": "Sync",
+        "last": "Last",
+        "id": "ID",
+        "railwayId": "Railway ID"
+      },
+      "noProjects": "no managed projects — see project discover and project import --all",
+      "personal": "personal",
+      "discoverCols": {
+        "workspace": "Workspace",
+        "project": "Project",
+        "managed": "Managed",
+        "railwayId": "Railway ID"
+      },
+      "yes": "yes",
+      "no": "no",
+      "namesOrAll": "use names/IDs or --all, not both",
+      "allManaged": "every accessible project is already managed",
+      "needProjects": "give projects (name or Railway ID) or --all",
+      "multiWorkspace": "'{{text}}' exists in more than one workspace: use the Railway ID",
+      "noRailwayProject": "no project '{{text}}' on Railway — see project discover",
+      "projectAdded": "project {{name}} registered ({{id}})",
+      "showRows": {
+        "field": "Field",
+        "value": "Value",
+        "railwayName": "Name on Railway",
+        "description": "Description",
+        "sync": "Sync",
+        "id": "ID",
+        "railwayId": "Railway ID",
+        "schedules": "Schedules",
+        "nextAction": "Next action"
+      },
+      "instances": "Instances",
+      "instCols": {
+        "service": "Service",
+        "environment": "Environment",
+        "state": "State",
+        "id": "ID"
+      },
+      "needNameOrDesc": "give --name and/or --description",
+      "projectUpdated": "project {{name}} updated",
+      "needProjectsOrAll": "give projects or --all",
+      "synced": "{{name}}: {{status}} — {{refreshed}} read, {{notFound}} not found, {{failed}} failed",
+      "removeWarn": "removing {{name}} from management deletes {{instances}} instance(s) and {{schedules}} schedule(s) locally; nothing changes on Railway and the history is kept",
+      "confirmRemoveProject": "Remove the project {{name}}?",
+      "projectRemoved": "project {{name}} removed from management",
+      "instListCols": {
+        "instance": "Instance",
+        "state": "State",
+        "id": "ID"
+      },
+      "discInstCols": {
+        "environment": "Environment",
+        "service": "Service",
+        "managed": "Managed",
+        "state": "State"
+      },
+      "ephemeral": " (ephemeral)",
+      "noInstanceOnRailway": "no instance '{{text}}' on Railway for {{project}} — see instance discover {{project}}",
+      "specOrAll": "use service@environment or --all, not both",
+      "needSpec": "give service@environment (e.g. api@production) or --all",
+      "nothingToImport": "nothing to import: the instances are already managed",
+      "ambiguousInstance": "'{{spec}}' matches {{count}} instances: be specific (service@environment)",
+      "associated": "instance {{instance}} associated with {{project}}",
+      "confirmRemoveInstances": "Remove {{count}} instance(s) from management (nothing changes on Railway)?",
+      "instancesRemoved": "{{count}} instance(s) removed from management",
+      "serviceSyntax": "use project/service (e.g. shop/worker)",
+      "noService": "no managed service '{{service}}' in {{project}}",
+      "serviceWarn": "removes {{service}} and its {{count}} managed instance(s) ({{envs}})",
+      "confirmRemoveService": "Remove the service {{project}}/{{service}} from management?",
+      "serviceRemoved": "service {{service}} removed from management",
+      "noToken": "no token registered — use credential set <account|workspace>",
+      "credCols": {
+        "kind": "Type",
+        "account": "Account",
+        "suffix": "Suffix",
+        "status": "Status",
+        "validated": "Validated",
+        "workspace": "Workspace"
+      },
+      "kindInvalid": "invalid type: use 'account' or 'workspace'",
+      "needWorkspace": "workspace tokens require --workspace <id>",
+      "tokenPrompt": "Railway token ({{kind}})",
+      "tokenSaved": "token validated and saved: {{label}} (…{{suffix}})",
+      "confirmRemoveToken": "Remove the Railway token? Operations and schedules will stop working.",
+      "tokenRemoved": "token removed"
+    },
+    "sel": {
+      "empty": "empty selector",
+      "emptyEnv": "empty environment in selector '{{raw}}'",
+      "emptyProject": "empty project in selector '{{raw}}'",
+      "emptyService": "empty service in selector '{{raw}}'",
+      "allNoService": "'all' does not accept a service: use '*/{{service}}'",
+      "noMatch": "no {{kind}} '{{text}}'{{scope}}{{hint}}",
+      "kind": {
+        "project": "project",
+        "service": "service",
+        "environment": "environment"
+      },
+      "similar": " — similar: {{list}}",
+      "noneRegistered": " — none registered",
+      "inProject": " in {{name}}",
+      "forSelector": " for '{{raw}}'",
+      "inTarget": " in the target",
+      "noInstance": "no managed instance for '{{raw}}'",
+      "needOne": "give at least one selector (e.g. all, shop, shop/api@production)",
+      "invalidState": "invalid state: '{{state}}' — use {{list}}",
+      "nothingLeft": "no instance left in the target after the filters",
+      "severalProjects": "'{{text}}' matches several projects: {{list}}"
+    },
+    "parse": {
+      "emptyLine": "empty line",
+      "unknownCommand": "unknown command: {{token}}{{hint}}",
+      "didYouMean": " — did you mean {{name}}?",
+      "usageSub": "usage: {{path}} <{{subs}}> — see help {{path}}",
+      "unknownSub": "unknown subcommand: {{path}} {{token}}{{hint}}",
+      "unknownOption": "unknown option for {{path}}: {{token}}{{hint}}",
+      "needsValue": "the --{{name}} option requires a value ({{value}})",
+      "noValue": "the --{{name}} option takes no value",
+      "twice": "the --{{name}} option was given more than once",
+      "missingArg": "missing required argument: <{{name}}> — usage: {{usage}}",
+      "tooMany": "too many arguments for {{path}}: {{args}}",
+      "positiveInt": "--{{name}} must be a positive integer: '{{raw}}'"
+    },
+    "engine": {
+      "sessionExpired": "session expired: log in again",
+      "interrupted": "interrupted",
+      "network": "network failure: {{message}}",
+      "secretInLine": "do not put the token on the command line: use `credential set <account|workspace>` and type it in the masked field",
+      "syntax": "syntax error: {{message}}",
+      "notRunnable": "'{{path}}' does nothing by itself — see help {{path}}"
+    },
+    "lexer": {
+      "quote": "unclosed {{quote}} quote"
+    },
+    "help": {
+      "intro": "Railway Manager commands. Use `help <command>` (or `<command> --help`) to see options and examples.",
+      "cols": {
+        "command": "Command",
+        "also": "Also",
+        "description": "Description",
+        "subcommand": "Subcommand",
+        "argument": "Argument",
+        "option": "Option",
+        "default": "Default"
+      },
+      "footer": "Selectors: all · project · project@environment · project/service · project/service@environment · wildcard * (e.g. */worker).\nShortcuts: Ctrl+` or Ctrl+K opens/closes · ↑/↓ history · Ctrl+R search · Tab completes · Ctrl+C interrupts · Ctrl+L clears.",
+      "usage": "usage: {{usage}}",
+      "usageSub": "usage: {{path}} <{{subs}}> …",
+      "also": "also: {{list}}",
+      "subcommands": "Subcommands",
+      "arguments": "Arguments",
+      "options": "Options",
+      "optional": " (optional)",
+      "repeatable": " (repeatable)",
+      "examples": "Examples:",
+      "noHelp": "no help for '{{path}}': unknown command — see help",
+      "needCommand": "give a command"
+    },
+    "ui": {
+      "log": "Console output",
+      "welcome": "Railway Manager console. Type <1>help</1> to see the commands — for example <2>stop all --dry-run</2> or <2>start shop@production</2>.",
+      "yesNo": "[y/N]",
+      "search": "search ({{term}}){{noResult}} ›",
+      "noResult": " no result",
+      "command": "Command",
+      "running": "running… (Ctrl+C interrupts)",
+      "placeholder": "type a command — help",
+      "cliLabel": "command line · {{status}}",
+      "authenticated": "authenticated",
+      "notAuthenticated": "not authenticated",
+      "graphical": "Graphical interface",
+      "cliWelcomeIn": "Railway Manager — command line. Type help to see the commands and ui to use the graphical interface.",
+      "cliWelcomeOut": "Railway Manager — command line. Type login to log in and ui to use the graphical interface.",
+      "pageIntro": "Everything the interface does, in one line. Type <1>help</1> to see the commands; open this console on any screen with Ctrl+` (Ctrl+K opens the command palette).",
+      "consoleTitle": "Console",
+      "interrupt": "Interrupt"
+    },
+    "out": {
+      "copyTitle": "{{id}} — click to copy",
+      "copied": "copied",
+      "act": {
+        "will_stop": "stop",
+        "will_start": "start",
+        "will_skip": "skip"
+      },
+      "toStop": "{{count}} to stop",
+      "toStart": "{{count}} to start",
+      "skipped": "{{count}} skipped",
+      "nothing": "nothing",
+      "planTitle": "Plan — {{kind}}: {{total}}",
+      "planCols": {
+        "project": "Project",
+        "service": "Service",
+        "environment": "Environment",
+        "current": "Current state",
+        "action": "Planned action"
+      },
+      "willFail": "will fail",
+      "willSkip": "skip",
+      "planFooter": "{{count}} call(s) to Railway · plan valid until {{time}}",
+      "starting": "starting…",
+      "operation": "Operation",
+      "following": " (following… Ctrl+C to detach)",
+      "detached": " (keeps running on the server)",
+      "progCols": {
+        "project": "Project",
+        "service": "Service",
+        "environment": "Environment",
+        "result": "Result",
+        "final": "Final state",
+        "duration": "Duration"
+      },
+      "error": "error{{status}}: {{message}}"
+    },
+    "prov": {
+      "cancelled": "(cancelled)",
+      "yesWords": "y,yes,s,sim",
+      "outside": "useConsole outside the ConsoleProvider"
+    },
+    "lang": {
+      "current": "current language: {{language}} (available: {{list}})",
+      "set": "language changed to {{language}}",
+      "invalid": "invalid language: '{{value}}' — use {{list}}"
+    }
+  }
+}

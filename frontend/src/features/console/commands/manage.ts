@@ -5,18 +5,19 @@ import { SYNC_LABEL } from '@/shared/lib/format'
 import { flag, str } from '@/features/console/engine/parse'
 import { findProject, instanceName, parseSelector, resolveSelectors } from '@/features/console/state/selectors'
 import type { CommandDef, Ctx, Invocation } from '@/features/console/state/types'
+import { ct, defineCommands } from '@/features/console/lib/i18n'
 import { CommandError } from '@/features/console/state/types'
 import { YES, confirmOrCancel, note, show, when } from './shared'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-function importReport(ctx: Ctx, report: ProjectImportReport | InstanceImportReport, what: string) {
+function importReport(ctx: Ctx, report: ProjectImportReport | InstanceImportReport, what: 'project' | 'instance') {
   const imported = report.imported.length
   show(ctx, report, {
     kind: 'text',
     tone: report.failed.length ? 'warn' : 'success',
     text: [
-      `${imported} ${what} importado(s), ${report.already_managed.length} já gerenciado(s), ${report.failed.length} falha(s)`,
+      ct('m.manage.importReport', { imported, what: ct(`m.manage.what.${what}`), already: report.already_managed.length, failed: report.failed.length }),
       ...report.failed.map((f) => `  ✗ ${f.id}: ${f.reason}`),
     ].join('\n'),
   })
@@ -28,7 +29,14 @@ async function projectList(ctx: Ctx) {
   const { projects } = await ctx.api.projects()
   show(ctx, projects, {
     kind: 'table',
-    columns: ['Projeto', 'Nome no Railway', 'Sincronização', 'Última', 'ID', 'ID Railway'],
+    columns: [
+      ct('m.manage.listCols.project'),
+      ct('m.manage.listCols.railwayName'),
+      ct('m.manage.listCols.sync'),
+      ct('m.manage.listCols.last'),
+      ct('m.manage.listCols.id'),
+      ct('m.manage.listCols.railwayId'),
+    ],
     rows: projects.map((p) => [
       p.display_name ?? p.name,
       p.name,
@@ -38,12 +46,12 @@ async function projectList(ctx: Ctx) {
       { id: p.railway_project_id },
     ]),
   })
-  if (projects.length === 0) note(ctx, 'nenhum projeto gerenciado — veja project discover e project import --all')
+  if (projects.length === 0) note(ctx, ct('m.manage.noProjects'))
 }
 
 async function discovered(ctx: Ctx) {
   return (await ctx.api.discoverProjects()).workspaces.flatMap((w) =>
-    w.projects.map((p) => ({ ...p, workspace: w.workspace?.name ?? 'pessoal' })),
+    w.projects.map((p) => ({ ...p, workspace: w.workspace?.name ?? ct('m.manage.personal') })),
   )
 }
 
@@ -51,11 +59,11 @@ async function projectDiscover(ctx: Ctx) {
   const all = await discovered(ctx)
   show(ctx, all, {
     kind: 'table',
-    columns: ['Workspace', 'Projeto', 'Gerenciado', 'ID Railway'],
+    columns: [ct('m.manage.discoverCols.workspace'), ct('m.manage.discoverCols.project'), ct('m.manage.discoverCols.managed'), ct('m.manage.discoverCols.railwayId')],
     rows: all.map((p) => [
       p.workspace,
       p.project.name,
-      p.managed ? { text: 'sim', tone: 'success' } : { text: 'não', tone: 'muted' },
+      p.managed ? { text: ct('m.manage.yes'), tone: 'success' } : { text: ct('m.manage.no'), tone: 'muted' },
       { id: p.project.id },
     ]),
   })
@@ -65,20 +73,20 @@ async function projectImport(ctx: Ctx, inv: Invocation) {
   const all = await discovered(ctx)
   let ids: string[]
   if (flag(inv, 'all')) {
-    if (inv.args.length) throw new CommandError('use nomes/IDs ou --all, não os dois')
+    if (inv.args.length) throw new CommandError(ct('m.manage.namesOrAll'))
     ids = all.filter((p) => !p.managed).map((p) => p.project.id)
     if (ids.length === 0) {
-      note(ctx, 'todos os projetos acessíveis já são gerenciados', 'info')
+      note(ctx, ct('m.manage.allManaged'), 'info')
       return
     }
   } else {
-    if (inv.args.length === 0) throw new CommandError('informe projetos (nome ou ID Railway) ou --all')
+    if (inv.args.length === 0) throw new CommandError(ct('m.manage.needProjects'))
     ids = inv.args.map((text) => {
       if (UUID.test(text)) return text
       const found = all.filter((p) => p.project.name.toLowerCase() === text.toLowerCase())
       if (found.length !== 1) {
         throw new CommandError(
-          found.length ? `'${text}' existe em mais de um workspace: use o ID Railway` : `nenhum projeto '${text}' no Railway — veja project discover`,
+          found.length ? ct('m.manage.multiWorkspace', { text }) : ct('m.manage.noRailwayProject', { text }),
         )
       }
       return found[0].project.id
@@ -86,14 +94,14 @@ async function projectImport(ctx: Ctx, inv: Invocation) {
   }
   const report = await ctx.api.importProjects(ids)
   ctx.invalidate()
-  importReport(ctx, report, 'projeto(s)')
+  importReport(ctx, report, 'project')
   return report.failed.length === 0
 }
 
 async function projectAdd(ctx: Ctx, inv: Invocation) {
   const { project } = await ctx.api.createProject(inv.args[0], str(inv, 'name'))
   ctx.invalidate()
-  show(ctx, project, { kind: 'text', tone: 'success', text: `projeto ${project.display_name ?? project.name} cadastrado (${project.id})` })
+  show(ctx, project, { kind: 'text', tone: 'success', text: ct('m.manage.projectAdded', { name: project.display_name ?? project.name, id: project.id }) })
 }
 
 async function projectShow(ctx: Ctx, inv: Invocation) {
@@ -107,21 +115,21 @@ async function projectShow(ctx: Ctx, inv: Invocation) {
   ctx.print({
     kind: 'table',
     title: project.display_name ?? project.name,
-    columns: ['Campo', 'Valor'],
+    columns: [ct('m.manage.showRows.field'), ct('m.manage.showRows.value')],
     rows: [
-      ['Nome no Railway', project.name],
-      ['Descrição', project.description ?? ''],
-      ['Sincronização', `${SYNC_LABEL[project.sync_status]} · ${when(project.last_synced_at)}`],
-      ['ID', { id: project.id }],
-      ['ID Railway', { id: project.railway_project_id }],
-      ['Agendas', schedules.map((s) => s.schedule.name).join(', ') || '—'],
-      ['Próxima ação', entry.next_action ? `${entry.next_action.action} ${when(entry.next_action.at)}` : '—'],
+      [ct('m.manage.showRows.railwayName'), project.name],
+      [ct('m.manage.showRows.description'), project.description ?? ''],
+      [ct('m.manage.showRows.sync'), `${SYNC_LABEL[project.sync_status]} · ${when(project.last_synced_at)}`],
+      [ct('m.manage.showRows.id'), { id: project.id }],
+      [ct('m.manage.showRows.railwayId'), { id: project.railway_project_id }],
+      [ct('m.manage.showRows.schedules'), schedules.map((s) => s.schedule.name).join(', ') || '—'],
+      [ct('m.manage.showRows.nextAction'), entry.next_action ? `${entry.next_action.action} ${when(entry.next_action.at)}` : '—'],
     ],
   })
   ctx.print({
     kind: 'table',
-    title: 'Instâncias',
-    columns: ['Serviço', 'Ambiente', 'Estado', 'ID'],
+    title: ct('m.manage.instances'),
+    columns: [ct('m.manage.instCols.service'), ct('m.manage.instCols.environment'), ct('m.manage.instCols.state'), ct('m.manage.instCols.id')],
     rows: entry.environments.flatMap(({ environment, instances }) =>
       instances.map((i) => [i.service_name, environment.name, { state: i.state }, { id: i.id }]),
     ),
@@ -131,19 +139,19 @@ async function projectShow(ctx: Ctx, inv: Invocation) {
 async function projectEdit(ctx: Ctx, inv: Invocation) {
   const name = str(inv, 'name')
   const description = str(inv, 'description')
-  if (name === undefined && description === undefined) throw new CommandError('informe --name e/ou --description')
+  if (name === undefined && description === undefined) throw new CommandError(ct('m.manage.needNameOrDesc'))
   const { project } = findProject(await ctx.dashboard(true), inv.args[0])
   const updated = await ctx.api.editProject(project.id, {
     display_name: name === undefined ? project.display_name : name || null,
     description: description === undefined ? project.description : description || null,
   })
   ctx.invalidate()
-  show(ctx, updated, { kind: 'text', tone: 'success', text: `projeto ${updated.project.display_name ?? updated.project.name} atualizado` })
+  show(ctx, updated, { kind: 'text', tone: 'success', text: ct('m.manage.projectUpdated', { name: updated.project.display_name ?? updated.project.name }) })
 }
 
 async function projectSync(ctx: Ctx, inv: Invocation) {
   const dashboard = await ctx.dashboard(true)
-  if (!flag(inv, 'all') && inv.args.length === 0) throw new CommandError('informe projetos ou --all')
+  if (!flag(inv, 'all') && inv.args.length === 0) throw new CommandError(ct('m.manage.needProjectsOrAll'))
   const projects = flag(inv, 'all') ? dashboard.projects : inv.args.map((a) => findProject(dashboard, a))
   let ok = true
   for (const { project } of projects) {
@@ -152,7 +160,13 @@ async function projectSync(ctx: Ctx, inv: Invocation) {
     show(ctx, report, {
       kind: 'text',
       tone: synced.sync_status === 'ok' ? 'success' : 'warn',
-      text: `${synced.display_name ?? synced.name}: ${SYNC_LABEL[synced.sync_status]} — ${report.refreshed} lidas, ${report.not_found} não encontradas, ${report.failed} falhas`,
+      text: ct('m.manage.synced', {
+        name: synced.display_name ?? synced.name,
+        status: SYNC_LABEL[synced.sync_status],
+        refreshed: report.refreshed,
+        notFound: report.not_found,
+        failed: report.failed,
+      }),
     })
   }
   ctx.invalidate()
@@ -166,13 +180,13 @@ async function projectRm(ctx: Ctx, inv: Invocation) {
   const name = entry.project.display_name ?? entry.project.name
   note(
     ctx,
-    `remover ${name} do gerenciamento apaga localmente ${instances} instância(s) e ${schedules.length} agenda(s); nada é alterado no Railway e o histórico é preservado`,
+    ct('m.manage.removeWarn', { name, instances, schedules: schedules.length }),
     'warn',
   )
-  if (!(await confirmOrCancel(ctx, inv, `Remover o projeto ${name}?`))) return false
+  if (!(await confirmOrCancel(ctx, inv, ct('m.manage.confirmRemoveProject', { name })))) return false
   await ctx.api.removeProject(entry.project.id)
   ctx.invalidate()
-  note(ctx, `projeto ${name} removido do gerenciamento`, 'success')
+  note(ctx, ct('m.manage.projectRemoved', { name }), 'success')
 }
 
 // ---------- instâncias e serviços ----------
@@ -185,7 +199,7 @@ async function instanceList(ctx: Ctx, inv: Invocation) {
   })
   show(ctx, instances, {
     kind: 'table',
-    columns: ['Instância', 'Estado', 'ID'],
+    columns: [ct('m.manage.instListCols.instance'), ct('m.manage.instListCols.state'), ct('m.manage.instListCols.id')],
     rows: instances.map((i) => [instanceName(i), { state: i.state }, { id: i.id }]),
   })
 }
@@ -207,12 +221,12 @@ async function instanceDiscover(ctx: Ctx, inv: Invocation) {
   const rows = flatDiscovered(environments)
   show(ctx, environments, {
     kind: 'table',
-    columns: ['Ambiente', 'Serviço', 'Estado', 'Gerenciada'],
+    columns: [ct('m.manage.discInstCols.environment'), ct('m.manage.discInstCols.service'), ct('m.manage.discInstCols.state'), ct('m.manage.discInstCols.managed')],
     rows: rows.map((r) => [
-      r.environment + (r.ephemeral ? ' (efêmero)' : ''),
+      r.environment + (r.ephemeral ? ct('m.manage.ephemeral') : ''),
       r.service_name,
       { state: r.state },
-      r.managed ? { text: 'sim', tone: 'success' } : { text: 'não', tone: 'muted' },
+      r.managed ? { text: ct('m.manage.yes'), tone: 'success' } : { text: ct('m.manage.no'), tone: 'muted' },
     ]),
   })
 }
@@ -226,7 +240,7 @@ function matchDiscovered(rows: ReturnType<typeof flatDiscovered>, text: string, 
       (re(service!).test(r.service_name) || r.service_id === service) &&
       (!environment || re(environment).test(r.environment) || r.environment_id === environment),
   )
-  if (found.length === 0) throw new CommandError(`nenhuma instância '${text}' no Railway para ${project} — veja instance discover ${project}`)
+  if (found.length === 0) throw new CommandError(ct('m.manage.noInstanceOnRailway', { text, project }))
   return found
 }
 
@@ -238,14 +252,14 @@ async function instanceImport(ctx: Ctx, inv: Invocation) {
   if (env) rows = rows.filter((r) => r.environment.toLowerCase() === env.toLowerCase())
   let chosen: typeof rows
   if (flag(inv, 'all')) {
-    if (specs.length) throw new CommandError('use serviço@ambiente ou --all, não os dois')
+    if (specs.length) throw new CommandError(ct('m.manage.specOrAll'))
     chosen = rows.filter((r) => !r.managed && !r.ephemeral)
   } else {
-    if (specs.length === 0) throw new CommandError('informe serviço@ambiente (ex.: api@production) ou --all')
+    if (specs.length === 0) throw new CommandError(ct('m.manage.needSpec'))
     chosen = specs.flatMap((s) => matchDiscovered(rows, s, project.name))
   }
   if (chosen.length === 0) {
-    note(ctx, 'nada a importar: as instâncias já são gerenciadas', 'info')
+    note(ctx, ct('m.manage.nothingToImport'), 'info')
     return
   }
   const report = await ctx.api.importInstances(
@@ -253,7 +267,7 @@ async function instanceImport(ctx: Ctx, inv: Invocation) {
     chosen.map((r) => ({ environment_id: r.environment_id, service_id: r.service_id })),
   )
   ctx.invalidate()
-  importReport(ctx, report, 'instância(s)')
+  importReport(ctx, report, 'instance')
   return report.failed.length === 0
 }
 
@@ -261,7 +275,7 @@ async function instanceAdd(ctx: Ctx, inv: Invocation) {
   const [projectText, spec] = inv.args
   const { project, environments } = await discoverIn(ctx, projectText)
   const found = matchDiscovered(flatDiscovered(environments), spec, project.name)
-  if (found.length !== 1) throw new CommandError(`'${spec}' corresponde a ${found.length} instâncias: seja específico (serviço@ambiente)`)
+  if (found.length !== 1) throw new CommandError(ct('m.manage.ambiguousInstance', { spec, count: found.length }))
   const { instance } = await ctx.api.associateInstance(project.id, {
     environment_id: found[0].environment_id,
     service_id: found[0].service_id,
@@ -270,35 +284,35 @@ async function instanceAdd(ctx: Ctx, inv: Invocation) {
   show(ctx, instance, {
     kind: 'text',
     tone: 'success',
-    text: `instância ${instance.service.name}@${instance.environment.name} associada a ${project.display_name ?? project.name}`,
+    text: ct('m.manage.associated', { instance: `${instance.service.name}@${instance.environment.name}`, project: project.display_name ?? project.name }),
   })
 }
 
 async function instanceRm(ctx: Ctx, inv: Invocation) {
   const targets = resolveSelectors(await ctx.dashboard(true), inv.args, { env: str(inv, 'env') })
   note(ctx, targets.map(instanceName).join('\n'))
-  if (!(await confirmOrCancel(ctx, inv, `Remover ${targets.length} instância(s) do gerenciamento (nada muda no Railway)?`))) {
+  if (!(await confirmOrCancel(ctx, inv, ct('m.manage.confirmRemoveInstances', { count: targets.length })))) {
     return false
   }
   for (const t of targets) await ctx.api.removeInstance(t.id)
   ctx.invalidate()
-  note(ctx, `${targets.length} instância(s) removida(s) do gerenciamento`, 'success')
+  note(ctx, ct('m.manage.instancesRemoved', { count: targets.length }), 'success')
 }
 
 async function serviceRm(ctx: Ctx, inv: Invocation) {
   const sel = parseSelector(inv.args[0])
-  if (sel.all || !sel.service || sel.environment) throw new CommandError('use projeto/serviço (ex.: loja/worker)')
+  if (sel.all || !sel.service || sel.environment) throw new CommandError(ct('m.manage.serviceSyntax'))
   const { project } = findProject(await ctx.dashboard(true), sel.project!)
   const views = (await ctx.api.instances(project.id)).instances.filter(
     (v) => v.service.name.toLowerCase() === sel.service!.toLowerCase() || v.service.id === sel.service,
   )
-  if (views.length === 0) throw new CommandError(`nenhum serviço '${sel.service}' gerenciado em ${project.name}`)
+  if (views.length === 0) throw new CommandError(ct('m.manage.noService', { service: sel.service, project: project.name }))
   const service = views[0].service
-  note(ctx, `remove ${service.name} e suas ${views.length} instância(s) gerenciada(s) (${views.map((v) => v.environment.name).join(', ')})`, 'warn')
-  if (!(await confirmOrCancel(ctx, inv, `Remover o serviço ${project.name}/${service.name} do gerenciamento?`))) return false
+  note(ctx, ct('m.manage.serviceWarn', { service: service.name, count: views.length, envs: views.map((v) => v.environment.name).join(', ') }), 'warn')
+  if (!(await confirmOrCancel(ctx, inv, ct('m.manage.confirmRemoveService', { project: project.name, service: service.name })))) return false
   await ctx.api.removeService(service.id)
   ctx.invalidate()
-  note(ctx, `serviço ${service.name} removido do gerenciamento`, 'success')
+  note(ctx, ct('m.manage.serviceRemoved', { service: service.name }), 'success')
 }
 
 // ---------- credencial ----------
@@ -306,12 +320,12 @@ async function serviceRm(ctx: Ctx, inv: Invocation) {
 async function credentialShow(ctx: Ctx) {
   const { credential } = await ctx.api.credential()
   if (!credential) {
-    show(ctx, null, { kind: 'text', tone: 'warn', text: 'nenhum token cadastrado — use credential set <account|workspace>' })
+    show(ctx, null, { kind: 'text', tone: 'warn', text: ct('m.manage.noToken') })
     return
   }
   show(ctx, credential, {
     kind: 'table',
-    columns: ['Tipo', 'Conta', 'Final', 'Situação', 'Validado', 'Workspace'],
+    columns: [ct('m.manage.credCols.kind'), ct('m.manage.credCols.account'), ct('m.manage.credCols.suffix'), ct('m.manage.credCols.status'), ct('m.manage.credCols.validated'), ct('m.manage.credCols.workspace')],
     rows: [
       [
         credential.kind,
@@ -327,43 +341,41 @@ async function credentialShow(ctx: Ctx) {
 
 async function credentialSet(ctx: Ctx, inv: Invocation) {
   const kind = inv.args[0] as CredentialKind
-  if (kind !== 'account' && kind !== 'workspace') throw new CommandError("tipo inválido: use 'account' ou 'workspace'")
+  if (kind !== 'account' && kind !== 'workspace') throw new CommandError(ct('m.manage.kindInvalid'))
   const workspace = str(inv, 'workspace')
-  if (kind === 'workspace' && !workspace) throw new CommandError('tokens de workspace exigem --workspace <id>')
-  const token = await ctx.secret(`Token do Railway (${kind})`)
+  if (kind === 'workspace' && !workspace) throw new CommandError(ct('m.manage.needWorkspace'))
+  const token = await ctx.secret(ct('m.manage.tokenPrompt', { kind }))
   if (!token) {
-    note(ctx, 'cancelado')
+    note(ctx, ct('m.common.cancelled'))
     return false
   }
   const { credential } = await ctx.api.saveCredential({ kind, token, workspace_id: workspace })
   ctx.invalidate()
-  note(ctx, `token validado e salvo: ${credential.label} (…${credential.masked_suffix})`, 'success')
+  note(ctx, ct('m.manage.tokenSaved', { label: credential.label, suffix: credential.masked_suffix }), 'success')
 }
 
 async function credentialRm(ctx: Ctx, inv: Invocation) {
-  if (!(await confirmOrCancel(ctx, inv, 'Remover o token do Railway? Operações e agendas deixarão de funcionar.'))) return false
+  if (!(await confirmOrCancel(ctx, inv, ct('m.manage.confirmRemoveToken')))) return false
   await ctx.api.removeCredential()
   ctx.invalidate()
-  note(ctx, 'token removido', 'success')
+  note(ctx, ct('m.manage.tokenRemoved'), 'success')
 }
 
 // ---------- definições ----------
 
-const PROJECT_ARG = { name: 'projeto', required: true, help: 'nome ou ID', complete: 'project' as const }
+const PROJECT_ARG = { name: 'projeto', required: true, complete: 'project' as const }
 
-export const manageCommands: CommandDef[] = [
+export const manageCommands: CommandDef[] = defineCommands([
   {
     name: 'project',
     aliases: ['projeto', 'projects'],
     group: 'Cadastro',
-    summary: 'projetos gerenciados',
     subcommands: [
-      { name: 'list', aliases: ['ls'], group: 'Cadastro', summary: 'lista os projetos gerenciados', examples: ['project list'], run: projectList },
+      { name: 'list', aliases: ['ls'], group: 'Cadastro', examples: ['project list'], run: projectList },
       {
         name: 'discover',
         aliases: ['descobrir'],
         group: 'Cadastro',
-        summary: 'lista os projetos acessíveis pelo token no Railway',
         examples: ['project discover'],
         run: projectDiscover,
       },
@@ -371,10 +383,9 @@ export const manageCommands: CommandDef[] = [
         name: 'import',
         aliases: ['importar'],
         group: 'Cadastro',
-        summary: 'importa projetos do Railway (nome ou ID) ou todos os não gerenciados',
         usage: '<projeto...> | --all',
-        args: [{ name: 'projeto', variadic: true, help: 'nome ou ID Railway' }],
-        options: [{ name: 'all', help: 'importa todos os projetos acessíveis ainda não gerenciados' }],
+        args: [{ name: 'projeto', variadic: true }],
+        options: [{ name: 'all' }],
         examples: ['project import --all', 'project import loja blog'],
         run: projectImport,
       },
@@ -382,17 +393,15 @@ export const manageCommands: CommandDef[] = [
         name: 'add',
         aliases: ['cadastrar'],
         group: 'Cadastro',
-        summary: 'cadastra um projeto pelo ID Railway',
         usage: '<id-railway> [--name <nome>]',
-        args: [{ name: 'id-railway', required: true, help: 'Railway Project ID' }],
-        options: [{ name: 'name', value: 'nome', help: 'nome de exibição' }],
+        args: [{ name: 'id-railway', required: true }],
+        options: [{ name: 'name', value: 'nome' }],
         examples: ['project add 0f3c2a1b-1234-4abc-9def-0123456789ab --name Loja'],
         run: projectAdd,
       },
       {
         name: 'show',
         group: 'Cadastro',
-        summary: 'detalhes, instâncias e agendas de um projeto',
         usage: '<projeto>',
         args: [PROJECT_ARG],
         examples: ['project show loja'],
@@ -402,12 +411,11 @@ export const manageCommands: CommandDef[] = [
         name: 'edit',
         aliases: ['editar'],
         group: 'Cadastro',
-        summary: 'altera nome de exibição e descrição (vazio limpa)',
         usage: '<projeto> [--name <nome>] [--description <texto>]',
         args: [PROJECT_ARG],
         options: [
-          { name: 'name', value: 'nome', help: 'nome de exibição ("" volta ao nome do Railway)' },
-          { name: 'description', value: 'texto', help: 'descrição ("" limpa)' },
+          { name: 'name', value: 'nome' },
+          { name: 'description', value: 'texto' },
         ],
         examples: ['project edit loja --name "Loja virtual"', 'project edit loja --description ""'],
         run: projectEdit,
@@ -416,10 +424,9 @@ export const manageCommands: CommandDef[] = [
         name: 'sync',
         aliases: ['sincronizar'],
         group: 'Cadastro',
-        summary: 'sincroniza nome, ambientes e estados com o Railway',
         usage: '<projeto...> | --all',
-        args: [{ name: 'projeto', variadic: true, help: 'nome ou ID', complete: 'project' }],
-        options: [{ name: 'all', help: 'sincroniza todos' }],
+        args: [{ name: 'projeto', variadic: true, complete: 'project' }],
+        options: [{ name: 'all' }],
         examples: ['project sync loja', 'project sync --all'],
         run: projectSync,
       },
@@ -427,7 +434,6 @@ export const manageCommands: CommandDef[] = [
         name: 'rm',
         aliases: ['remover'],
         group: 'Cadastro',
-        summary: 'remove o projeto do gerenciamento (nada muda no Railway)',
         usage: '<projeto> [-y]',
         args: [PROJECT_ARG],
         options: [YES],
@@ -440,18 +446,16 @@ export const manageCommands: CommandDef[] = [
     name: 'instance',
     aliases: ['instancia', 'instances'],
     group: 'Cadastro',
-    summary: 'instâncias gerenciadas (serviço × ambiente)',
     subcommands: [
       {
         name: 'list',
         aliases: ['ls'],
         group: 'Cadastro',
-        summary: 'lista instâncias gerenciadas com IDs',
         usage: '[seletor...]',
-        args: [{ name: 'seletor', variadic: true, help: 'padrão: all', complete: 'selector' }],
+        args: [{ name: 'seletor', variadic: true, complete: 'selector' }],
         options: [
-          { name: 'env', value: 'ambiente', help: 'só um ambiente', complete: 'environment' },
-          { name: 'state', value: 'estado', help: 'só neste estado', complete: 'state' },
+          { name: 'env', value: 'ambiente', complete: 'environment' },
+          { name: 'state', value: 'estado', complete: 'state' },
         ],
         examples: ['instance list loja', 'instance list --state failed'],
         run: instanceList,
@@ -460,7 +464,6 @@ export const manageCommands: CommandDef[] = [
         name: 'discover',
         aliases: ['descobrir'],
         group: 'Cadastro',
-        summary: 'lista as instâncias do projeto no Railway e se já são gerenciadas',
         usage: '<projeto>',
         args: [PROJECT_ARG],
         examples: ['instance discover loja'],
@@ -470,15 +473,14 @@ export const manageCommands: CommandDef[] = [
         name: 'import',
         aliases: ['importar'],
         group: 'Cadastro',
-        summary: 'importa instâncias do Railway',
         usage: '<projeto> [serviço@ambiente...] [--all] [--env <ambiente>]',
         args: [
           PROJECT_ARG,
-          { name: 'serviço@ambiente', variadic: true, help: 'aceita * e IDs Railway' },
+          { name: 'serviço@ambiente', variadic: true },
         ],
         options: [
-          { name: 'all', help: 'importa todas as não gerenciadas (exceto ambientes efêmeros)' },
-          { name: 'env', value: 'ambiente', help: 'só deste ambiente', complete: 'environment' },
+          { name: 'all' },
+          { name: 'env', value: 'ambiente', complete: 'environment' },
         ],
         examples: ['instance import loja --all', 'instance import loja api@production worker@*', 'instance import loja --all --env staging'],
         run: instanceImport,
@@ -487,9 +489,8 @@ export const manageCommands: CommandDef[] = [
         name: 'add',
         aliases: ['associar'],
         group: 'Cadastro',
-        summary: 'associa uma instância específica',
         usage: '<projeto> <serviço@ambiente>',
-        args: [PROJECT_ARG, { name: 'serviço@ambiente', required: true, help: 'nomes ou IDs Railway' }],
+        args: [PROJECT_ARG, { name: 'serviço@ambiente', required: true }],
         examples: ['instance add loja api@pr-7'],
         run: instanceAdd,
       },
@@ -497,10 +498,9 @@ export const manageCommands: CommandDef[] = [
         name: 'rm',
         aliases: ['remover'],
         group: 'Cadastro',
-        summary: 'remove instâncias do gerenciamento (nada muda no Railway)',
         usage: '<seletor...> [-y]',
-        args: [{ name: 'seletor', required: true, variadic: true, help: 'instâncias a remover', complete: 'selector' }],
-        options: [{ name: 'env', value: 'ambiente', help: 'só um ambiente', complete: 'environment' }, YES],
+        args: [{ name: 'seletor', required: true, variadic: true, complete: 'selector' }],
+        options: [{ name: 'env', value: 'ambiente', complete: 'environment' }, YES],
         examples: ['instance rm loja/worker@staging', 'instance rm loja --env staging -y'],
         run: instanceRm,
       },
@@ -510,15 +510,13 @@ export const manageCommands: CommandDef[] = [
     name: 'service',
     aliases: ['servico'],
     group: 'Cadastro',
-    summary: 'serviços gerenciados',
     subcommands: [
       {
         name: 'rm',
         aliases: ['remover'],
         group: 'Cadastro',
-        summary: 'remove o serviço e todas as suas instâncias do gerenciamento',
         usage: '<projeto/serviço> [-y]',
-        args: [{ name: 'projeto/serviço', required: true, help: 'ex.: loja/worker', complete: 'selector' }],
+        args: [{ name: 'projeto/serviço', required: true, complete: 'selector' }],
         options: [YES],
         examples: ['service rm loja/worker'],
         run: serviceRm,
@@ -529,18 +527,15 @@ export const manageCommands: CommandDef[] = [
     name: 'credential',
     aliases: ['credencial', 'token'],
     group: 'Configuração',
-    summary: 'token do Railway',
     subcommands: [
-      { name: 'show', group: 'Configuração', summary: 'mostra o token cadastrado (mascarado)', examples: ['credential show'], run: credentialShow },
+      { name: 'show', group: 'Configuração', examples: ['credential show'], run: credentialShow },
       {
         name: 'set',
         aliases: ['definir'],
         group: 'Configuração',
-        summary: 'cadastra ou substitui o token (digitado num campo mascarado)',
         usage: '<account|workspace> [--workspace <id>]',
-        args: [{ name: 'tipo', required: true, help: 'account ou workspace', complete: { values: ['account', 'workspace'] } }],
-        options: [{ name: 'workspace', value: 'id', help: 'ID do workspace (obrigatório para tokens de workspace)' }],
-        details: 'O token nunca é aceito como argumento e nunca vai para o histórico de comandos.',
+        args: [{ name: 'tipo', required: true, complete: { values: ['account', 'workspace'] } }],
+        options: [{ name: 'workspace', value: 'id' }],
         examples: ['credential set account', 'credential set workspace --workspace 0f3c2a1b-…'],
         run: credentialSet,
       },
@@ -548,7 +543,6 @@ export const manageCommands: CommandDef[] = [
         name: 'rm',
         aliases: ['remover'],
         group: 'Configuração',
-        summary: 'remove o token',
         usage: '[-y]',
         options: [YES],
         examples: ['credential rm'],
@@ -556,4 +550,4 @@ export const manageCommands: CommandDef[] = [
       },
     ],
   },
-]
+])

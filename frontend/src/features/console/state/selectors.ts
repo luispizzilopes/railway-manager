@@ -5,6 +5,7 @@
 
 import type { Dashboard, ObservedState } from '@/shared/api/types'
 import { similar } from '@/features/console/engine/parse'
+import { ct } from '@/features/console/lib/i18n'
 import { CommandError } from './types'
 
 export interface ResolvedInstance {
@@ -47,18 +48,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function parseSelector(raw: string): Selector {
   const text = raw.trim()
-  if (!text) throw new CommandError('seletor vazio')
+  if (!text) throw new CommandError(ct('m.sel.empty'))
   const at = text.lastIndexOf('@')
   const head = at === -1 ? text : text.slice(0, at)
   const environment = at === -1 ? undefined : text.slice(at + 1)
-  if (environment !== undefined && !environment) throw new CommandError(`ambiente vazio no seletor '${raw}'`)
+  if (environment !== undefined && !environment) throw new CommandError(ct('m.sel.emptyEnv', { raw }))
   const slash = head.indexOf('/')
   const project = slash === -1 ? head : head.slice(0, slash)
   const service = slash === -1 ? undefined : head.slice(slash + 1)
-  if (!project) throw new CommandError(`projeto vazio no seletor '${raw}'`)
-  if (service !== undefined && !service) throw new CommandError(`serviço vazio no seletor '${raw}'`)
+  if (!project) throw new CommandError(ct('m.sel.emptyProject', { raw }))
+  if (service !== undefined && !service) throw new CommandError(ct('m.sel.emptyService', { raw }))
   if (project.toLowerCase() === 'all') {
-    if (service !== undefined) throw new CommandError(`'all' não aceita serviço: use '*/${service}'`)
+    if (service !== undefined) throw new CommandError(ct('m.sel.allNoService', { service }))
     return { raw, all: true, environment }
   }
   return { raw, all: false, project, service, environment }
@@ -109,10 +110,10 @@ function projectCandidates(dashboard: Dashboard, id: string) {
   return p ? [p.display_name, p.name, p.id, p.railway_project_id] : []
 }
 
-function noMatch(kind: string, text: string, pool: string[], scope = ''): CommandError {
+function noMatch(kind: 'project' | 'service' | 'environment', text: string, pool: string[], scope = ''): CommandError {
   const close = similar(text.replace(/\*/g, ''), [...new Set(pool)])
-  const hint = close.length ? ` — semelhantes: ${close.join(', ')}` : pool.length ? '' : ' — nenhum cadastrado'
-  return new CommandError(`nenhum ${kind} '${text}'${scope}${hint}`)
+  const hint = close.length ? ct('m.sel.similar', { list: close.join(', ') }) : pool.length ? '' : ct('m.sel.noneRegistered')
+  return new CommandError(ct('m.sel.noMatch', { kind: ct(`m.sel.kind.${kind}`), text, scope, hint }))
 }
 
 function selectOne(dashboard: Dashboard, all: ResolvedInstance[], s: Selector): ResolvedInstance[] {
@@ -126,15 +127,15 @@ function selectOne(dashboard: Dashboard, all: ResolvedInstance[], s: Selector): 
     const project = s.project
     pool = pool.filter((i) => matches(project, projectCandidates(dashboard, i.projectId)))
     if (pool.length === 0 && !dashboard.projects.some((p) => matches(project, projectCandidates(dashboard, p.project.id)))) {
-      throw noMatch('projeto', project, projectNames(dashboard))
+      throw noMatch('project', project, projectNames(dashboard))
     }
     if (s.service) {
       const service = s.service
       const before = pool
       pool = pool.filter((i) => matches(service, [i.service, i.id]))
       if (pool.length === 0) {
-        const scope = hasWildcard(project) ? '' : ` em ${before[0]?.projectName ?? project}`
-        throw noMatch('serviço', service, before.map((i) => i.service), scope)
+        const scope = hasWildcard(project) ? '' : ct('m.sel.inProject', { name: before[0]?.projectName ?? project })
+        throw noMatch('service', service, before.map((i) => i.service), scope)
       }
     }
   }
@@ -142,9 +143,9 @@ function selectOne(dashboard: Dashboard, all: ResolvedInstance[], s: Selector): 
     const environment = s.environment
     const before = pool
     pool = pool.filter((i) => matches(environment, [i.environment, i.environmentId]))
-    if (pool.length === 0) throw noMatch('ambiente', environment, before.map((i) => i.environment), ` para '${s.raw}'`)
+    if (pool.length === 0) throw noMatch('environment', environment, before.map((i) => i.environment), ct('m.sel.forSelector', { raw: s.raw }))
   }
-  if (pool.length === 0) throw new CommandError(`nenhuma instância gerenciada para '${s.raw}'`)
+  if (pool.length === 0) throw new CommandError(ct('m.sel.noInstance', { raw: s.raw }))
   return pool
 }
 
@@ -154,7 +155,7 @@ export function resolveSelectors(
   selectors: string[],
   options: SelectOptions = {},
 ): ResolvedInstance[] {
-  if (selectors.length === 0) throw new CommandError('informe ao menos um seletor (ex.: all, loja, loja/api@production)')
+  if (selectors.length === 0) throw new CommandError(ct('m.sel.needOne'))
   const all = flatten(dashboard)
   const picked = new Set<string>()
   for (const raw of selectors) for (const i of selectOne(dashboard, all, parseSelector(raw))) picked.add(i.id)
@@ -164,12 +165,12 @@ export function resolveSelectors(
     const env = options.env
     const before = result
     result = result.filter((i) => matches(env, [i.environment, i.environmentId]))
-    if (result.length === 0) throw noMatch('ambiente', env, before.map((i) => i.environment), ' no alvo')
+    if (result.length === 0) throw noMatch('environment', env, before.map((i) => i.environment), ct('m.sel.inTarget'))
   }
   if (options.state) {
     const state = options.state.toLowerCase()
     if (!STATES.includes(state as ObservedState)) {
-      throw new CommandError(`estado inválido: '${options.state}' — use ${STATES.join(', ')}`)
+      throw new CommandError(ct('m.sel.invalidState', { state: options.state, list: STATES.join(', ') }))
     }
     result = result.filter((i) => i.state === state)
   }
@@ -177,7 +178,7 @@ export function resolveSelectors(
     const excluded = new Set(selectOne(dashboard, all, parseSelector(raw)).map((i) => i.id))
     result = result.filter((i) => !excluded.has(i.id))
   }
-  if (result.length === 0) throw new CommandError('nenhuma instância restou no alvo depois dos filtros')
+  if (result.length === 0) throw new CommandError(ct('m.sel.nothingLeft'))
   return result
 }
 
@@ -191,9 +192,9 @@ export function findProject(dashboard: Dashboard, text: string) {
   const found = dashboard.projects.filter(({ project }) =>
     matches(text, [project.display_name, project.name, project.id, project.railway_project_id]),
   )
-  if (found.length === 0) throw noMatch('projeto', text, projectNames(dashboard))
+  if (found.length === 0) throw noMatch('project', text, projectNames(dashboard))
   if (found.length > 1) {
-    throw new CommandError(`'${text}' corresponde a vários projetos: ${found.map((p) => p.project.name).join(', ')}`)
+    throw new CommandError(ct('m.sel.severalProjects', { text, list: found.map((p) => p.project.name).join(', ') }))
   }
   return found[0]
 }

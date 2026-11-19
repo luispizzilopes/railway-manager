@@ -1,0 +1,53 @@
+{
+  "title": "Configurações",
+  "subtitle": "Token usado para falar com a API do Railway.",
+  "tokenCard": "Token do Railway",
+  "status": {
+    "valid": "Válido",
+    "invalid": "Recusado pelo Railway",
+    "undecipherable": "Indecifrável com a chave mestra atual"
+  },
+  "form": {
+    "label": "Token do Railway",
+    "kindLegend": "Tipo de token",
+    "account": "Conta",
+    "workspace": "Workspace (recomendado)",
+    "noProjectTokens": "Tokens de projeto não são suportados: eles valem para um único ambiente e não listam projetos.",
+    "workspaceId": "ID do workspace",
+    "invalidUuid": "Informe um UUID válido.",
+    "token": "Token",
+    "tokenHint": "Validado no Railway e guardado cifrado. Ele não é exibido novamente.",
+    "saved": "Token validado e salvo.",
+    "validating": "Validando…",
+    "replaceToken": "Substituir token",
+    "validateSave": "Validar e salvar"
+  },
+  "theme": {
+    "system": "Seguir o sistema",
+    "light": "Claro",
+    "dark": "Escuro",
+    "appearance": "Aparência",
+    "legend": "Tema"
+  },
+  "info": {
+    "type": "Tipo",
+    "account": "Conta",
+    "workspace": "Workspace",
+    "linkedTo": "Associado a",
+    "token": "Token",
+    "status": "Situação",
+    "validatedAt": "Validado em"
+  },
+  "reactivate": "Cadastre um novo token para reativar a integração.",
+  "inactive": "A integração está inativa: avise um administrador.",
+  "replace": "Substituir",
+  "remove": "Remover",
+  "none": "Nenhum token cadastrado. Peça a um administrador para cadastrá-lo.",
+  "removed": "Token removido.",
+  "removeTitle": "Remover token",
+  "removeMessage": "As operações que dependem do Railway deixam de funcionar até um novo cadastro. Projetos, serviços e histórico locais são mantidos.",
+  "language": {
+    "title": "Idioma",
+    "legend": "Idioma da interface"
+  }
+}

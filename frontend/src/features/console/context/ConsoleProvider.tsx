@@ -8,6 +8,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { api } from '@/shared/api/client'
 import type { Mode } from '@/features/auth/lib/mode'
 import { COMMANDS } from '@/features/console/commands'
+import { ct } from '@/features/console/lib/i18n'
 import { clearInterruptedRestart, peekInterruptedRestart, restartCommand, restartNotice } from '@/features/console/commands/power'
 import { carriesSecret, runLine } from '@/features/console/engine/engine'
 import { browserStore } from '@/features/console/state/store'
@@ -47,7 +48,7 @@ const ConsoleContext = createContext<ConsoleState | null>(null)
 
 export function useConsole(): ConsoleState {
   const value = useContext(ConsoleContext)
-  if (!value) throw new Error('useConsole fora do ConsoleProvider')
+  if (!value) throw new Error(ct('m.prov.outside'))
   return value
 }
 
@@ -145,16 +146,16 @@ export function ConsoleProvider({
           print({ kind: 'input', text: `${question} ${answer ?? ''}` })
           if (answer === null) return false
           const text = answer.trim().toLowerCase()
-          return options?.word ? text === options.word.toLowerCase() : ['s', 'sim', 'y', 'yes'].includes(text)
+          return options?.word ? text === options.word.toLowerCase() : ct('m.prov.yesWords').split(',').includes(text)
         },
         async ask(label) {
           const answer = await ask(label, false, undefined, true)
-          print({ kind: 'input', text: `${label}: ${answer ?? '(cancelado)'}` })
+          print({ kind: 'input', text: `${label}: ${answer ?? ct('m.prov.cancelled')}` })
           return answer?.trim() || null
         },
         async secret(label) {
           const answer = await ask(label, true)
-          print({ kind: 'input', text: `${label}: ${answer ? '••••••••' : '(cancelado)'}` })
+          print({ kind: 'input', text: `${label}: ${answer ? '••••••••' : ct('m.prov.cancelled')}` })
           return answer || null
         },
         signal,

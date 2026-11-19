@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router'
 
 import { api } from '@/shared/api/client'
@@ -12,8 +13,9 @@ import { EmptyState, ErrorState, Skeleton } from '@/shared/ui/Feedback/Feedback'
 import { Input, Select } from '@/shared/ui/Field/Field'
 import { StatusBadge } from '@/shared/ui/StatusBadge/StatusBadge'
 import { Table } from '@/shared/ui/Table/Table'
+import { i18n } from '@/shared/i18n'
 import { useFeedbackMutation } from '@/shared/hooks/useFeedbackMutation'
-import { KIND_LABEL, STATE_LABEL, STATUS_LABEL, formatTime, relativeTime } from '@/shared/lib/format'
+import { KIND_LABEL, STATE_LABEL, STATUS_LABEL, formatDateTime, formatTime, relativeTime } from '@/shared/lib/format'
 import { useSession } from '@/features/auth/lib/session'
 
 /** Intervalo da atualização automática enquanto a tela está aberta. */
@@ -24,6 +26,20 @@ type Segment = { state: ObservedState; count: number }
 type Project = DashboardData['projects'][number]
 
 const SEGMENT_ORDER: ObservedState[] = ['running', 'sleeping', 'transitioning', 'awaiting_approval', 'stopped', 'failed', 'unknown']
+
+/** Texto do alerta no idioma ativo; códigos com dados específicos usam a mensagem do backend. */
+function alertText(alert: DashboardData['alerts'][number], pausedUntil: string | null | undefined): string {
+  switch (alert.code) {
+    case 'no_credential':
+    case 'credential_invalid':
+    case 'credential_undecipherable':
+      return i18n.t(`dashboard:alerts.${alert.code}`)
+    case 'rate_limited':
+      return pausedUntil ? i18n.t('dashboard:alerts.rate_limited', { until: formatDateTime(pausedUntil) }) : alert.message
+    default:
+      return alert.message
+  }
+}
 
 /** Barra segmentada com a proporção de serviços em cada estado. */
 function StateBar({ segments, className = '' }: { segments: Segment[]; className?: string }) {
@@ -49,6 +65,7 @@ function countStates(cards: InstanceCard[]): Segment[] {
 
 /** Resumo de saúde: frase curta, proporção por estado e as contagens do painel. */
 function Summary({ data }: { data: DashboardData }) {
+  const { t } = useTranslation('dashboard')
   const i = data.indicators
   const segments: Segment[] = [
     { state: 'running', count: i.running - i.sleeping },
@@ -60,26 +77,26 @@ function Summary({ data }: { data: DashboardData }) {
   const pct = i.instances > 0 ? Math.round((i.running / i.instances) * 100) : null
   const headline =
     i.instances === 0
-      ? 'Nenhum serviço monitorado'
+      ? t('summary.none')
       : i.failed > 0
-        ? `${i.failed} ${i.failed === 1 ? 'serviço com falha' : 'serviços com falha'}`
-        : `${i.running} de ${i.instances} serviços em operação`
+        ? t('summary.failed', { count: i.failed })
+        : t('summary.operating', { running: i.running, total: i.instances })
   const stats = [
-    { label: 'Projetos', value: i.projects },
-    { label: 'Serviços monitorados', value: i.instances },
-    { label: 'Ativos', value: i.running, note: i.sleeping ? `${i.sleeping} dormindo` : undefined, tone: 'running' },
-    { label: 'Desligados', value: i.stopped },
-    { label: 'Com falha', value: i.failed, tone: i.failed > 0 ? 'alert' : undefined },
-    { label: 'Outros estados', value: i.other },
+    { id: 'projects', label: t('stats.projects'), value: i.projects },
+    { id: 'monitored', label: t('stats.monitored'), value: i.instances },
+    { id: 'active', label: t('stats.active'), value: i.running, note: i.sleeping ? t('summary.sleepingNote', { count: i.sleeping }) : undefined, tone: 'running' },
+    { id: 'stopped', label: t('stats.stopped'), value: i.stopped },
+    { id: 'failed', label: t('stats.failed'), value: i.failed, tone: i.failed > 0 ? 'alert' : undefined },
+    { id: 'other', label: t('stats.other'), value: i.other },
   ]
   return (
-    <section className="card" aria-label="Resumo" data-testid="health-panel">
+    <section className="card" aria-label={t('summary.label')} data-testid="health-panel">
       <div className="summary">
         <div className="summary-top">
           <span className="summary-headline">{headline}</span>
           {pct !== null && (
-            <span className="summary-pct" title="Serviços ativos ou dormindo">
-              <span className="mono">{pct}%</span> em operação
+            <span className="summary-pct" title={t('summary.activeOrSleeping')}>
+              <span className="mono">{pct}%</span> {t('summary.pctOperating')}
             </span>
           )}
         </div>
@@ -96,7 +113,7 @@ function Summary({ data }: { data: DashboardData }) {
       </div>
       <div className="stats">
         {stats.map((s) => (
-          <div className={`stat${s.tone ? ` stat-${s.tone}` : ''}`} key={s.label} data-testid={`stat-${s.label}`}>
+          <div className={`stat${s.tone ? ` stat-${s.tone}` : ''}`} key={s.id} data-testid={`stat-${s.id}`}>
             <div className="stat-label">{s.label}</div>
             <div className="stat-value">{s.value}</div>
             {s.note && <div className="stat-note">{s.note}</div>}
@@ -107,7 +124,7 @@ function Summary({ data }: { data: DashboardData }) {
   )
 }
 
-type Attention = { card: InstanceCard; project: Project['project']; environment: string; reason: string }
+type Attention = { card: InstanceCard; project: Project['project']; environment: string; reason: 'notFound' | 'failed' | 'awaiting_approval' | 'unavailable' | 'stale' }
 
 /** Serviços que exigem atenção, com o motivo em texto. */
 function attentionItems(projects: Project[]): Attention[] {
@@ -116,15 +133,15 @@ function attentionItems(projects: Project[]): Attention[] {
     for (const { environment, instances } of environments) {
       for (const card of instances) {
         const reason = card.not_found
-          ? 'Não encontrado no Railway'
+          ? 'notFound'
           : card.state === 'failed'
-            ? 'Com falha'
+            ? 'failed'
             : card.state === 'awaiting_approval'
-              ? 'Aguardando aprovação'
+              ? 'awaiting_approval'
               : card.freshness === 'unavailable'
-                ? 'Leitura indisponível'
+                ? 'unavailable'
                 : card.freshness === 'stale'
-                  ? 'Leitura desatualizada'
+                  ? 'stale'
                   : null
         if (reason) items.push({ card, project, environment: environment.name, reason })
       }
@@ -144,18 +161,19 @@ function AttentionPanel({
   canOperate: boolean
   onStart: (a: Attention) => void
 }) {
+  const { t } = useTranslation('dashboard')
   if (items.length === 0) {
     return (
       <p className="all-clear">
         <Icon name="check" />
-        Nenhum serviço requer atenção.
+        {t('attention.none')}
       </p>
     )
   }
   return (
-    <section className="card attention" aria-label="Requer atenção">
+    <section className="card attention" aria-label={t('attention.title')}>
       <div className="card-head">
-        <h3>Requer atenção</h3>
+        <h3>{t('attention.title')}</h3>
         <span className="subtle">{items.length}</span>
       </div>
       {items.map((a) => (
@@ -163,15 +181,15 @@ function AttentionPanel({
           <StatusBadge state={a.card.state} freshness={a.card.freshness} />
           <span className="attention-name">{a.card.service_name}</span>
           <span className="subtle">
-            {a.project.display_name ?? a.project.name} · {a.environment} · {a.reason}
+            {a.project.display_name ?? a.project.name} · {a.environment} · {t(`attention.${a.reason}`)}
           </span>
           <span className="spacer" />
           {canOperate && a.card.state === 'failed' && !a.card.not_found && !a.card.busy ? (
             <Button size="sm" disabled={!ready} onClick={() => onStart(a)}>
-              Iniciar
+              {t('attention.start')}
             </Button>
           ) : (
-            <Link to={`/projects/${a.project.id}`}>Ver projeto</Link>
+            <Link to={`/projects/${a.project.id}`}>{t('attention.viewProject')}</Link>
           )}
         </div>
       ))}
@@ -191,6 +209,7 @@ export function InstanceRow({
   readOnly?: boolean
   onAction: (kind: PowerKind) => void
 }) {
+  const { t } = useTranslation('dashboard')
   const off = card.state === 'stopped' || card.state === 'failed'
   return (
     <tr className={`instance-row row-${card.state}`} data-testid="instance-row" data-freshness={card.freshness}>
@@ -202,17 +221,17 @@ export function InstanceRow({
       </td>
       <td>
         {card.not_found ? (
-          <span className="freshness freshness-unavailable">Não encontrado no Railway</span>
+          <span className="freshness freshness-unavailable">{t('row.notFound')}</span>
         ) : (
           <FreshnessNote freshness={card.freshness} observedAt={card.last_observed_at} error={card.last_sync_error} />
         )}
       </td>
       <td className="actions">
         {card.busy ? (
-          <span className="subtle">operação em andamento</span>
+          <span className="subtle">{t('row.busy')}</span>
         ) : readOnly ? null : (
           <Button size="sm" disabled={disabled || card.not_found} onClick={() => onAction(off ? 'start' : 'stop')}>
-            {off ? 'Iniciar' : 'Desligar'}
+            {off ? t('row.start') : t('row.stop')}
           </Button>
         )}
       </td>
@@ -221,9 +240,10 @@ export function InstanceRow({
 }
 
 function ProjectSummary({ cards }: { cards: InstanceCard[] }) {
+  const { t } = useTranslation('dashboard')
   const running = cards.filter((c) => c.state === 'running' || c.state === 'sleeping').length
   return (
-    <span className="project-summary" title={`${running} de ${cards.length} em operação`}>
+    <span className="project-summary" title={t('inOperation', { running, total: cards.length })}>
       <StateBar segments={countStates(cards)} className="statebar-sm" />
       <span className="mono">
         {running}/{cards.length}
@@ -235,6 +255,7 @@ function ProjectSummary({ cards }: { cards: InstanceCard[] }) {
 const STATE_FILTERS: ObservedState[] = ['running', 'sleeping', 'stopped', 'transitioning', 'failed', 'awaiting_approval', 'unknown']
 
 export function Dashboard() {
+  const { t } = useTranslation('dashboard')
   const queryClient = useQueryClient()
   const canOperate = useSession().can('operator')
   const [flow, setFlow] = useState<Flow | null>(null)
@@ -267,7 +288,7 @@ export function Dashboard() {
   })
   const refresh = useFeedbackMutation({
     mutationFn: api.refresh,
-    success: 'Estados atualizados.',
+    success: t('refreshed'),
     invalidate: [['dashboard']],
   })
 
@@ -319,20 +340,19 @@ export function Dashboard() {
     <>
       <div className="page-head">
         <div>
-          <h1>Visão geral</h1>
+          <h1>{t('title')}</h1>
           <p className="muted">
             {data ? (
               <span className={`live${paused ? ' live-paused' : ''}`}>
                 <span className="live-dot" aria-hidden="true" />
-                {paused ? 'Atualização pausada (cota do Railway)' : 'Atualização automática'} · atualizado {relativeTime(data.generated_at)}
+                {t('live.updated', { mode: paused ? t('live.paused') : t('live.auto'), when: relativeTime(data.generated_at) })}
               </span>
             ) : (
-              'Carregando…'
+              t('loading')
             )}
             {data?.rate_limit.remaining != null && data.rate_limit.limit != null && (
               <span className="subtle">
-                {' '}
-                · cota do Railway: {data.rate_limit.remaining}/{data.rate_limit.limit}
+                {t('live.quota', { remaining: data.rate_limit.remaining, limit: data.rate_limit.limit })}
               </span>
             )}
           </p>
@@ -340,7 +360,7 @@ export function Dashboard() {
         <div className="row">
           {canOperate && selected.length > 0 && (
             <>
-              <span className="subtle">{selected.length} projeto(s) selecionado(s)</span>
+              <span className="subtle">{t('selected', { count: selected.length })}</span>
               {(['start', 'stop'] as const).map((kind) => (
                 <Button
                   key={kind}
@@ -349,19 +369,19 @@ export function Dashboard() {
                     setFlow({
                       kind,
                       target: { type: 'batch', project_ids: selected },
-                      title: `${KIND_LABEL[kind]} projetos selecionados`,
+                      title: t('kindProjects', { kind: KIND_LABEL[kind] }),
                       confirm: true,
                     })
                   }
                 >
-                  {KIND_LABEL[kind]} selecionados
+                  {t('kindSelected', { kind: KIND_LABEL[kind] })}
                 </Button>
               ))}
             </>
           )}
           {canOperate && (
             <Button variant="primary" onClick={() => refresh.mutate()} loading={refresh.isPending} disabled={!ready}>
-              Atualizar estados
+              {t('refresh')}
             </Button>
           )}
         </div>
@@ -372,15 +392,15 @@ export function Dashboard() {
         {data?.alerts.map((a) => (
           <div key={a.code + a.message} className={a.code === 'rate_limited' ? 'alert alert-warn' : 'alert alert-danger'} role="alert">
             <span>
-              {a.message}{' '}
-              {(a.code === 'no_credential' || a.code.startsWith('credential')) && <Link to="/settings">Configurar token</Link>}
+              {alertText(a, data.rate_limit.paused_until)}{' '}
+              {(a.code === 'no_credential' || a.code.startsWith('credential')) && <Link to="/settings">{t('alerts.configure')}</Link>}
             </span>
           </div>
         ))}
 
         {dashboard.isPending && (
           <div className="card">
-            <Skeleton lines={5} label="Carregando a visão geral…" />
+            <Skeleton lines={5} label={t('loadingOverview')} />
           </div>
         )}
 
@@ -394,7 +414,7 @@ export function Dashboard() {
                 setFlow({
                   kind: 'start',
                   target: { type: 'instance', instance_id: card.id },
-                  title: `Iniciar ${card.service_name} (${environment}) — ${project.display_name ?? project.name}`,
+                  title: t('attention.startTitle', { service: card.service_name, environment, project: project.display_name ?? project.name }),
                   confirm: false,
                 })
               }
@@ -407,14 +427,14 @@ export function Dashboard() {
       {data && data.projects.length === 0 && (
         <div className="card" style={{ marginTop: 'var(--space-4)' }}>
           <EmptyState
-            title="Nenhum projeto gerenciado"
+            title={t('empty.title')}
             action={
               <Link to="/projects" className="btn btn-primary">
-                Importar projetos
+                {t('empty.import')}
               </Link>
             }
           >
-            Importe projetos da sua conta do Railway para começar.
+            {t('empty.body')}
           </EmptyState>
         </div>
       )}
@@ -423,29 +443,29 @@ export function Dashboard() {
         <div className="toolbar" role="search" style={{ margin: 'var(--space-5) 0 var(--space-3)' }}>
           <Input
             type="search"
-            aria-label="Buscar serviço"
-            placeholder="Buscar serviço…"
+            aria-label={t('filters.searchLabel')}
+            placeholder={t('filters.searchPlaceholder')}
             value={query}
             onChange={(e) => setFilter('q', e.target.value)}
           />
-          <Select aria-label="Filtrar por estado" value={stateFilter} onChange={(e) => setFilter('estado', e.target.value)}>
-            <option value="">Todos os estados</option>
+          <Select aria-label={t('filters.state')} value={stateFilter} onChange={(e) => setFilter('estado', e.target.value)}>
+            <option value="">{t('filters.allStates')}</option>
             {STATE_FILTERS.map((st) => (
               <option key={st} value={st}>
                 {STATE_LABEL[st]}
               </option>
             ))}
           </Select>
-          <Select aria-label="Filtrar por projeto" value={projectFilter} onChange={(e) => setFilter('projeto', e.target.value)}>
-            <option value="">Todos os projetos</option>
+          <Select aria-label={t('filters.project')} value={projectFilter} onChange={(e) => setFilter('projeto', e.target.value)}>
+            <option value="">{t('filters.allProjects')}</option>
             {data.projects.map(({ project }) => (
               <option key={project.id} value={project.id}>
                 {project.display_name ?? project.name}
               </option>
             ))}
           </Select>
-          <Select aria-label="Filtrar por ambiente" value={envFilter} onChange={(e) => setFilter('ambiente', e.target.value)}>
-            <option value="">Todos os ambientes</option>
+          <Select aria-label={t('filters.environment')} value={envFilter} onChange={(e) => setFilter('ambiente', e.target.value)}>
+            <option value="">{t('filters.allEnvironments')}</option>
             {environmentNames.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -454,11 +474,11 @@ export function Dashboard() {
           </Select>
           {filtering && (
             <Button variant="ghost" onClick={() => setParams({}, { replace: true })}>
-              Limpar filtros
+              {t('filters.clear')}
             </Button>
           )}
           <span className="toolbar-count" aria-live="polite">
-            {filtering ? `${matches} ${matches === 1 ? 'serviço encontrado' : 'serviços encontrados'}` : `${matches} ${matches === 1 ? 'serviço' : 'serviços'}`}
+            {filtering ? t('filters.found', { count: matches }) : t('filters.count', { count: matches })}
           </span>
         </div>
       )}
@@ -466,10 +486,10 @@ export function Dashboard() {
       {data && data.projects.length > 0 && filtering && visible.length === 0 && (
         <div className="card">
           <EmptyState
-            title="Nenhum serviço encontrado"
-            action={<Button onClick={() => setParams({}, { replace: true })}>Limpar filtros</Button>}
+            title={t('filters.noneTitle')}
+            action={<Button onClick={() => setParams({}, { replace: true })}>{t('filters.clear')}</Button>}
           >
-            Nenhum serviço corresponde aos filtros aplicados.
+            {t('filters.noneBody')}
           </EmptyState>
         </div>
       )}
@@ -480,7 +500,7 @@ export function Dashboard() {
             {canOperate && (
               <input
                 type="checkbox"
-                aria-label={`Selecionar ${project.display_name ?? project.name}`}
+                aria-label={t('card.select', { name: project.display_name ?? project.name })}
                 checked={selected.includes(project.id)}
                 onChange={() => toggle(project.id)}
               />
@@ -488,10 +508,10 @@ export function Dashboard() {
             <h3>
               <Link to={`/projects/${project.id}`}>{project.display_name ?? project.name}</Link>
             </h3>
-            {project.sync_status === 'not_found' && <span className="result result-failed">não encontrado no Railway</span>}
+            {project.sync_status === 'not_found' && <span className="result result-failed">{t('card.notFound')}</span>}
             {next_action && (
               <span className="next-action" data-testid="next-action">
-                Próxima: {KIND_LABEL[next_action.action]} às {formatTime(next_action.at)} ·{' '}
+                {t('card.next', { kind: KIND_LABEL[next_action.action], time: formatTime(next_action.at) })}
                 <Link to="/schedules">{next_action.schedule_name}</Link>
               </span>
             )}
@@ -506,28 +526,28 @@ export function Dashboard() {
                   setFlow({
                     kind,
                     target: { type: 'project', project_id: project.id },
-                    title: `${KIND_LABEL[kind]} todos — ${project.display_name ?? project.name}`,
+                    title: t('row.allTitle', { kind: KIND_LABEL[kind], project: project.display_name ?? project.name }),
                     confirm: true,
                   })
                 }
               >
-                {kind === 'start' ? 'Iniciar todos' : 'Desligar todos'}
+                {kind === 'start' ? t('row.startAll') : t('row.stopAll')}
               </Button>
             ))}
           </div>
           {environments.length === 0 && (
             <div className="card-body muted">
-              Nenhum serviço gerenciado. <Link to={`/projects/${project.id}`}>Importar serviços</Link>
+              {t('card.noServices')}<Link to={`/projects/${project.id}`}>{t('card.importServices')}</Link>
             </div>
           )}
           {environments.length > 0 && (
-            <Table label={`Serviços de ${project.display_name ?? project.name}`} className="table-services">
+            <Table label={t('card.servicesOf', { name: project.display_name ?? project.name })} className="table-services">
               <thead>
                 <tr>
-                  <th>Serviço</th>
-                  <th>Estado</th>
-                  <th>Leitura</th>
-                  <th className="actions">Ações</th>
+                  <th>{t('table.service')}</th>
+                  <th>{t('table.state')}</th>
+                  <th>{t('table.reading')}</th>
+                  <th className="actions">{t('table.actions')}</th>
                 </tr>
               </thead>
               {environments.map(({ environment, instances }) => (
@@ -547,7 +567,7 @@ export function Dashboard() {
                         setFlow({
                           kind,
                           target: { type: 'instance', instance_id: card.id },
-                          title: `${KIND_LABEL[kind]} ${card.service_name} (${environment.name})`,
+                          title: t('row.actionTitle', { kind: KIND_LABEL[kind], service: card.service_name, environment: environment.name }),
                           confirm: false,
                         })
                       }
@@ -563,18 +583,18 @@ export function Dashboard() {
       {data && data.recent_operations.length > 0 && (
         <section className="card" style={{ marginTop: 'var(--space-5)' }}>
           <div className="card-head">
-            <h3>Últimas operações</h3>
+            <h3>{t('recent.title')}</h3>
             <span className="spacer" />
-            <Link to="/history">Ver histórico</Link>
+            <Link to="/history">{t('recent.history')}</Link>
           </div>
-          <Table label="Últimas operações">
+          <Table label={t('recent.title')}>
             <thead>
               <tr>
-                <th>Quando</th>
-                <th>Tipo</th>
-                <th>Projetos</th>
-                <th>Resultado</th>
-                <th className="num">Itens</th>
+                <th>{t('recent.when')}</th>
+                <th>{t('recent.type')}</th>
+                <th>{t('recent.projects')}</th>
+                <th>{t('recent.result')}</th>
+                <th className="num">{t('recent.items')}</th>
               </tr>
             </thead>
             <tbody>
@@ -588,7 +608,7 @@ export function Dashboard() {
                   </td>
                   <td className="num">
                     {s.succeeded}✓ {s.failed > 0 && `${s.failed}✗ `}
-                    {s.skipped > 0 && `${s.skipped} ignorado(s)`}
+                    {s.skipped > 0 && t('recent.skipped', { count: s.skipped })}
                   </td>
                 </tr>
               ))}

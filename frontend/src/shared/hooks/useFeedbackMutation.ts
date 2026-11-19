@@ -1,5 +1,6 @@
 import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { errorMessage } from '@/shared/i18n/errors'
 import { useToast } from '@/shared/ui/Toast/Toast'
 
 /** Mutation com o feedback padrão: aviso de sucesso/erro e atualização das consultas afetadas.
@@ -24,6 +25,6 @@ export function useFeedbackMutation<Data, Vars = void>({
       onSuccess?.(data, vars)
       await Promise.all(invalidate.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : 'Não foi possível concluir a ação.'),
+    onError: (error) => toast.error(errorMessage(error)),
   })
 }

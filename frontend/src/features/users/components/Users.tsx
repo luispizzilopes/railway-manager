@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 
 import { api } from '@/shared/api/client'
 import type { AssignableRole, ManagedUser } from '@/shared/api/types'
@@ -10,25 +11,21 @@ import { Button } from '@/shared/ui/Button/Button'
 import { EmptyState, ErrorState, Skeleton } from '@/shared/ui/Feedback/Feedback'
 import { Field, Input, Select } from '@/shared/ui/Field/Field'
 import { Table } from '@/shared/ui/Table/Table'
+import { errorMessage } from '@/shared/i18n/errors'
 import { useFeedbackMutation } from '@/shared/hooks/useFeedbackMutation'
 import { relativeTime } from '@/shared/lib/format'
-import { ROLE_LABEL, useSession } from '@/features/auth/lib/session'
+import { roleLabel, useSession } from '@/features/auth/lib/session'
 
 const ROLES: AssignableRole[] = ['viewer', 'operator', 'admin']
 
-const ROLE_HINT: Record<AssignableRole, string> = {
-  viewer: 'Só consulta: visão geral, projetos, agendas, histórico e logs.',
-  operator: 'Também liga e desliga serviços, atualiza estados e pausa/retoma agendas.',
-  admin: 'Também gerencia projetos, serviços, agendas e o token do Railway.',
-}
-
 function CreateUserForm({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation('users')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<AssignableRole>('viewer')
   const create = useFeedbackMutation({
     mutationFn: () => api.createUser({ username: username.trim(), password, role }),
-    success: 'Usuário criado.',
+    success: t('create.done'),
     invalidate: [['users']],
     onSuccess: onDone,
   })
@@ -39,23 +36,23 @@ function CreateUserForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form className="stack" onSubmit={submit} aria-label="Novo usuário">
-      <Field label="Usuário" hint="De 3 a 32 caracteres: letras, números, '.', '_' ou '-'.">
+    <form className="stack" onSubmit={submit} aria-label={t('create.label')}>
+      <Field label={t('create.username')} hint={t('create.usernameHint')}>
         {(p) => (
           <Input {...p} value={username} autoComplete="off" autoCapitalize="none" onChange={(e) => setUsername(e.target.value)} required autoFocus />
         )}
       </Field>
-      <Field label="Senha" hint="Ao menos 8 caracteres.">
+      <Field label={t('create.password')} hint={t('create.passwordHint')}>
         {(p) => (
           <Input {...p} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
         )}
       </Field>
-      <Field label="Papel" hint={ROLE_HINT[role]}>
+      <Field label={t('create.role')} hint={t(`hint.${role}`)}>
         {(p) => (
           <Select {...p} value={role} onChange={(e) => setRole(e.target.value as AssignableRole)}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
-                {ROLE_LABEL[r]}
+                {roleLabel(r)}
               </option>
             ))}
           </Select>
@@ -63,46 +60,48 @@ function CreateUserForm({ onDone }: { onDone: () => void }) {
       </Field>
       <div className="row">
         <Button variant="primary" type="submit" loading={create.isPending} disabled={username.trim().length < 3 || password.length < 8}>
-          Criar usuário
+          {t('create.submit')}
         </Button>
-        <Button onClick={onDone}>Cancelar</Button>
+        <Button onClick={onDone}>{t('ui.cancel', { ns: 'common' })}</Button>
       </div>
     </form>
   )
 }
 
 function PasswordForm({ user, onDone }: { user: ManagedUser; onDone: () => void }) {
+  const { t } = useTranslation('users')
   const [password, setPassword] = useState('')
   const reset = useFeedbackMutation({
     mutationFn: () => api.setUserPassword(user.id, password),
-    success: 'Senha redefinida; as sessões do usuário foram encerradas.',
+    success: t('password.done'),
     onSuccess: onDone,
   })
   return (
     <form
       className="stack"
-      aria-label={`Nova senha de ${user.username}`}
+      aria-label={t('password.label', { user: user.username })}
       onSubmit={(e) => {
         e.preventDefault()
         reset.mutate()
       }}
     >
-      <Field label="Nova senha" hint="Ao menos 8 caracteres.">
+      <Field label={t('password.field')} hint={t('create.passwordHint')}>
         {(p) => (
           <Input {...p} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoFocus />
         )}
       </Field>
       <div className="row">
         <Button variant="primary" type="submit" loading={reset.isPending} disabled={password.length < 8}>
-          Redefinir senha
+          {t('password.submit')}
         </Button>
-        <Button onClick={onDone}>Cancelar</Button>
+        <Button onClick={onDone}>{t('ui.cancel', { ns: 'common' })}</Button>
       </div>
     </form>
   )
 }
 
 export function Users() {
+  const { t } = useTranslation('users')
   const { can } = useSession()
   const users = useQuery({ queryKey: ['users'], queryFn: api.users, enabled: can('master') })
   const [creating, setCreating] = useState(false)
@@ -110,50 +109,50 @@ export function Users() {
   const [removing, setRemoving] = useState<ManagedUser | null>(null)
   const update = useFeedbackMutation({
     mutationFn: (v: { id: string; role?: AssignableRole; is_active?: boolean }) => api.updateUser(v.id, { role: v.role, is_active: v.is_active }),
-    success: 'Usuário atualizado.',
+    success: t('updated'),
     invalidate: [['users']],
   })
   const remove = useFeedbackMutation({
     mutationFn: (id: string) => api.removeUser(id),
-    success: 'Usuário removido.',
+    success: t('removed'),
     invalidate: [['users']],
     onSuccess: () => setRemoving(null),
   })
 
-  if (!can('master')) return <p className="muted">Somente o usuário master gerencia usuários.</p>
+  if (!can('master')) return <p className="muted">{t('denied')}</p>
   const list = users.data?.users ?? []
 
   return (
     <>
       <div className="page-head">
         <div>
-          <h1>Usuários</h1>
-          <p className="muted">Quem pode entrar e o que cada pessoa pode fazer.</p>
+          <h1>{t('title')}</h1>
+          <p className="muted">{t('subtitle')}</p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
-          Novo usuário
+          {t('new')}
         </Button>
       </div>
       <ErrorState error={users.error ?? update.error} onRetry={() => void users.refetch()} />
       {users.isPending && (
         <div className="card">
-          <Skeleton lines={3} label="Carregando usuários…" />
+          <Skeleton lines={3} label={t('loading')} />
         </div>
       )}
       {users.data && list.length === 0 && (
         <div className="card">
-          <EmptyState title="Nenhum usuário cadastrado">Crie usuários para dar acesso à equipe com o papel certo.</EmptyState>
+          <EmptyState title={t('emptyTitle')}>{t('emptyBody')}</EmptyState>
         </div>
       )}
       {list.length > 0 && (
         <div className="card">
-          <Table label="Usuários">
+          <Table label={t('table')}>
             <thead>
               <tr>
-                <th>Usuário</th>
-                <th>Papel</th>
-                <th>Situação</th>
-                <th>Criado</th>
+                <th>{t('user')}</th>
+                <th>{t('role')}</th>
+                <th>{t('status')}</th>
+                <th>{t('created')}</th>
                 <th />
               </tr>
             </thead>
@@ -163,7 +162,7 @@ export function Users() {
                   <td>{u.username}</td>
                   <td>
                     <Select
-                      aria-label={`Papel de ${u.username}`}
+                      aria-label={t('roleOf', { user: u.username })}
                       value={u.role}
                       disabled={update.isPending}
                       style={{ width: 'auto' }}
@@ -171,25 +170,25 @@ export function Users() {
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>
-                          {ROLE_LABEL[r]}
+                          {roleLabel(r)}
                         </option>
                       ))}
                     </Select>
                   </td>
                   <td>
-                    <span className={u.is_active ? 'result result-succeeded' : 'result result-skipped'}>{u.is_active ? 'Ativo' : 'Inativo'}</span>
+                    <span className={u.is_active ? 'result result-succeeded' : 'result result-skipped'}>{u.is_active ? t('active') : t('inactive')}</span>
                   </td>
                   <td>{relativeTime(u.created_at)}</td>
                   <td className="num">
                     <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
                       <Button size="sm" disabled={update.isPending} onClick={() => update.mutate({ id: u.id, is_active: !u.is_active })}>
-                        {u.is_active ? 'Desativar' : 'Ativar'}
+                        {u.is_active ? t('deactivate') : t('activate')}
                       </Button>
                       <Button size="sm" onClick={() => setResetting(u)}>
-                        Redefinir senha
+                        {t('resetPassword')}
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => setRemoving(u)}>
-                        Remover
+                        {t('remove')}
                       </Button>
                     </div>
                   </td>
@@ -200,27 +199,27 @@ export function Users() {
         </div>
       )}
       {creating && (
-        <Modal title="Novo usuário" onClose={() => setCreating(false)}>
+        <Modal title={t('create.label')} onClose={() => setCreating(false)}>
           <CreateUserForm onDone={() => setCreating(false)} />
         </Modal>
       )}
       {resetting && (
-        <Modal title={`Redefinir senha de ${resetting.username}`} onClose={() => setResetting(null)}>
+        <Modal title={t('password.title', { user: resetting.username })} onClose={() => setResetting(null)}>
           <PasswordForm user={resetting} onDone={() => setResetting(null)} />
         </Modal>
       )}
       {removing && (
         <ConfirmDialog
-          title="Remover usuário"
+          title={t('removeTitle')}
           message={
             <p>
-              Remover <strong>{removing.username}</strong>? As sessões abertas são encerradas e o histórico de operações continua com o nome.
+              <Trans t={t} i18nKey="removeMessage" values={{ user: removing.username }} components={{ 1: <strong /> }} />
             </p>
           }
-          confirmLabel="Remover"
+          confirmLabel={t('remove')}
           danger
           busy={remove.isPending}
-          error={remove.error?.message}
+          error={remove.error ? errorMessage(remove.error) : undefined}
           onConfirm={() => remove.mutate(removing.id)}
           onClose={() => setRemoving(null)}
         />

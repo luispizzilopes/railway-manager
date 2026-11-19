@@ -1202,6 +1202,26 @@ alias fimdodia="stop all --except infra -y"
 alias bomdia="start all --env production -y"
 ```
 
+### `language`
+
+Mostra ou troca o idioma da interface (guardado neste navegador).
+
+```
+language [idioma]
+```
+
+Também: `idioma`, `lang`.
+
+| Argumento | Descrição |
+| --- | --- |
+| `<idioma>` (opcional) | pt-BR ou en; sem argumento, mostra o idioma atual |
+
+```
+language
+language en
+idioma pt-BR
+```
+
 ### `unalias`
 
 Remove um apelido.

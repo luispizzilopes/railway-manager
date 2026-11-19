@@ -18,6 +18,10 @@
       } catch (e) {
         document.documentElement.dataset.theme = 'light'
       }
+      // Idioma salvo no <html lang> antes da primeira pintura (a regra completa fica em src/shared/i18n).
+      try {
+        if (localStorage.getItem('rm:lang') === 'en') document.documentElement.lang = 'en'
+      } catch (e) {}
     </script>
     <title>Railway Manager</title>
   </head>
