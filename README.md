@@ -319,7 +319,12 @@ backend/                 Cargo workspace
   crates/infrastructure  Railway (GraphQL validado em compilação), SQLite, criptografia
   crates/api             HTTP (Axum)
   crates/server          binário, configuração e composição
+  (cada crate agrupa seus módulos por contexto: access, catalog, operations, scheduling)
 frontend/                React + TypeScript + Vite
+  src/app                bootstrap, rotas e layout
+  src/features/<tela>    cada funcionalidade: telas, hooks, testes e CSS
+  src/shared             cliente de API, componentes de UI e utilitários
+  src/styles             camadas, tokens e base
 docs/adr/                decisões de arquitetura
 openspec/                especificação (proposta, design, specs, tarefas)
 ```

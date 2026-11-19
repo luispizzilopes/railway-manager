@@ -1,0 +1,227 @@
+/* ---------- visão geral ---------- */
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.live-paused .live-dot {
+  background: var(--warn);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.summary-top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.summary-headline {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.summary-pct {
+  margin-left: auto;
+  color: var(--text-2);
+  font-size: var(--text-md);
+}
+
+.summary-pct .mono {
+  color: var(--text);
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+
+.statebar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.statebar-sm {
+  width: 72px;
+  height: 6px;
+}
+
+.statebar-seg {
+  min-width: 3px;
+  background: var(--idle);
+}
+
+.statebar-empty {
+  background: var(--border);
+}
+
+.seg-running {
+  background: var(--ok);
+}
+
+.seg-sleeping {
+  background: var(--info);
+}
+
+.seg-stopped {
+  background: var(--border-strong);
+}
+
+.seg-transitioning,
+.seg-awaiting_approval {
+  background: var(--warn);
+}
+
+.seg-failed {
+  background: var(--fail);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-md);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-label {
+  color: var(--text-2);
+}
+
+.legend-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--idle);
+}
+
+.dot-running {
+  background: var(--ok);
+}
+
+.dot-sleeping {
+  background: var(--info);
+}
+
+.dot-stopped {
+  background: var(--border-strong);
+}
+
+.dot-failed {
+  background: var(--fail);
+}
+
+/* Divisórias por `gap` sobre o fundo: continuam certas quando as métricas quebram de linha. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1px;
+  border-top: 1px solid var(--border);
+  background: var(--border);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+}
+
+.stat-label {
+  order: 0;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.stat-value {
+  order: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-note {
+  order: 2;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+
+.stat-running .stat-value {
+  color: var(--ok);
+}
+
+.stat-alert .stat-value {
+  color: var(--fail);
+}
+
+.attention {
+  border-color: color-mix(in oklab, var(--fail) 40%, var(--border));
+}
+
+.attention .card-head {
+  background: color-mix(in oklab, var(--fail) 8%, var(--surface));
+}
+
+.attention-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--row-h);
+  padding: var(--space-1) var(--space-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--text-md);
+  flex-wrap: wrap;
+}
+
+.attention-item:first-of-type {
+  border-top: 0;
+}
+
+.attention-name {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.all-clear {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-md);
+}
+
+.all-clear .icon {
+  color: var(--ok);
+}
+

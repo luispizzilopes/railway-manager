@@ -1,7 +1,18 @@
 @layer reset, tokens, base, components, pages, utilities;
 
+/* A ordem dos imports define a cascata dentro de cada camada: não reordene. */
 @import './tokens.css' layer(tokens);
 @import './base.css' layer(base);
-@import './pages.css' layer(pages);
-@import './console.css' layer(pages);
-@import './logs.css' layer(pages);
+
+/* CSS de cada tela/componente fica ao lado dele; este arquivo só fixa a ordem. */
+@import '../app/layout.css' layer(pages);
+@import '../features/dashboard/dashboard.css' layer(pages);
+@import '../features/projects/projects.css' layer(pages);
+@import '../features/auth/auth.css' layer(pages);
+@import '../shared/components/CommandPalette.css' layer(pages);
+@import '../app/mobile.css' layer(pages);
+@import '../features/history/history.css' layer(pages);
+@import '../shared/components/OperationFlow.css' layer(pages);
+@import '../features/projects/services-table.css' layer(pages);
+@import '../features/console/console.css' layer(pages);
+@import '../features/logs/logs.css' layer(pages);

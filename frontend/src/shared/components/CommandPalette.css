@@ -1,0 +1,72 @@
+/* ---------- paleta de comandos ---------- */
+
+.palette {
+  align-self: start;
+  margin-top: 12vh;
+  width: min(560px, calc(100vw - 2 * var(--space-4)));
+  max-height: 60vh;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+
+.palette[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.palette::backdrop {
+  background: oklch(0.1 0.01 255 / 0.45);
+}
+
+.palette-input {
+  height: 48px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-lg);
+  outline: none;
+}
+
+.palette-list {
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  overflow-y: auto;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.palette-item[aria-selected='true'] {
+  background: var(--accent-soft);
+}
+
+.palette-item .hint {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+
+.palette-empty {
+  padding: var(--space-4);
+  color: var(--text-2);
+  text-align: center;
+}
+

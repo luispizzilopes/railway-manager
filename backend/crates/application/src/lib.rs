@@ -1,17 +1,19 @@
 //! Casos de uso e portas (traits) implementadas pela infraestrutura.
+//!
+//! Os casos de uso ficam agrupados por contexto e são reexportados na raiz, então
+//! `application::power` e `application::operations::power` são o mesmo caminho.
 
-pub mod credentials;
-pub mod dashboard;
+pub mod access;
+pub mod catalog;
 pub mod error;
-pub mod history;
-pub mod inventory;
-pub mod logs;
+pub mod operations;
 pub mod ports;
-pub mod power;
-pub mod projects;
 pub mod railway;
-pub mod scheduled_actions;
-pub mod schedules;
+pub mod scheduling;
 #[cfg(any(test, feature = "testkit"))]
 pub mod testkit;
-pub mod users;
+
+pub use access::{credentials, users};
+pub use catalog::{dashboard, inventory, logs, projects};
+pub use operations::{history, power};
+pub use scheduling::{scheduled_actions, schedules};

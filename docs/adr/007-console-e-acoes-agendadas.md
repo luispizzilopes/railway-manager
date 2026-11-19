@@ -17,7 +17,7 @@ de UI.
 ## Decisão
 
 1. **Console renderizado em React, no cliente.** É um registro declarativo de comandos
-   (`frontend/src/console/commands`), a fonte única para o parser, a execução, o autocompletar,
+   (`frontend/src/features/console/commands`), a fonte única para o parser, a execução, o autocompletar,
    o `help` e a referência em `docs/console.md`. Um teste compara o registro e o documento
    nos dois sentidos.
 2. **Seletores resolvidos no cliente** sobre `GET /api/dashboard`, relida antes de cada

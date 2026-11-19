@@ -30,6 +30,11 @@ backend/crates/server          binário: configuração, wiring, migrações,
                                serviço do frontend estático
 ```
 
+Dentro de `domain` e `application`, os módulos são agrupados por contexto (`access`,
+`catalog`, `operations`, `scheduling`) e reexportados na raiz da crate, então caminhos como
+`domain::schedule` e `application::power` continuam válidos. No `api`, as rotas ficam em
+`routes/`, um módulo por assunto.
+
 Direção das dependências (somente para baixo):
 
 ```

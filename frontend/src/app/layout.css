@@ -1,0 +1,198 @@
+/* ---------- estrutura da aplicação ---------- */
+
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.side {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+}
+
+.side-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  flex: none;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.brand-name span {
+  margin-left: 4px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+}
+
+.nav-label {
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text-2);
+  font-size: var(--text-md);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.nav a:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.nav a[aria-current='page'] {
+  background: var(--surface-active);
+  color: var(--text);
+}
+
+.nav a[aria-current='page'] .icon {
+  color: var(--accent-text);
+}
+
+.side-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.side-foot .btn {
+  width: 100%;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  color: var(--text-2);
+}
+
+.content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-6);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.topnav-brand {
+  display: none;
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.topnav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cmdbar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 30px;
+  width: min(360px, 40vw);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-3);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.cmdbar:hover {
+  color: var(--text-2);
+}
+
+.cmdbar span {
+  flex: 1;
+  text-align: left;
+}
+
+kbd {
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+
+.main {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-6) var(--space-7);
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.page-head .muted {
+  margin-top: 2px;
+  font-size: var(--text-md);
+}
+
+.page-head .crumb {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.page-head .crumb a {
+  color: var(--text-3);
+  text-decoration: none;
+}
+
+.page-head .crumb a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
